@@ -97,11 +97,10 @@ class NodeData(dict):
     rela_ids = typed_property("relaIds", list, False)
     omitted_devices = typed_property("omittedDevices", list, False)
 
-    def __init__(self, metric_name, device_label, method_type, relate_device_labels=None, omitted_devices=None):
+    def __init__(self, metric_name, device_label, method_type, server_ip="localhost", relate_device_labels=None, omitted_devices=None):
         super().__init__()
         # device_label: 1
         sys_id = device_label
-        server_ip = "localhost"
         self.object_id = str(sys_id)
         self.server_ip = server_ip
         self.device_info = f"rank_{device_label}"

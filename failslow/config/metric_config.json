@@ -1,0 +1,212 @@
+{
+  "HcclAllGather": {
+    "metric_type": "device",
+    "aggregation": {
+      "during_s": 3,
+      "funcs": [
+        {
+          "func": "percentile",
+          "func_params": {
+            "q": 90
+          }
+        }
+      ]
+    },
+    "priority": 20,
+    "alarm_filter_window_size": 5,
+    "space_detector": {
+      "dist_metric": "euclidean",
+      "eps": 0.4,
+      "cv_threshold": 0.03,
+      "min_samples": 2,
+      "window_size": 22,
+      "scaling": false,
+      "type": "SlidingWindowDBSCAN"
+    },
+    "time_detector": {
+      "alarm_filter_window_size": 5,
+      "preprocess_eps": 0.1,
+      "preprocess_min_samples": 10,
+      "type": "SlidingWindowKSigmaDetector",
+      "n_sigma_method": {
+        "type": "SlidingWindowNSigma",
+        "training_window_size": 20,
+        "min_update_window_size": 10,
+        "min_std_val": 0.0001,
+        "bias": 0.1,
+        "abs_bias": null,
+        "nsigma_coefficient": 4,
+        "detect_type": "upper_bound",
+        "min_expert_lower_bound": null,
+        "max_expert_lower_bound": null,
+        "min_expert_upper_bound": null,
+        "max_expert_upper_bound": null
+      }
+    },
+    "type": "compute"
+  },
+  "HcclAllGather_launch": {
+    "metric_type": "host",
+    "aggregation": {
+      "during_s": 3,
+      "funcs": [
+        {
+          "func": "percentile",
+          "func_params": {
+            "q": 90
+          }
+        }
+      ]
+    },
+    "priority": 20,
+    "alarm_filter_window_size": 5,
+    "space_detector": {
+      "dist_metric": "euclidean",
+      "eps": 3.0,
+      "cv_threshold": 0.03,
+      "min_samples": 2,
+      "window_size": 20,
+      "scaling": true,
+      "type": "SlidingWindowDBSCAN"
+    },
+    "time_detector": {
+      "alarm_filter_window_size": 5,
+      "preprocess_eps": 0.1,
+      "preprocess_min_samples": 10,
+      "type": "SlidingWindowKSigmaDetector",
+      "n_sigma_method": {
+        "type": "SlidingWindowNSigma",
+        "training_window_size": 20,
+        "min_update_window_size": 10,
+        "min_std_val": 0.0001,
+        "bias": 0.1,
+        "abs_bias": 5,
+        "nsigma_coefficient": 4,
+        "detect_type": "upper_bound",
+        "min_expert_lower_bound": null,
+        "max_expert_lower_bound": null,
+        "min_expert_upper_bound": null,
+        "max_expert_upper_bound": null
+      }
+    },
+    "type": "compute"
+  },
+  "HcclReduceScatter": {
+    "metric_type": "device",
+    "aggregation": {
+      "during_s": 5,
+      "funcs": [
+        {
+          "func": "percentile",
+          "func_params": {
+            "q": 90
+          }
+        }
+      ]
+    },
+    "priority": 20,
+    "alarm_filter_window_size": 5,
+    "space_detector": {
+      "dist_metric": "euclidean",
+      "eps": 0.4,
+      "cv_threshold": 0.03,
+      "min_samples": 2,
+      "window_size": 100,
+      "scaling": false,
+      "type": "SlidingWindowDBSCAN"
+    },
+    "time_detector": {
+      "alarm_filter_window_size": 5,
+      "preprocess_eps": 0.1,
+      "preprocess_min_samples": 10,
+      "type": "SlidingWindowKSigmaDetector",
+      "n_sigma_method": {
+        "type": "SlidingWindowNSigma",
+        "training_window_size": 40,
+        "min_update_window_size": 10,
+        "min_std_val": 0.0001,
+        "bias": 0.1,
+        "abs_bias": 5,
+        "nsigma_coefficient": 4,
+        "detect_type": "upper_bound",
+        "min_expert_lower_bound": null,
+        "max_expert_lower_bound": null,
+        "min_expert_upper_bound": 50,
+        "max_expert_upper_bound": null
+      }
+    },
+    "type": "compute"
+  },
+  "HcclBatchSendRecv": {
+    "metric_type": "device",
+    "aggregation": {
+      "during_s": 5,
+      "funcs": [
+        {
+          "func": "percentile",
+          "func_params": {
+            "q": 90
+          }
+        },
+        {
+          "func": "percentile",
+          "func_params": {
+            "q": 10
+          }
+        }
+      ]
+    },
+    "priority": 20,
+    "alarm_filter_window_size": 5,
+    "space_detector": null,
+    "time_detector": {
+      "alarm_filter_window_size": 5,
+      "preprocess_eps": 0.1,
+      "preprocess_min_samples": 10,
+      "type": "SlidingWindowKSigmaDetector",
+      "n_sigma_method": {
+        "type": "SlidingWindowNSigma",
+        "training_window_size": 20,
+        "min_update_window_size": 10,
+        "min_std_val": 0.0001,
+        "bias": 0.1,
+        "abs_bias": null,
+        "nsigma_coefficient": 4,
+        "detect_type": "upper_bound",
+        "min_expert_lower_bound": null,
+        "max_expert_lower_bound": null,
+        "min_expert_upper_bound": null,
+        "max_expert_upper_bound": null
+      }
+    },
+    "type": "network"
+  },
+  "HcclAllReduce": {
+    "metric_type": "device",
+    "method": "sum",
+    "priority": 20,
+    "alarm_filter_window_size": 5,
+    "space_detector": null,
+    "time_detector": {
+      "alarm_filter_window_size": 5,
+      "preprocess_eps": 0.1,
+      "preprocess_min_samples": 10,
+      "type": "SlidingWindowKSigmaDetector",
+      "n_sigma_method": {
+        "type": "SlidingWindowNSigma",
+        "training_window_size": 20,
+        "min_update_window_size": 10,
+        "min_std_val": 0.0001,
+        "bias": 0.1,
+        "abs_bias": null,
+        "nsigma_coefficient": 4,
+        "detect_type": "upper_bound",
+        "min_expert_lower_bound": null,
+        "max_expert_lower_bound": null,
+        "min_expert_upper_bound": 50,
+        "max_expert_upper_bound": null
+      }
+    },
+    "type": "network"
+  }
+}
