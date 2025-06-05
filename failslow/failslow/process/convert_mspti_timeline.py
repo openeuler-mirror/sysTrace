@@ -61,7 +61,12 @@ def process_df(data_df, device_id, id2name_dict: dict):
         'Name': 'first',
     }).reset_index()
     df.columns = ['Id', 'start', 'end', 'Kind', 'SourceKind', 'Name']
-    df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split(',',
+    if len(df):
+        if "!" in df["Name"].iloc[0]:
+            df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split('!',
+                                                                                                        expand=True)
+        else:
+            df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split(',',
                                                                                                         expand=True)
     df = df.drop(columns=['Name'])
     df['cat'] = "hccl"

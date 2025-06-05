@@ -1,0 +1,41 @@
+{
+  "with_fail_slow": false,
+  "task_stable_step": 3,
+  "min_startup_detection_steps": 10,
+  "fail_slow_span_mins": 10,
+  "training_log": "/etc/systrace/data/rank0_mindformer.log",
+  "step_data_path": "/etc/systrace/data/step_data.csv",
+  "fail_slow_perception_path": "/etc/systrace/result/fail_slow",
+  "steps_window_size": 5,
+  "k_sigma": 2,
+  "anomaly_degree_thr": 0.2,
+  "slow_node_detection_range_times": [],
+  "slow_node_detection_time_span_hours": 0.5,
+  "slow_node_detection_path": "/etc/systrace/result/slow_node",
+  "data_type": "json",
+  "root_path": "/home/hbdir/systrace/data/cal_slow_rank3",
+  "filter_data_by_timestamp": false,
+  "enable_detect_type": {
+    "enable_cal": true,
+    "enable_op_launch": false,
+    "enable_comm": false,
+    "enable_dataloader": false,
+    "enable_ckpt": false
+  },
+  "fail_slow_ops":{
+    "cal_slow": "HcclAllGather",
+    "op_launch_slow": "HcclAllGather_launch",
+    "comm_slow": "HcclBatchSendRecv",
+    "dataloader_slow": "Dataloader",
+    "ckpt_slow": "SaveCkpt"
+  },
+  "save_image": "image",
+  "record_kpi": false,
+  "use_plot": false,
+  "max_num_normal_results": 16,
+  "look_back": 20,
+  "hccl_domain": {
+  },
+  "rank_table_json": "./rank_table.json",
+  "debug_data": false
+}

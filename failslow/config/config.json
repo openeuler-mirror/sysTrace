@@ -1,0 +1,611 @@
+{
+  "jobStableTimeSpan": 1.0,
+  "localizationTimeSpan": 6,
+  "maxNumNormalResults": 16,
+  "MinRequestLength": 10,
+  "metrics": {
+    "aiCPUUsage": {
+      "priority": 30,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.01,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 70,
+          "max_expert_upper_bound": 80
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.01,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 70,
+          "max_expert_upper_bound": 80
+        }
+      },
+      "type": "compute"
+    },
+    "temperature": {
+      "priority": 25,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.01,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 70,
+          "max_expert_upper_bound": 100
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.01,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 70,
+          "max_expert_upper_bound": 100
+        }
+      },
+      "type": "compute"
+    },
+    "hbmMemUsage": {
+      "priority": 25,
+      "alarm_filter_window_size": 5,
+      "space_detector": {
+        "dist_metric": "euclidean",
+        "eps": 5,
+        "cv_threshold": 0.0,
+        "min_samples": 2,
+        "window_size": 30,
+        "scaling": false,
+        "type": "SlidingWindowDBSCAN"
+      },
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.02,
+          "abs_bias": 5,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.02,
+          "abs_bias": 5,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "compute"
+    },
+    "aiCoreFrequency": {
+      "priority": 40,
+      "alarm_filter_window_size": 5,
+      "space_detector": {
+        "dist_metric": "euclidean",
+        "eps": 3.0,
+        "cv_threshold": 0.03,
+        "min_samples": 2,
+        "window_size": 30,
+        "scaling": false,
+        "type": "SlidingWindowDBSCAN"
+      },
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "lower_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "lower_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "compute"
+    },
+    "processMEM": {
+      "priority": 20,
+      "alarm_filter_window_size": 5,
+      "space_detector": {
+        "first_gap_rate": 0.3,
+        "second_gap_rate": 0.2,
+        "base_threshold": 150,
+        "discrete_rate": 1.5,
+        "nsigma_coefficient": 2,
+        "discrete_point_suppression_ratio": 0.03,
+        "non_major_anomaly_suppression": 0.1,
+        "type": "OuterDataDetector"
+      },
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.1,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "bi_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.1,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "bi_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "compute"
+    },
+    "singleBitErrorCnt": {
+      "priority": 20,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 30,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 30,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "compute"
+    },
+    "writeTimeAvg": {
+      "priority": 5,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.1,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.1,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "storage"
+    },
+    "readTimeAvg": {
+      "alarm_filter_window_size": 5,
+      "priority": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.1,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.1,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "storage"
+    },
+    "writeTime": {
+      "priority": 5,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.3,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.3,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "storage"
+    },
+    "readTime": {
+      "alarm_filter_window_size": 5,
+      "priority": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.3,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 60,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.3,
+          "abs_bias": 0,
+          "nsigma_coefficient": 0,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": null,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "storage"
+    },
+    "roCETxErrPktCnt": {
+      "priority": 10,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "network"
+    },
+    "errOut": {
+      "priority": 10,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "network"
+    },
+    "dropOut": {
+      "priority": 5,
+      "alarm_filter_window_size": 5,
+      "space_detector": null,
+      "time_detector": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "time_detector_with_small_dataset": {
+        "preprocess_eps": 0.1,
+        "preprocess_min_samples": 10,
+        "type": "SlidingWindowKSigmaDetector",
+        "n_sigma_method": {
+          "type": "SlidingWindowNSigma",
+          "training_window_size": 40,
+          "min_update_window_size": 10,
+          "min_std_val": 0.0001,
+          "bias": 0.05,
+          "abs_bias": 0,
+          "nsigma_coefficient": 4,
+          "detect_type": "upper_bound",
+          "min_expert_lower_bound": null,
+          "max_expert_lower_bound": null,
+          "min_expert_upper_bound": 10,
+          "max_expert_upper_bound": null
+        }
+      },
+      "type": "network"
+    }
+  },
+  "multiprocess_num": {
+    "n_cpu4algorithm": 7,
+    "n_cpu4data_request": 200
+  },
+  "n_sys_id_per_request": 40,
+  "data_request_timeout": 30
+}

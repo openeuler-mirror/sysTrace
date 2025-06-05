@@ -21,11 +21,12 @@ logger = get_default_logger(__name__)
 
 
 class PostProcess():
-    def __init__(self, metric_args, model_args):
+    def __init__(self, metric_args, model_args, node_ip2ranks):
         self.metric_args = metric_args
         self.model_args = model_args
         self.max_num_normal_results = self.model_args.get("max_num_normal_results", 10)
         self.record_kpi_value = self.model_args.get("record_kpi", False)
+        self.node_ip2ranks = node_ip2ranks
 
     def gen_final_alarm(self, detect_results: List):
         response = AIJobDetectResult()
@@ -73,12 +74,22 @@ class PostProcess():
                 break  # Assuming only one SPACE type is considered for simplicity.
         return keep_devices, omitted_devices
 
+    def get_node_id_by_rank(self, rank):
+        node_id = "localhost"
+        for tmp_node_ip, ranks in self.node_ip2ranks.items():
+            if rank in ranks:
+                node_id = tmp_node_ip
+                break
+
+        return node_id
+
     def _process_abnormal_device(self, detect_result: Dict, device_label: str, keep_devices: List,
                                  omitted_devices: List, metric_name: str) -> NodeData:
         method_type = detect_result["detect_result_type"][device_label].get(metric_name, "TIME")
         time_stamp_data, values = detect_result["anomaly_locations"][device_label][metric_name]
         label_dict = dict(zip(time_stamp_data.tolist(), values.tolist()))
-        abnormal_node_data = NodeData(metric_name, device_label, method_type, keep_devices, omitted_devices)
+        node_ip = self.get_node_id_by_rank(device_label)
+        abnormal_node_data = NodeData(metric_name, device_label, method_type, node_ip, keep_devices, omitted_devices)
 
         if self.record_kpi_value:
             g_ts, g_value = detect_result["group_data"][device_label].values[:, 0], detect_result["group_data"][
@@ -93,7 +104,8 @@ class PostProcess():
                             metric_name: str):
         if keep_devices:
             for device_label in keep_devices:
-                normal_node_data = NodeData(metric_name, device_label, "SPACE")
+                node_ip = self.get_node_id_by_rank(device_label)
+                normal_node_data = NodeData(metric_name, device_label, "SPACE", node_ip)
                 if self.record_kpi_value:
                     g_ts, g_value = detect_result["group_data"][device_label].values[:, 0], detect_result["group_data"][
                                                                                                 device_label].values[:,

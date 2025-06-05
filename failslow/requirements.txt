@@ -1,0 +1,8 @@
+numpy==1.22.4
+PyYAML==5.3
+pandas==2.2.2
+setuptools==63.2.0
+xarray==2023.10.0
+matplotlib
+scikit_learn==0.24.2
+joblib==0.14.1
