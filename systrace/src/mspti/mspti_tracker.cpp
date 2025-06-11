@@ -2,12 +2,14 @@
 #include <dlfcn.h>
 #include <iostream>
 #include <stdlib.h>
+#include "../../include/common/util.h"
 
 constexpr size_t KB = 1 * 1024;
 constexpr size_t MB = 1 * 1024 * KB;
 constexpr size_t ALIGN_SIZE = 8;
 
 std::mutex MSPTITracker::mtx;
+using namespace systrace::util;
 
 inline uint8_t *align_buffer(uint8_t *buffer, size_t align)
 {
@@ -18,8 +20,9 @@ inline uint8_t *align_buffer(uint8_t *buffer, size_t align)
 MSPTITracker::MSPTITracker()
 {
     std::cout << "Logging initialized from preloaded library." << std::endl;
+    std::string file_name = "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.json"; 
     hcclFileWriter =
-        std::make_unique<MSPTIHcclFileWriter>("hccl_activity.json");
+        std::make_unique<MSPTIHcclFileWriter>(file_name);
     msptiSubscribe(&subscriber, nullptr, nullptr);
     msptiActivityRegisterCallbacks(UserBufferRequest, UserBufferComplete);
     msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
