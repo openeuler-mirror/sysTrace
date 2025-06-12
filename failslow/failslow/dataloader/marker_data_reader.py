@@ -1,6 +1,7 @@
 import re
 import os
 import datetime
+import multiprocessing
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -177,43 +178,94 @@ class MarkerDataloader:
         id2name_map = input_df[input_df[TableItem.name].notna()].set_index(TableItem.id)[TableItem.name].to_dict()
         self.id2name_maps[csv_file] = id2name_map
 
-    def extract_comm_domain(self):
-        all_comm_groups = []
+    def extract_id2name_maps_for_all_csvs(self):
         for csv_file in self.csv_files:
             csv_path = os.path.join(self._root_path, csv_file)
             data_df = self.read_csv(csv_path)
             self.extract_id2name_map(csv_file, data_df)
 
-            device_df = self.extract_device_df(data_df)
-            op_launch_df = self.extract_op_launch_df(data_df)
+    def process_csv_file(self, csv_file):
+        rank_info = {}
+        csv_path = os.path.join(self._root_path, csv_file)
+        data_df = self.read_csv(csv_path)
+        device_df = self.extract_device_df(data_df)
+        op_launch_df = self.extract_op_launch_df(data_df)
 
-            device_ids = int(csv_file.split(".")[-2])
-            self.get_node_ids_from_filepath(csv_file, device_ids)
-            if not len(device_df):
-                self.empty_data_ranks.append(device_ids)
-            # 分列以及生成start,end timestamp
-            device_df = self.process_df(device_df, csv_file)
-            op_launch_df = self.process_df(op_launch_df, csv_file)
-            self.save_device_df(device_df, csv_file)
-            self.save_op_launch_df(op_launch_df, csv_file)
-            if len(device_df):
-                comm_groups_ids = device_df[TableItem.ex_comm_group].unique()   
-            else:
-                comm_groups_ids = []
-            selected_indices, comm_ops = self.get_ops_by_comm_name(comm_groups_ids, device_df)
-            count_ops = self.get_count_ops(comm_groups_ids, device_df)
+        device_ids = int(csv_file.split(".")[-2])
+        node_id = csv_file.split("-")[1]
+        rank_info["csv_file"] = csv_file
+        rank_info["rank"] = device_ids
+        rank_info["node_id"] = node_id
+        if not len(device_df):
+            rank_info["is_empty"] = True
+        else:
+            rank_info["is_empty"] = False
+        # 分列以及生成start,end timestamp
+        device_df = self.process_df(device_df, csv_file)
+        op_launch_df = self.process_df(op_launch_df, csv_file)
+        device_path = self.save_device_df(device_df, csv_file)
+        host_path = self.save_op_launch_df(op_launch_df, csv_file)
+        rank_info["device_path"] = device_path
+        rank_info["host_path"] = host_path
 
-            logger.info(f"src file:{csv_file}, selected comm op index: {selected_indices}, comm ops: {comm_ops}")
-            comm_groups = self.create_comm_groups(comm_groups_ids, selected_indices, comm_ops, device_ids, count_ops)
-            self.extend_group_ranks(all_comm_groups, comm_groups)
+        if len(device_df):
+            comm_groups_ids = device_df[TableItem.ex_comm_group].unique()   
+        else:
+            comm_groups_ids = []
+        selected_indices, comm_ops = self.get_ops_by_comm_name(comm_groups_ids, device_df)
+        count_ops = self.get_count_ops(comm_groups_ids, device_df)
 
+        logger.info(f"src file:{csv_file}, selected comm op index: {selected_indices}, comm ops: {comm_ops}")
+        comm_groups = self.create_comm_groups(comm_groups_ids, selected_indices, comm_ops, device_ids, count_ops)
+        return comm_groups, rank_info 
+
+    def extract_comm_domain(self):
+        self.extract_id2name_maps_for_all_csvs()
+
+        all_comm_groups = []
+        max_processes = min(os.cpu_count()//2 or 1, len(self.csv_files))
+        with multiprocessing.Pool(processes=max_processes) as pool:
+            for comm_groups, rank_info in pool.imap_unordered(self.process_csv_file, self.csv_files):
+                self.get_node_ids_from_filepath(rank_info["node_id"], rank_info["rank"])
+                if rank_info["is_empty"]:
+                    self.empty_data_ranks.append(rank_info["rank"])
+                self.local_d_files[rank_info["csv_file"]] = rank_info["device_path"]
+                self.local_op_launch_files[rank_info["csv_file"]] = rank_info["host_path"]
+                
+                self.extend_group_ranks(all_comm_groups, comm_groups)
+                
         logger.info(f"node id and ranks: {self.node_id2ranks_dict}")
         all_comm_groups = self.get_fp_comm_groups(all_comm_groups)
         return all_comm_groups
 
-    def get_node_ids_from_filepath(self, csv_file: str, rank: int):
+    # def extract_comm_domain(self):
+    #     self.extract_id2name_maps_for_all_csvs()
+
+    #     all_comm_groups = []
+    #     max_processes = min(os.cpu_count()//2 or 1, len(self.csv_files))
+    #     with multiprocessing.Pool(processes=max_processes) as pool:
+    #         results = []
+    #         for csv_file in self.csv_files:
+    #             result = pool.apply_async(self.process_csv_file, args=(csv_file,))
+    #             results.append(result)
+
+    #         for result in results:
+    #             comm_groups, rank_info = result.get()
+    #             self.get_node_ids_from_filepath(rank_info["node_id"], rank_info["rank"])
+    #             if rank_info["is_empty"]:
+    #                 self.empty_data_ranks.append(rank_info["rank"])
+    #             self.local_d_files[rank_info["csv_file"]] = rank_info["device_path"]
+    #             self.local_op_launch_files[rank_info["csv_file"]] = rank_info["host_path"]
+                
+    #             self.extend_group_ranks(all_comm_groups, comm_groups)
+                
+    #     logger.info(f"node id and ranks: {self.node_id2ranks_dict}")
+    #     all_comm_groups = self.get_fp_comm_groups(all_comm_groups)
+    #     return all_comm_groups
+
+
+    def get_node_ids_from_filepath(self, node_id: str, rank: int):
         ''' csv_file: hccl_activity-9.13.100.7-.0.csv '''
-        node_id = csv_file.split("-")[1]
         if node_id not in self.node_id2ranks_dict.keys():
             self.node_id2ranks_dict[node_id] = [rank]
         else:
@@ -276,20 +328,22 @@ class MarkerDataloader:
 
         return clip_data
 
-    def save_device_df(self, device_df: pd.DataFrame, csv_file: str) -> None:
+    def save_device_df(self, device_df: pd.DataFrame, csv_file: str) -> str:
         csv_path = os.path.join(self._root_path, csv_file)
         save_path = f"{csv_path[:-4]}_device.csv"
-        self.local_d_files[csv_file] = save_path
         device_df = self.extract_data_by_time_range(device_df)
         device_df.to_csv(save_path, index=False)
+        
+        return save_path
 
-    def save_op_launch_df(self, op_launch_df: pd.DataFrame, csv_file: str) -> None:
+    def save_op_launch_df(self, op_launch_df: pd.DataFrame, csv_file: str) -> str:
         csv_path = os.path.join(self._root_path, csv_file)
         save_path = f"{csv_path[:-4]}_op_launch.csv"
-        self.local_op_launch_files[csv_file] = save_path
 
         op_launch_df = self.extract_data_by_time_range(op_launch_df)
         op_launch_df.to_csv(save_path, index=False)
+
+        return save_path
 
     def get_fp_comm_groups(self, comm_groups: List[CommGroup]):
         # group_rank: comm_group
