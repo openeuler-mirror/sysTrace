@@ -279,6 +279,5 @@ std::string GetPrimaryIP()
     freeifaddrs(ifaddr);
     return primaryIP;
 }
-
 } // namespace util
 } // namespace systrace

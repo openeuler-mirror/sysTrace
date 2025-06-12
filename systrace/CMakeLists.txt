@@ -46,6 +46,7 @@ target_include_directories(common PUBLIC ${PROJECT_SOURCE_DIR}/include ${Python3
 add_subdirectory(protos)
 
 add_library(sysTrace_hook SHARED
+    ${PROJECT_SOURCE_DIR}/include/common/shared_constants.c
     ${PROJECT_SOURCE_DIR}/src/trace/systrace_manager.cc
     ${PROJECT_SOURCE_DIR}/src/trace/library_loader.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_loader.cc
@@ -54,8 +55,12 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/ascend/hook.cc
     ${PROJECT_SOURCE_DIR}/src/mspti/mspti_tracker.cpp
     ${PROJECT_SOURCE_DIR}/src/cann/cann_hook.c
+    ${PROJECT_SOURCE_DIR}/server/monitor_server.cpp
 )
 
+add_executable(sysTrace_cli
+    ${PROJECT_SOURCE_DIR}/client/sysTracecli.cpp
+)
 set_target_properties(sysTrace_hook PROPERTIES OUTPUT_NAME "sysTrace")
 
 target_link_libraries(sysTrace_hook

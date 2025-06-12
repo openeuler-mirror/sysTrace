@@ -226,6 +226,10 @@ static char is_ready_to_write(ThreadData *td, time_t *current)
 
 static void write_protobuf_to_file()
 {
+    if (!checkAndUpdateTimer(2))
+    {
+        return; 
+    }
     time_t current;
     uint8_t *buf;
     ThreadData *td = get_thread_data();
