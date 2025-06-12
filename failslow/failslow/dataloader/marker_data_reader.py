@@ -177,10 +177,9 @@ class MarkerDataloader:
 
             device_df = self.extract_device_df(data_df)
             op_launch_df = self.extract_op_launch_df(data_df)
-            if len(device_df):
-                device_ids = int(device_df[TableItem.device_id].unique()[0])
-            else:
-                device_ids = int(csv_file.split(".")[1])
+
+            device_ids = int(csv_file.split(".")[1])
+            if not len(device_df):
                 self.empty_data_ranks.append(device_ids)
             # 分列以及生成start,end timestamp
             device_df = self.process_df(device_df, csv_file)
@@ -344,6 +343,8 @@ class MarkerDataloader:
         comm_ops = []
         for comm_id in comm_group_ids:
             mask = data_df[TableItem.ex_comm_group] == comm_id
+            if sum(mask) == 0:
+                continue
             index = int(data_df[mask].index[0])
             comm_ops.append(data_df.loc[index][TableItem.ex_comm_op])
             selected_indices.append(index)
