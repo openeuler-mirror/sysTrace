@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+message StackFrame {
+    uint64 address = 1;
+    string so_name = 2;
+}
+
+message MemAllocEntry {
+  uint64 alloc_ptr = 1;
+  uint32 stage_id = 2;
+  StageType stage_type = 3;
+  uint64 mem_size = 4;
+  repeated StackFrame stack_frames = 5;
+}
+
+message MemFreeEntry {
+  uint64 alloc_ptr = 1;
+  uint32 stage_id = 2;
+  StageType stage_type = 3;
+}
+
+message ProcMem {
+  uint32 pid = 1;
+  repeated MemAllocEntry mem_alloc_stacks = 2;
+  repeated MemFreeEntry mem_free_stacks = 3;
+}
+
+enum StageType {
+  STAGE_UNKNOWN = 0;
+  STAGE_DATALOADER = 1;
+  STAGE_FORWARD = 2;
+  STAGE_BACKWARD = 3;
+  STAGE_SYNCHRONIZATION = 4;
+  STAGE_GC = 5;
+}
+
+message GcDebugData {
+  uint32 collected = 1;
+  uint32 uncollectable = 2;
+}
+
+message PytorchStage {
+  uint32 stage_id = 1;
+  string stage_type = 2;
+  uint64 start_us = 3;
+  uint64 end_us = 4;
+  repeated string stack_frames = 5;
+  oneof debug_data {
+    GcDebugData gc_debug = 6;
+  }
+}
+
+message Pytorch {
+  repeated PytorchStage pytorch_stages = 1;
+  uint32 rank = 2;
+  uint32 step_id = 3;  
+  string comm = 4;  //任务名
+}
+
+message Mem {
+  repeated ProcMem proc_mem = 1;
+}
