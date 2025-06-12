@@ -20,7 +20,7 @@ inline uint8_t *align_buffer(uint8_t *buffer, size_t align)
 MSPTITracker::MSPTITracker()
 {
     std::cout << "Logging initialized from preloaded library." << std::endl;
-    std::string file_name = "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.json"; 
+    std::string file_name = "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.csv"; 
     hcclFileWriter =
         std::make_unique<MSPTIHcclFileWriter>(file_name);
     msptiSubscribe(&subscriber, nullptr, nullptr);

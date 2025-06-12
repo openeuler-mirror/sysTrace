@@ -54,8 +54,16 @@ class MarkerDataloader:
 
         return data_df
 
+    def get_node_ip_by_rank(self, rank):
+        for node_ip, ranks in self.node_id2ranks_dict.items():
+            if rank in ranks:
+                return node_ip
+        
+        return None
+
     def read_local_device_df_by_rank(self, rank: int):
-        file = f"hccl_activity.{rank}.csv"
+        node_ip = self.get_node_ip_by_rank(rank)
+        file = f"hccl_activity-{node_ip}-.{rank}.csv"
         if file in self.csv_files:
             local_device_path = self.local_d_files.get(file, None)
             if local_device_path:
@@ -73,7 +81,8 @@ class MarkerDataloader:
         return comm_results
     
     def read_local_op_launch_df_by_rank(self, rank: int):
-        file = f"hccl_activity.{rank}.csv"
+        node_ip = self.get_node_ip_by_rank(rank)
+        file = f"hccl_activity-{node_ip}-.{rank}.csv"
         if file in self.csv_files:
             local_device_path = self.local_op_launch_files.get(file, None)
             if local_device_path:
@@ -178,7 +187,8 @@ class MarkerDataloader:
             device_df = self.extract_device_df(data_df)
             op_launch_df = self.extract_op_launch_df(data_df)
 
-            device_ids = int(csv_file.split(".")[1])
+            device_ids = int(csv_file.split(".")[-2])
+            self.get_node_ids_from_filepath(csv_file, device_ids)
             if not len(device_df):
                 self.empty_data_ranks.append(device_ids)
             # 分列以及生成start,end timestamp
@@ -187,8 +197,7 @@ class MarkerDataloader:
             self.save_device_df(device_df, csv_file)
             self.save_op_launch_df(op_launch_df, csv_file)
             if len(device_df):
-                comm_groups_ids = device_df[TableItem.ex_comm_group].unique()
-                self.get_node_ids_from_comm_groups(comm_groups_ids, device_ids)
+                comm_groups_ids = device_df[TableItem.ex_comm_group].unique()   
             else:
                 comm_groups_ids = []
             selected_indices, comm_ops = self.get_ops_by_comm_name(comm_groups_ids, device_df)
@@ -198,19 +207,17 @@ class MarkerDataloader:
             comm_groups = self.create_comm_groups(comm_groups_ids, selected_indices, comm_ops, device_ids, count_ops)
             self.extend_group_ranks(all_comm_groups, comm_groups)
 
-        self.fix_node_ids2ranks()
         logger.info(f"node id and ranks: {self.node_id2ranks_dict}")
         all_comm_groups = self.get_fp_comm_groups(all_comm_groups)
         return all_comm_groups
 
-    def get_node_ids_from_comm_groups(self, comm_groups_ids: list, rank: int):
-        for comm_group_id in comm_groups_ids:
-            node_id = comm_group_id.split("%")[0]
-            if node_id not in self.node_id2ranks_dict.keys():
-                self.node_id2ranks_dict[node_id] = [rank]
-            else:
-                self.node_id2ranks_dict[node_id].append(rank)
-            break
+    def get_node_ids_from_filepath(self, csv_file: str, rank: int):
+        ''' csv_file: hccl_activity-9.13.100.7-.0.csv '''
+        node_id = csv_file.split("-")[1]
+        if node_id not in self.node_id2ranks_dict.keys():
+            self.node_id2ranks_dict[node_id] = [rank]
+        else:
+            self.node_id2ranks_dict[node_id].append(rank)
 
     def fix_node_ids2ranks(self):
         for rank_empty in self.empty_data_ranks:
