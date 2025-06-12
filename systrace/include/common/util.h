@@ -13,11 +13,16 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include <ifaddrs.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <cstring>
 
 namespace systrace
 {
 namespace util
 {
+std::string GetPrimaryIP();
 namespace config
 {
 

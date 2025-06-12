@@ -249,5 +249,36 @@ void InitializeSystemUtilities()
     config::InitializeGlobalConfiguration();
 }
 
+std::string GetPrimaryIP()
+{
+    struct ifaddrs *ifaddr, *ifa;
+    std::string primaryIP;
+
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
+        return "";
+    }
+
+    for (ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == nullptr || ifa->ifa_addr->sa_family != AF_INET) {
+            continue; 
+        }
+
+        if (strcmp(ifa->ifa_name, "lo") == 0) {
+            continue;
+        }
+
+        struct sockaddr_in *addr = (struct sockaddr_in *)ifa->ifa_addr;
+        char ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &addr->sin_addr, ip, INET_ADDRSTRLEN);
+
+        primaryIP = ip;
+        break;
+    }
+
+    freeifaddrs(ifaddr);
+    return primaryIP;
+}
+
 } // namespace util
 } // namespace systrace
