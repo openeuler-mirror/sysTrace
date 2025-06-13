@@ -136,6 +136,9 @@ public:
     }
 
     void hcclActivityFormatToCSV() {
+        if (!checkAndUpdateTimer(1) && !need_dump_L1_once()) {
+            return;
+        }
         std::lock_guard<std::mutex> lock(this->buffermtx);
         if (this->file.is_open()) {
             // enumerate the buffer and write to file
@@ -154,6 +157,13 @@ public:
                 }
             }
             this->markerActivityBuffer->clear();
+            SharedData *shared_data = get_shared_data();
+            if (!shared_data)
+            {
+                return;
+            }
+            shared_data->dumped_L1 = true;
+            shared_data->need_dump_L1_once = false;
         } else {
             std::cout << "File is not open" << std::endl;
         }

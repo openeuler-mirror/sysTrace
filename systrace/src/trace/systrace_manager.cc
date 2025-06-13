@@ -67,7 +67,14 @@ void PyTorchTrace::registerTracingFunctions()
     }
 }
 
-bool PyTorchTrace::triggerTrace() { return has_trigger_trace_.exchange(true); }
+bool PyTorchTrace::triggerTrace() 
+{
+    SharedData* shared_data = get_shared_data();
+    if (!shared_data) {
+        return false;
+    }
+    return has_trigger_trace_.exchange(true) && shared_data->g_dump_L0; 
+}
 
 void PyTorchTrace::dumpPyTorchTracing()
 {
@@ -195,6 +202,7 @@ void SysTrace::initializeSystem()
         return;
 
     systrace::util::InitializeSystemUtilities();
+    MonitorServer::getInstance();
     MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
 

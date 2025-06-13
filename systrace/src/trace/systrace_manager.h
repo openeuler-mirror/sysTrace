@@ -7,8 +7,10 @@
 
 #include "../../include/common/logging.h"
 #include "../../include/common/util.h"
+#include "../../include/common/shared_constants.h"
 #include "../../protos/systrace.pb.h"
 #include "../mspti/mspti_tracker.hpp"
+#include "../../server/monitor_server.hpp"
 #include "library_loader.h"
 #include "python/pytorch_tracing_loader.h"
 
