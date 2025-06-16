@@ -44,6 +44,7 @@ target_include_directories(common PUBLIC ${PROJECT_SOURCE_DIR}/include ${Python3
 
 
 add_subdirectory(protos)
+add_subdirectory(src/os)
 
 add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/include/common/shared_constants.c
@@ -70,6 +71,7 @@ target_link_libraries(sysTrace_hook
     protobuf::libprotobuf
     ${CMAKE_THREAD_LIBS}
     pthread
+    os_probe
     jsoncpp
     -ldl
 )
