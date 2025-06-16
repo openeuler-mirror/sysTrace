@@ -357,6 +357,10 @@ static void collect_stack_frames(MemAllocEntry *entry)
 
 static void add_mem_alloc_entry(void *pp, size_t size)
 {
+    if (!checkAndUpdateTimer(2))
+    {
+        return; 
+    }
     ThreadData *td = get_thread_data();
 
     MemAllocEntry *entry = malloc(sizeof(MemAllocEntry));
@@ -380,6 +384,10 @@ static void add_mem_alloc_entry(void *pp, size_t size)
 
 static void add_mem_free_entry(void *pp)
 {
+    if (!checkAndUpdateTimer(2))
+    {
+        return; 
+    }
     ThreadData *td = get_thread_data();
 
     MemFreeEntry *entry = malloc(sizeof(MemFreeEntry));
@@ -423,111 +431,6 @@ drvError_t halMemFree(void *pp)
     if (ret == 0 && pp)
     {
         add_mem_free_entry(pp);
-    }
-
-    write_protobuf_to_file();
-
-    return ret;
-}
-
-drvError_t aclrtMalloc(void **devPtr, size_t size, aclrtMemMallocPolicy policy)
-{
-    if (!orig_aclrtMalloc)
-    {
-        init_mem_trace();
-    }
-    int ret = orig_aclrtMalloc(devPtr, size, policy);
-    if (ret == 0 && devPtr && *devPtr)
-    {
-        add_mem_alloc_entry(*devPtr, size);
-    }
-
-    write_protobuf_to_file();
-
-    return ret;
-}
-
-drvError_t aclrtMallocCached(void **devPtr, size_t size,
-                             aclrtMemMallocPolicy policy)
-{
-    if (!orig_aclrtMallocCached)
-    {
-        init_mem_trace();
-    }
-    int ret = orig_aclrtMallocCached(devPtr, size, policy);
-    if (ret == 0 && devPtr && *devPtr)
-    {
-        add_mem_alloc_entry(*devPtr, size);
-    }
-
-    write_protobuf_to_file();
-
-    return ret;
-}
-
-drvError_t aclrtMallocAlign32(void **devPtr, size_t size,
-                              aclrtMemMallocPolicy policy)
-{
-    if (!orig_aclrtMallocAlign32)
-    {
-        init_mem_trace();
-    }
-    int ret = orig_aclrtMallocAlign32(devPtr, size, policy);
-    if (ret == 0 && devPtr && *devPtr)
-    {
-        add_mem_alloc_entry(*devPtr, size);
-    }
-
-    write_protobuf_to_file();
-
-    return ret;
-}
-
-drvError_t aclrtFree(void *devPtr)
-{
-    if (!orig_aclrtFree)
-    {
-        init_mem_trace();
-    }
-    int ret = orig_aclrtFree(devPtr);
-    if (ret == 0 && devPtr)
-    {
-        add_mem_free_entry(devPtr);
-    }
-
-    write_protobuf_to_file();
-
-    return ret;
-}
-
-drvError_t halMemCreate(void **handle, size_t size, void *prop, uint64_t flag)
-{
-    if (!orig_halMemCreate)
-    {
-        init_mem_trace();
-    }
-    int ret = orig_halMemCreate(handle, size, prop, flag);
-    if (ret == 0 && handle && *handle)
-    {
-        add_mem_alloc_entry(*handle, size);
-    }
-
-    write_protobuf_to_file();
-
-    return ret;
-}
-
-drvError_t halMemRelease(void *handle)
-{
-    if (!orig_halMemRelease)
-    {
-        init_mem_trace();
-    }
-
-    int ret = orig_halMemRelease(handle);
-    if (ret == 0 && handle)
-    {
-        add_mem_free_entry(handle);
     }
 
     write_protobuf_to_file();

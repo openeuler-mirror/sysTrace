@@ -12,6 +12,9 @@ class MSPTITracker
     msptiSubscriberHandle subscriber;
     std::unique_ptr<MSPTIHcclFileWriter> hcclFileWriter;
     std::atomic<int> requestedCount{0};
+    std::thread mspti_monitor_thread;
+    std::atomic<bool> is_collecting_{false}; 
+    std::atomic<bool> should_run_{true};
 
     MSPTITracker();
     ~MSPTITracker();
@@ -30,4 +33,5 @@ class MSPTITracker
                                   size_t *maxNumRecords);
     static void UserBufferComplete(uint8_t *buffer, size_t size,
                                    size_t validSize);
+    void collect();
 };

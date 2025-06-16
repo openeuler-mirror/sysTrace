@@ -25,7 +25,24 @@ MSPTITracker::MSPTITracker()
         std::make_unique<MSPTIHcclFileWriter>(file_name);
     msptiSubscribe(&subscriber, nullptr, nullptr);
     msptiActivityRegisterCallbacks(UserBufferRequest, UserBufferComplete);
-    msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
+    mspti_monitor_thread = std::thread(&MSPTITracker::collect, this);
+}
+
+void MSPTITracker::collect()
+{
+    while (should_run_) {
+        bool should_collect = checkAndUpdateTimer(1);
+        if (should_collect && !is_collecting_.load()) {
+            msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
+            is_collecting_.store(true);
+        } 
+        else if (!should_collect && is_collecting_.load()) {
+            msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
+            is_collecting_.store(false);
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 }
 
 MSPTITracker::~MSPTITracker()
@@ -33,6 +50,10 @@ MSPTITracker::~MSPTITracker()
     msptiActivityFlushAll(1);
     msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
     finish();
+    should_run_ = false;
+    if (mspti_monitor_thread.joinable()) {
+        mspti_monitor_thread.join();
+    }
 }
 
 MSPTITracker &MSPTITracker::getInstance()
