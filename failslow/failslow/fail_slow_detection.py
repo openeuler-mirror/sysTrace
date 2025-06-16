@@ -12,57 +12,10 @@ from typing import Dict
 
 from failslow.util.constant import AnomalyType
 from failslow.util.logging_utils import get_default_logger
+from failslow.util.constant import MODEL_CONFIG_PATH
+from failslow.dataloader.step_time_reader import StepReader
 
 logger = get_default_logger(__name__)
-
-
-def process_training_log(log_file_path: str, step_data_path: str) -> pd.DataFrame:
-    df = None
-    try:
-        with open(log_file_path, 'r', encoding='utf-8') as file:
-            log_lines = file.readlines()
-
-        valid_lines = [line for line in log_lines if 'per_step_time:' in line]
-        timestamp_pattern = r'(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d+)'
-        step_time_pattern = r'per_step_time: (\d+)ms'
-
-        # 准备数据
-        timestamps = []
-        step_times = []
-
-        for line in valid_lines:
-            # 查找时间戳
-            timestamp_match = re.search(timestamp_pattern, line)
-            # 查找 per_step_time
-            step_time_match = re.search(step_time_pattern, line)
-
-            if timestamp_match and step_time_match:
-                timestamp_str = timestamp_match.group(1)
-                step_time = step_time_match.group(1)
-
-                # 处理日期时间格式，将逗号替换为小数点
-                timestamp_str = timestamp_str.replace(',', '.')
-                # 解析日期时间字符串
-                timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S.%f')
-                timestamps.append(timestamp)
-                step_times.append(float(step_time))
-
-        data = {
-            'time': timestamps,
-            'step_time': step_times
-        }
-        df = pd.DataFrame(data)
-
-        df.to_csv(step_data_path, index=False)
-        logger.info(f"数据已成功写入 {step_data_path}")
-
-    except FileNotFoundError:
-        logger.error(f"未找到指定的日志文件: {log_file_path}")
-    except Exception as e:
-        logger.error(f"处理日志文件时出现错误: {e}")
-
-    return df
-
 
 def detect_step_time_anomalies(data_df: pd.DataFrame, model_args: Dict):
     """
@@ -119,8 +72,8 @@ def detect_step_time_anomalies(data_df: pd.DataFrame, model_args: Dict):
         anomaly_info["is_anomaly"] = False
         anomaly_info["anomaly_count_times"] = 0
         anomaly_info["anomaly_info"] = []
-    anomaly_info["start_time"] = int(timestamps.iloc[0].timestamp())
-    anomaly_info["end_time"] = int(timestamps.iloc[len(timestamps) - 1].timestamp())
+    anomaly_info["start_time"] = int(timestamps.iloc[0])
+    anomaly_info["end_time"] = int(timestamps.iloc[len(timestamps) - 1])
     return anomaly_info
 
 
@@ -134,16 +87,26 @@ def write_anomaly_info(anomaly_info: Dict, fail_slow_perception_path: str, file_
     try:
         with open(fail_slow_perception_path, 'w', encoding='utf-8') as json_file:
             json.dump(anomaly_info, json_file, ensure_ascii=False, indent=4)
+        logger.info(f"anomaly info {anomaly_info}")
         logger.info(f"writing result to {fail_slow_perception_path}")
     except Exception as e:
         logger.error(f"writing result fail: {e}")
 
 
+def get_extract_func_str(log_type: str):
+    extrct_func_dict = {
+        "timeline": "get_step_data_from_timeline",
+        "log": "get_step_data_from_training_log",
+    }
+
+    return extrct_func_dict.get(log_type, None)
+
+
 def run_slow_node_perception(args: Dict):
     training_log = args.get("training_log", "./log/rank0_mindformer.log")
-    step_data_path = args.get("step_data_path", "/log/step_data.csv")
     fail_slow_perception_result = args.get("fail_slow_perception_path", "/log")
     os.makedirs(fail_slow_perception_result, exist_ok=True)
+    log_type = args.get("log_type", "timeline")
 
     task_stable_step = args.get("task_stable_step", 2)  # just for first time detection
     fail_slow_span_mins = args.get("fail_slow_span_mins", 0.1)
@@ -155,6 +118,10 @@ def run_slow_node_perception(args: Dict):
     hang_info = []
     next_detection_timestamp = None
     timer_flag = False
+
+    step_reader = StepReader()
+    log_extract_func = getattr(step_reader, get_extract_func_str(log_type))
+
     while True:
         # now_time = datetime.now(timezone.utc).astimezone().astimezone()
         # now_timestamp = now_time.timestamp()
@@ -164,10 +131,11 @@ def run_slow_node_perception(args: Dict):
         #     continue
         # next_detection_timestamp = (now_time + timedelta(minutes=fail_slow_span_mins)).timestamp()
         if timer_flag:
-            time.sleep(2)
+            time.sleep(fail_slow_span_mins * 60)
         timer_flag = True
 
-        data = process_training_log(training_log, step_data_path)
+
+        data = log_extract_func(training_log)
         training_steps = len(data)
         if not training_steps:
             logger.info(f"training data is empty.")
@@ -189,9 +157,8 @@ def run_slow_node_perception(args: Dict):
                     "detect_point": hang_info,
                     "hang_minutes": fail_slow_span_mins * hang_times_thr
                 }
-                logger.info("hang detection find training process is hang.")
+                logger.info(f"hang detection find training process is hang at: {hang_info[0]}")
                 write_anomaly_info(anomaly_info, fail_slow_perception_result)
-                break
             continue
         else:
             hang_info = []
@@ -225,7 +192,7 @@ def run_slow_node_perception(args: Dict):
         anomaly_info["anomaly_type"] = AnomalyType.fail_slow
         write_anomaly_info(anomaly_info, fail_slow_perception_result)
 
-        fail_slow_stop_flag = os.getenv('FAIL_SLOW_STOP', 'False').lower() == "True"
+        fail_slow_stop_flag = os.getenv('FAIL_SLOW_STOP', 'False').lower() == "true"
         if fail_slow_stop_flag:
             logger.info("User set stop fail slow detection.")
             break
@@ -233,11 +200,7 @@ def run_slow_node_perception(args: Dict):
 
 if __name__ == "__main__":
     ''' 循环检测， '''
-    with open("../config/model_config.json", 'r', encoding='utf-8') as reader:
+    with open(MODEL_CONFIG_PATH, 'r', encoding='utf-8') as reader:
         model_args = json.load(reader)
-    run_slow_node_perception(model_args)
 
-    # thread = threading.Thread(target=run_slow_node_perception, args=(model_args,))
-    # thread.start()
-    #
-    # thread.join()
+    run_slow_node_perception(model_args)
