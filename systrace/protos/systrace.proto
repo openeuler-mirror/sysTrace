@@ -60,3 +60,17 @@ message Pytorch {
 message Mem {
   repeated ProcMem proc_mem = 1;
 }
+
+message OSprobe {
+  repeated OSprobeEntry OSprobe_entries = 1;
+}
+
+message OSprobeEntry {
+  uint32 key = 1;
+  uint64 start_us = 2;
+  uint64 dur = 3;
+  uint64 rundelay = 4;
+  uint32 OS_event_type = 5;
+  uint32 rank = 6;
+  string comm = 7;
+}
