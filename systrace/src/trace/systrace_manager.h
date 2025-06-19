@@ -47,6 +47,7 @@ class PyTorchTrace
     std::mutex trace_mutex_;
 
     std::vector<std::string> pytorch_tracing_functions_;
+    std::string PyFuncListPath_ = "/etc/systrace/config/PyFuncList";
     pytorch_tracing::PyTorchTracingLibrary *pytorch_tracing_library_;
 };
 
