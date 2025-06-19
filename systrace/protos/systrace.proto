@@ -73,4 +73,6 @@ message OSprobeEntry {
   uint32 OS_event_type = 5;
   uint32 rank = 6;
   string comm = 7;
+  string nxt_comm = 8;
+  uint32 nxt_pid = 9;
 }
