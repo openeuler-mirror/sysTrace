@@ -605,10 +605,14 @@ void systrace_register_tracing(const char **names, int count, char **errors)
     PyGILState_STATE gstate = PyGILState_Ensure();
 
     init_tracing_data_array(count);
-    systrace_register_gc(errors);
 
-    for (int i = 1; i < count; i++)
+    for (int i = 0; i < count; i++)
     {
+        if (strcmp(names[i], "GC") == 0)
+        {
+            systrace_register_gc(errors);
+            continue;
+        }
         register_tracing_function(names[i], i, errors);
     }
 

@@ -1,0 +1,24 @@
+# PyTorch Tracing Functions Configuration File
+# -------------------------------------------
+# This file lists Python functions that should be traced by sysTrace.
+# Each line represents one function to be traced, specified in the format:
+#
+#   module.path@ClassName@method_name  (for class methods)
+#   or
+#   module.path@function_name          (for standalone functions)
+#
+# Examples:
+#   torch.utils.data.dataloader@_BaseDataLoaderIter@__next__
+# -------------------------------------------
+GC
+torch.utils.data.dataloader@_BaseDataLoaderIter@__next__
+torch_npu@npu@synchronize
+torch_npu.npu@Event@synchronize
+torch_npu.npu@Event@wait
+torch_npu.npu@Stream@synchronize
+torch_npu.npu@Stream@wait_event
+torch_npu.npu@Stream@wait_stream
+torch@autograd@backward
+torch@autograd@grad
+megatron.core.pipeline_parallel@schedules@forward_step
+megatron.core.pipeline_parallel@schedules@backward_step

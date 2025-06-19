@@ -44,26 +44,29 @@ void PyTorchTrace::initialize()
 
 void PyTorchTrace::registerTracingFunctions()
 {
-    pytorch_tracing_functions_ = {
-        "GC",
-        "torch.utils.data.dataloader@_BaseDataLoaderIter@__next__",
-        "torch_npu@npu@synchronize",
-        "torch_npu.npu@Event@synchronize",
-        "torch_npu.npu@Event@wait",
-        "torch_npu.npu@Stream@synchronize",
-        "torch_npu.npu@Stream@wait_event",
-        "torch_npu.npu@Stream@wait_stream",
-        "torch@autograd@backward",
-        "torch@autograd@grad",
-        "megatron.core.pipeline_parallel@schedules@forward_step",
-        "megatron.core.pipeline_parallel@schedules@backward_step"};
+    std::ifstream funcListFile(PyFuncListPath_);
+    std::string line;
+    if (!funcListFile.is_open())
+    {
+        STLOG(ERROR) << "Failed to open PyFuncList file";
+        return;
+    }
+    while (std::getline(funcListFile, line))
+    {
+        if (!line.empty() && line[0] != '#')
+        {
+            pytorch_tracing_functions_.push_back(line);
+        }
+    }
+
+    funcListFile.close();
 
     auto errors =
         pytorch_tracing_library_->Register(pytorch_tracing_functions_);
     for (size_t i = 0; i < pytorch_tracing_functions_.size(); ++i)
     {
         STLOG(INFO) << "Registered function: " << pytorch_tracing_functions_[i]
-                    << ", status: " << errors[i];
+                    << ", status: " << errors[i] << std::endl;
     }
 }
 
