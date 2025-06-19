@@ -12,6 +12,9 @@ import os
 import json
 import pandas as pd
 from failslow.process.convert_json2csv import convert_jsons2csv
+from failslow.util.logging_utils import get_default_logger
+
+logger = get_default_logger(__name__)
 
 __all__ = ['convert_mspti_timeline']
 
@@ -69,18 +72,22 @@ def process_df(data_df, device_id, id2name_dict: dict):
             df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split(',',
                                                                                                         expand=True)
     df = df.drop(columns=['Name'])
-    df['cat'] = "hccl"
-    df['name'] = df['comm_op']
-    df['cname'] = df['comm_op'].map(OP_COLORS)
-    df['end'] = df['end'] / 1000.
-    df['start'] = df['start'] / 1000.
-    df['dur'] = df['end'] - df['start']
-    df['ph'] = "X"
-    df['pid'] = f"rank_{device_id}"
-    df['tid'] = df["SourceKind"].map(MODE)
-    df['args'] = df.apply(create_args, axis=1)
-    result = df[['cat', 'name', 'ph', 'pid', 'tid', 'start', 'dur', 'cname', 'args']].rename(
-        columns={'start': 'ts'}).to_dict(orient='records')
+    try:
+        df['cat'] = "hccl"
+        df['name'] = df['comm_op']
+        df['cname'] = df['comm_op'].map(OP_COLORS)
+        df['end'] = df['end'] / 1000.
+        df['start'] = df['start'] / 1000.
+        df['dur'] = df['end'] - df['start']
+        df['ph'] = "X"
+        df['pid'] = f"rank_{device_id}"
+        df['tid'] = df["SourceKind"].map(MODE)
+        df['args'] = df.apply(create_args, axis=1)
+        result = df[['cat', 'name', 'ph', 'pid', 'tid', 'start', 'dur', 'cname', 'args']].rename(
+            columns={'start': 'ts'}).to_dict(orient='records')
+    except:
+        logger.error(f"data is empty!")
+        result = {}
     return result
 
 
@@ -102,11 +109,13 @@ def process_files(root_path, debug: bool = False):
         id2name_dict = df[df['Name'].notna()].set_index('Id')['Name'].to_dict()
         # df['name'] = df.groupby('id')['name'].transform(lambda x: x.ffill().bfill())
         df_host, df_device = split_df(df)
-        device_id = df_device['msptiObjectId_Ds_DeviceId'].unique()[0]
+        device_id = int(csv_file.split(".")[-2])
         host_result = process_df(df_host, device_id, id2name_dict)
-        all_ranks.extend(host_result)
+        if host_result:
+            all_ranks.extend(host_result)
         device_result = process_df(df_device, device_id, id2name_dict)
-        all_ranks.extend(device_result)
+        if device_result:
+            all_ranks.extend(device_result)
     return all_ranks
 
 
