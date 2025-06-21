@@ -9,7 +9,7 @@
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
  * Author: curry
- * Create: 2025-04-30
+ * Create: 2025-06-20
  * Description: 
  ******************************************************************************/
 #ifdef BPF_PROG_KERN
@@ -68,7 +68,6 @@ static __inline int str_eq(const char *s1, const char *s2, int len) {
 
 static __always_inline void process_oncpu(struct task_struct *task, void *ctx)
 {
-    u64 new_delay;
     u32 pid = BPF_CORE_READ(task, pid);  // 获取 TGID
     u32 tgid = BPF_CORE_READ(task, tgid);  // 获取 PID
     offcpu_task_key_s task_offcpu_key = {0};
@@ -86,32 +85,25 @@ static __always_inline void process_oncpu(struct task_struct *task, void *ctx)
     }
     trace_event_data_t cur_event;
     create_cur_event(&cur_event, pid, offcpu_enter->start_time, offcpu_enter->end_time, offcpu_enter->rank, EVENT_TYPE_OFFCPU);
-    new_delay = BPF_CORE_READ((task), sched_info.run_delay);
-    cur_event.delay = new_delay - offcpu_enter->delay;
-    // bpf_get_current_comm(&cur_event.comm, sizeof(cur_event.comm));
-    char target1[16] = "python";
-    char target2[16] = "ACL_thread";
+    cur_event.delay = offcpu_enter->delay;
+    cur_event.next_pid = offcpu_enter->next_pid;
+    bpf_probe_read_kernel(cur_event.next_comm, sizeof(cur_event.next_comm), &offcpu_enter->next_comm);
     bpf_core_read_str(cur_event.comm, sizeof(cur_event.comm), &task->comm);
-    if (str_eq(cur_event.comm, target1, sizeof(cur_event.comm)) &&
-    str_eq(cur_event.comm, target2, sizeof(cur_event.comm))) {
-        bpf_printk("emit event comm name is %s", cur_event.comm);
-    }
-    
-    // bpf_printk("emit event pid is %lu tgid is %lu", pid, BPF_CORE_READ(task, tgid));
     emit_event(&cur_event, ctx);
     bpf_map_delete_elem(&task_cpu_map, &task_offcpu_key);
 }
 
-static __always_inline void process_offcpu(struct task_struct *task, void *ctx)
+static __always_inline void process_offcpu(struct task_struct *prev, struct task_struct *current, void *ctx)
 {
     task_cpu_s *offcpu_enter;
-    offcpu_enter = get_offcpu_enter(task);
+    offcpu_enter = get_offcpu_enter(prev);
     if (offcpu_enter == (void *)0) {
         return;
     }
     offcpu_enter->start_time = bpf_ktime_get_ns();
-    offcpu_enter->delay = BPF_CORE_READ((task), sched_info.run_delay);
-    bpf_printk("delay is %llu", offcpu_enter->delay);
+    offcpu_enter->delay = BPF_CORE_READ((prev), sched_info.run_delay);
+    bpf_probe_read_kernel(offcpu_enter->next_comm, sizeof(offcpu_enter->next_comm), &current->comm);
+    offcpu_enter->next_pid = BPF_CORE_READ(current, pid);
 }
 
 KRAWTRACE(sched_switch, bpf_raw_tracepoint_args)
@@ -122,7 +114,7 @@ KRAWTRACE(sched_switch, bpf_raw_tracepoint_args)
     if (is_filter_task(current)) {
         return 0;
     }
-    process_offcpu(prev, (void *)ctx);
+    process_offcpu(prev, current, (void *)ctx);
     process_oncpu(current, (void *)ctx);
 
     return 0;

@@ -8,8 +8,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: Mr.lu
- * Create: 2021-09-28
+ * Author: curry
+ * Create: 2025-06-20
  * Description: bpf header
  ******************************************************************************/
 #ifndef __GOPHER_LIB_BPF_H__

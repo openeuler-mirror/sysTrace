@@ -9,8 +9,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: wo_cow
- * Create: 2025-04-30
+ * Author: curry
+ * Create: 2025-06-20
  * Description: 
  ******************************************************************************/
 #include <sys/stat.h>
@@ -190,6 +190,10 @@ static void add_osprobe_entry(trace_event_data_t *evt_data)
     OSprobe_ThreadData *td = get_thread_data();
 
     OSprobeEntry *entry = malloc(sizeof(OSprobeEntry));
+    if (entry == NULL) {
+        perror("malloc failed");
+        exit(EXIT_FAILURE);
+    }
     osprobe_entry__init(entry);
     entry->key = evt_data->key;
     entry->start_us = get_unix_time_from_uptime(evt_data->start_time) / NSEC_PER_USEC;
@@ -197,15 +201,12 @@ static void add_osprobe_entry(trace_event_data_t *evt_data)
     entry->rundelay = evt_data->delay;
     entry->os_event_type = (u32)evt_data->type;
     entry->rank = rank;
-    if (evt_data->comm[0] != '\0') {
-        if (strcasecmp(evt_data->comm, "python") != 0 && strcasecmp(evt_data->comm, "ACL_thread") != 0) {
-            fprintf(stderr, "[OS_PROBE RANK_%d] emit common name is: %s.\n", rank, evt_data->comm);
-        }
-        entry->comm = strdup(evt_data->comm);
-    } else {
-        char comm[16] = "unknown";
-        entry->comm = strdup(comm);
-        // fprintf(stderr, "[OS_PROBE RANK_%d] emit common name NULl evt type is: %d.\n", rank, evt_data->type);
+    entry->comm = strdup(evt_data->comm);
+
+
+    if (entry->os_event_type == EVENT_TYPE_OFFCPU && evt_data->next_comm) {
+        entry->nxt_comm = strdup(evt_data->next_comm);
+        entry->nxt_pid = evt_data->next_pid;
     }
 
     td->osprobe->n_osprobe_entries++;
@@ -410,7 +411,7 @@ int update_filter_map(){
     char line[1024];
 
     // 获取进程号
-    sleep(2);
+    sleep(10);
     fp = popen("npu-smi info", "r");
     if (fp == NULL) {
         perror("Failed to run npu-smi info");

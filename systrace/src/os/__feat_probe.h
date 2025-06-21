@@ -8,8 +8,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: Yang Hanlin
- * Create: 2023-09-18
+ * Author: curry
+ * Create: 2025-06-20
  * Description: Utility functions for feature probes
  ******************************************************************************/
 

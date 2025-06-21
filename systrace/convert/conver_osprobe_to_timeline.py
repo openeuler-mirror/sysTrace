@@ -2,6 +2,7 @@ import json
 import systrace_pb2
 import argparse
 import glob
+from collections import defaultdict
 
 event_type_dic = {
     0: "mm_fault",
@@ -14,7 +15,10 @@ event_type_dic = {
 
 def process_timeline_file(input_path, trace_data):
     last_delay = {}
-    delay = 0;
+    rank_acl = defaultdict(list)
+    rank_acl_count = defaultdict(int)
+    min_acl_thread = float('inf')
+    delay = 0
     with open(input_path, "rb") as f:
         osprobe_data = systrace_pb2.OSprobe()
         osprobe_data.ParseFromString(f.read())
@@ -24,6 +28,23 @@ def process_timeline_file(input_path, trace_data):
             if f"{entry.comm}: {entry.key}" in last_delay:
                 delay = entry.rundelay - last_delay[f"{entry.comm}: {entry.key}"]
             last_delay[f"{entry.comm}: {entry.key}"] = entry.rundelay
+        if entry.comm == "ACL_thread":
+            rank_acl_count[entry.key] += 1
+            rank_acl[entry.key].append({
+                "name": event_type_dic[entry.OS_event_type],
+                "cat": "osprobe",
+                "ph": "X",
+                "pid": entry.rank if entry.OS_event_type in [0, 4] else f"CPU: {entry.key}",
+                "tid":  f"{entry.comm}: {entry.key}" if entry.OS_event_type in [0, 4] else entry.key ,
+                "ts": entry.start_us,
+                "dur": entry.dur,
+                "args": {
+                    "cpu_rundelay": delay,
+                    "sus_comm": entry.nxt_comm,
+                    "sus_pid": entry.nxt_pid
+                } if entry.OS_event_type == 4 else {}
+            })
+            continue
 
         trace_data["traceEvents"].append({
             "name": event_type_dic[entry.OS_event_type],
@@ -34,9 +55,13 @@ def process_timeline_file(input_path, trace_data):
             "ts": entry.start_us,
             "dur": entry.dur,
             "args": {
-                "cpu_rundelay": delay
+                "cpu_rundelay": delay,
+                "next_comm": entry.nxt_comm,
+                "next_pid": entry.nxt_pid
             } if entry.OS_event_type == 4 else {}
         })
+    acl_thread = max(rank_acl_count, key=lambda k: rank_acl_count[k])
+    trace_data["traceEvents"].extend(rank_acl[acl_thread])
 
 def aggregate_timeline_files(output_path):
     trace_data = {

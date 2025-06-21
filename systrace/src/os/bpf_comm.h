@@ -8,8 +8,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: wo_cow
- * Create: 2025-04-30
+ * Author: curry
+ * Create: 2025-06-20
  * Description: 
  ******************************************************************************/
 
@@ -30,11 +30,13 @@ typedef struct {
 } offcpu_task_key_s;
 
 typedef struct {
-    int pid;
+    u32 pid;
     int rank;
     __u64 start_time;
     __u64 end_time;
     __u64 delay;
+    char next_comm[THREAD_COMM_LEN];
+    u32 next_pid;
 } task_cpu_s;
 
 typedef struct {

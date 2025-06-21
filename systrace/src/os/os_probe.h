@@ -8,8 +8,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: luzhihao
- * Create: 2024-04-17
+ * Author: curry
+ * Create: 2025-06-20
  * Description: sli probe
  ******************************************************************************/
 #ifndef __OS_PROBE_H__

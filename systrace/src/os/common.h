@@ -8,8 +8,8 @@
  * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
  * PURPOSE.
  * See the Mulan PSL v2 for more details.
- * Author: Mr.lu
- * Create: 2022-5-30
+ * Author: curry
+ * Create: 2025-06-20
  * Description: common macro define
  ******************************************************************************/
 #ifndef __GOPHER_COMMON_H__
