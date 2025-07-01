@@ -56,6 +56,14 @@
     MAP_SET_PIN_PATH(probe_name, osprobe_map_5, "/sys/fs/bpf/sysTrace/__osprobe_map_5" , load); \
     MAP_SET_PIN_PATH(probe_name, osprobe_map_6, "/sys/fs/bpf/sysTrace/__osprobe_map_6" , load); \
     MAP_SET_PIN_PATH(probe_name, osprobe_map_7, "/sys/fs/bpf/sysTrace/__osprobe_map_7" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_8, "/sys/fs/bpf/sysTrace/__osprobe_map_8" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_9, "/sys/fs/bpf/sysTrace/__osprobe_map_9" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_10, "/sys/fs/bpf/sysTrace/__osprobe_map_10" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_11, "/sys/fs/bpf/sysTrace/__osprobe_map_11" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_12, "/sys/fs/bpf/sysTrace/__osprobe_map_12" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_13, "/sys/fs/bpf/sysTrace/__osprobe_map_13" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_14, "/sys/fs/bpf/sysTrace/__osprobe_map_14" , load); \
+    MAP_SET_PIN_PATH(probe_name, osprobe_map_15, "/sys/fs/bpf/sysTrace/__osprobe_map_15" , load); \
     MAP_SET_PIN_PATH(probe_name, proc_filter_map, PROC_FILTER_MAP_PATH, load); \
     MAP_SET_PIN_PATH(probe_name, kernel_filter_map, KERNEL_FILTER_MAP_PATH, load); \
 
@@ -76,6 +84,8 @@ static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 static int rank;
 static int local_rank;
 static u64 sysBootTime;
+static struct bpf_prog_s *prog = NULL;
+
 
 typedef struct
 {
@@ -376,8 +386,10 @@ err:
     return -1;
 }
 
-int update_filter_map(){
-    int proc_filter_map_fd, kernel_filter_map_fd;
+int update_filter_map_by_npu_smi() {
+    FILE *fp;
+    char line[MAX_PATH_LEN];
+    int proc_filter_map_fd;
     int ret = 0;
     proc_filter_map_fd = bpf_obj_get(PROC_FILTER_MAP_PATH);
     if (proc_filter_map_fd < 0) {
@@ -385,33 +397,7 @@ int update_filter_map(){
         fprintf(stderr, "[OS_PROBE RANK_%d] Failed to get bpf prog proc_filter map: %s.\n", rank, strerror(errno));
         return -1;
     }
-    kernel_filter_map_fd = bpf_obj_get(KERNEL_FILTER_MAP_PATH);
-    if (kernel_filter_map_fd < 0) {
-        // 打印error num
-        fprintf(stderr, "[OS_PROBE RANK_%d] Failed to get bpf prog kernel_filter map: %s.\n", rank, strerror(errno));
-        return -1;
-    }
-    for (int dev_id = 0; dev_id < 8; ++dev_id) {
-        char send_key[16] = {0};
-        char task_key[16] = {0};
-        snprintf(send_key, sizeof(send_key), "dev%d_sq_send_wq", dev_id);
-        snprintf(task_key, sizeof(task_key), "dev%d_sq_task", dev_id);
-
-        ret = bpf_map_update_elem(kernel_filter_map_fd, send_key, &dev_id, BPF_ANY);
-        if (ret != 0) {
-            perror("bpf_map_update_elem failed");
-        }
-        ret = bpf_map_update_elem(kernel_filter_map_fd, task_key, &dev_id, BPF_ANY);
-        if (ret != 0) {
-            perror("bpf_map_update_elem failed");
-        }
-    }
-
-    FILE *fp;
-    char line[1024];
-
     // 获取进程号
-    sleep(10);
     fp = popen("npu-smi info", "r");
     if (fp == NULL) {
         perror("Failed to run npu-smi info");
@@ -441,8 +427,35 @@ int update_filter_map(){
         }
     }
     pclose(fp);
+    return ret;
+}
 
-    return 0;
+int update_filter_map_by_kernel_thread() {
+    int kernel_filter_map_fd;
+    int ret = 0;
+    kernel_filter_map_fd = bpf_obj_get(KERNEL_FILTER_MAP_PATH);
+    if (kernel_filter_map_fd < 0) {
+        // 打印error num
+        fprintf(stderr, "[OS_PROBE RANK_%d] Failed to get bpf prog kernel_filter map: %s.\n", rank, strerror(errno));
+        return -1;
+    }
+    for (int dev_id = 0; dev_id < 16; ++dev_id) {
+        char send_key[16] = {0};
+        char task_key[16] = {0};
+        snprintf(send_key, sizeof(send_key), "dev%d_sq_send_wq", dev_id);
+        snprintf(task_key, sizeof(task_key), "dev%d_sq_task", dev_id);
+
+        ret = bpf_map_update_elem(kernel_filter_map_fd, send_key, &dev_id, BPF_ANY);
+        if (ret != 0) {
+            perror("bpf_map_update_elem failed");
+        }
+        ret = bpf_map_update_elem(kernel_filter_map_fd, task_key, &dev_id, BPF_ANY);
+        if (ret != 0) {
+            perror("bpf_map_update_elem failed");
+        }
+    }
+
+    return ret;
 }
 
 int bpf_buffer_init_from_pin(struct bpf_buffer **buffer_ptr, const char *map_path,
@@ -495,20 +508,25 @@ int bpf_buffer_init_from_pin(struct bpf_buffer **buffer_ptr, const char *map_pat
     return 0;
 }
 
-int run_osprobe() {
+void cleanup_osprobe() {
     FILE *fp;
+    fp = popen(RM_MAP_PATH, "r");
+    if (fp != NULL) {
+        (void)pclose(fp);
+        fp = NULL;
+    }
+    unload_bpf_prog(&prog);
+    if (prog) {
+        free_bpf_prog(prog);
+    }
+}
+
+int run_osprobe() {
     int ret = 0;
-    struct bpf_prog_s *prog = NULL;
     struct bpf_buffer *buffer = NULL;
     initialize_osprobe();
 
     if (local_rank == 0) {
-        
-        fp = popen(RM_MAP_PATH, "r");
-        if (fp != NULL) {
-            (void)pclose(fp);
-            fp = NULL;
-        }
         prog = alloc_bpf_prog();
         if (prog == NULL) {
             goto err;
@@ -524,12 +542,20 @@ int run_osprobe() {
             fprintf(stderr, "[OS_PROBE RANK_%d] load cpu probe failed.\n", rank);
             goto err;
         }
-        if (update_filter_map()) {
-            fprintf(stderr, "[OS_PROBE RANK_%d] Failed to update proc_filter map.\n", rank);
+        if (update_filter_map_by_kernel_thread()) {
+            fprintf(stderr, "[OS_PROBE RANK_%d] Failed to update proc_filter map by kernel thread.\n", rank);
+            goto err;
+        }
+        sleep(60);
+        if (update_filter_map_by_npu_smi()) {
+            fprintf(stderr, "[OS_PROBE RANK_%d] Failed to update proc_filter map by npu-smi info.\n", rank);
             goto err;
         }
         while (!g_stop) {
             sleep(1);
+            if (!checkAndUpdateTimer(3)) {
+                continue; 
+            }
             for (int i = 0; i < prog->num; i++) {
                 if (prog->buffers[i]
                     && ((ret = bpf_buffer__poll(prog->buffers[i], THOUSAND)) < 0)
@@ -559,6 +585,9 @@ int run_osprobe() {
             goto err;
         }
         while (!g_stop) {
+            if (!checkAndUpdateTimer(3)) {
+                continue; 
+            }
             if (((ret = bpf_buffer__poll(buffer, THOUSAND)) < 0)
                 && ret != -EINTR) {
                 fprintf(stderr, "[OS_PROBE RANK_%d] perf poll prog failed:%s.\n", local_rank, strerror(errno));
@@ -569,14 +598,6 @@ int run_osprobe() {
 
     fprintf(stderr, "[OS_PROBE RANK_%d] sysTrace ebpf trace finished\n", local_rank);
 err:
-    fp = popen(RM_MAP_PATH, "r");
-    if (fp != NULL) {
-        (void)pclose(fp);
-        fp = NULL;
-    }
-    unload_bpf_prog(&prog);
-    if (prog) {
-        free_bpf_prog(prog);
-    }
+    cleanup_osprobe();
     return ret;
 }

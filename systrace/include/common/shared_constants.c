@@ -55,16 +55,23 @@ int init_shared_memory()
     shared_data->g_dump_L0 = true;
     shared_data->g_dump_L1 = false;
     shared_data->g_dump_L2 = false;
+    shared_data->g_dump_L3 = false;
     shared_data->g_dump_L1_interval = 5;
     shared_data->g_dump_L2_interval = 5;
+    shared_data->g_dump_L3_interval = 2;
     shared_data->g_L1_timer_active = false;
     shared_data->g_L2_timer_active = false;
+    shared_data->g_L3_timer_active = false;
     shared_data->g_L1_start_time = 0;
     shared_data->g_L2_start_time = 0;
+    shared_data->g_L3_start_time = 0;
     shared_data->dumped_L1 = false;
     shared_data->dumped_L2 = false;
+    shared_data->dumped_L3 = false;
     shared_data->need_dump_L1_once = false;
     shared_data->need_dump_L2_once = false;
+    shared_data->need_dump_L3_once = false;
+    
     return 0;
 }
 
@@ -131,6 +138,15 @@ bool checkAndUpdateTimer(int level) {
             level_name = "L2";
             dumped = &shared_data->dumped_L2;
             need_dump_once = &shared_data->need_dump_L2_once;
+            break;
+        case 3:  // L2
+            dump_flag = &shared_data->g_dump_L3;
+            interval = &shared_data->g_dump_L3_interval;
+            timer_active = &shared_data->g_L3_timer_active;
+            start_time = &shared_data->g_L3_start_time;
+            level_name = "L3";
+            dumped = &shared_data->dumped_L3;
+            need_dump_once = &shared_data->need_dump_L3_once;
             break;
         default:
             pthread_mutex_unlock(&shared_data->g_trace_mutex);

@@ -6,9 +6,16 @@
 #include "../../include/common/constant.h"
 #include "../../include/common/shared_constants.h"
 #include "systrace_manager.h"
+// #include "../../src/os/os_probe.h"
 
 int global_stage_id = 0;
 int global_stage_type = 0;
+
+extern "C" {
+    int run_osprobe();
+    void cleanup_osprobe();
+}
+
 namespace systrace
 {
 
@@ -197,7 +204,11 @@ SysTrace &SysTrace::getInstance()
     return *instance_;
 }
 
-SysTrace::~SysTrace() { stopEventPoller(); }
+SysTrace::~SysTrace()
+{
+    stopOsProbePoller();
+    stopEventPoller();
+}
 
 void SysTrace::initializeSystem()
 {
@@ -208,6 +219,7 @@ void SysTrace::initializeSystem()
     MonitorServer::getInstance();
     MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
+    os_probe_ = std::thread(&run_osprobe);
 
     startEventPoller();
 }
@@ -220,6 +232,15 @@ void SysTrace::startEventPoller()
     pthread_setname_np(event_poller_.native_handle(), "systrace_poller");
 #endif
     STLOG(INFO) << "[SysTrace] Event poller started";
+}
+
+void SysTrace::stopOsProbePoller()
+{
+    cleanup_osprobe();
+    if (os_probe_.joinable())
+    {
+        os_probe_.join();
+    }
 }
 
 void SysTrace::stopEventPoller()
