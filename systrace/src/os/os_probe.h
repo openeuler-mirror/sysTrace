@@ -33,10 +33,12 @@ typedef struct {
     int rank;
     long long unsigned int start_time;
     long long unsigned int end_time;
-    long long unsigned int duration;  // 若为多个事件聚合，则表示累计的执行时间
+    long long unsigned int duration; 
     event_type_e type;
     long long unsigned int delay;
     char comm[THREAD_COMM_LEN];
+    char next_comm[THREAD_COMM_LEN];
+    long unsigned int next_pid;
 } trace_event_data_t;
 
 #endif

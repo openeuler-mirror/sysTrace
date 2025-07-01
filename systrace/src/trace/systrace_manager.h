@@ -66,6 +66,7 @@ class SysTrace
     void initializeSystem();
     void startEventPoller();
     void stopEventPoller();
+    void stopOsProbePoller();
     void eventPollerMain();
 
     inline static SysTrace *instance_ = nullptr;
@@ -74,6 +75,7 @@ class SysTrace
     std::atomic<bool> should_run_{true};
     std::atomic<uint64_t> loop_count_{0};
     std::thread event_poller_;
+    std::thread os_probe_;
 };
 
 } // namespace systrace

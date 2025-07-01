@@ -2,6 +2,12 @@
 
 sudo dnf remove -y libunwind libunwind-devel 2>/dev/null || true
 mkdir -p build
+mkdir -p /etc/systrace/config
+rm /sys/fs/bpf/sysTrace -rf
+mount -t bpf bpf /sys/fs/bpf/
+rm src/os/*.o -rf
+rm src/os/*.skel.h -rf
+
 cp -f config/PyFuncList /etc/systrace/config/PyFuncList
 
 cd protos

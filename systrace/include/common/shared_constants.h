@@ -20,16 +20,22 @@ extern "C"
         bool g_dump_L0;
         bool g_dump_L1;
         bool g_dump_L2;
+        bool g_dump_L3;
         unsigned int g_dump_L1_interval;
         unsigned int g_dump_L2_interval;
+        unsigned int g_dump_L3_interval;
         bool g_L1_timer_active;
         bool g_L2_timer_active;
+        bool g_L3_timer_active;
         bool dumped_L1; // Indicates if L1 has been dumped
         bool dumped_L2; // Indicates if L2 has been dumped
+        bool dumped_L3; // Indicates if L3 has been dumped
         bool need_dump_L1_once; // Indicates if L1 dump is needed once
         bool need_dump_L2_once; // Indicates if L2 dump is needed once
+        bool need_dump_L3_once; // Indicates if L3 dump is needed once
         time_t g_L1_start_time;
         time_t g_L2_start_time;
+        time_t g_L3_start_time;
         pthread_mutex_t g_trace_mutex;
     } SharedData;
 

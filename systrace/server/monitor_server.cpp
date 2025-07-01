@@ -170,6 +170,10 @@ void MonitorServer::process_command(
         {
             shared_data->g_dump_L2 = value;
         }
+        else if (level == "L3")
+        {
+            shared_data->g_dump_L3 = value;
+        }
         else
         {
             pthread_mutex_unlock(&shared_data->g_trace_mutex);
@@ -215,6 +219,10 @@ void MonitorServer::process_command(
         {
             shared_data->g_dump_L2_interval = value;
         }
+        else if (level == "L3")
+        {
+            shared_data->g_dump_L3_interval = value;
+        }
         else
         {
             pthread_mutex_unlock(&shared_data->g_trace_mutex);
@@ -243,8 +251,11 @@ void MonitorServer::process_command(
                 << "\n"
                 << "  L2: " << (shared_data->g_dump_L2 ? "true" : "false")
                 << "\n"
+                << "  L3: " << (shared_data->g_dump_L3 ? "true" : "false")
+                << "\n"
                 << "  L1_interval: " << shared_data->g_dump_L1_interval << "\n"
-                << "  L2_interval: " << shared_data->g_dump_L2_interval << "\n";
+                << "  L2_interval: " << shared_data->g_dump_L2_interval << "\n"
+                << "  L3_interval: " << shared_data->g_dump_L3_interval << "\n";
         }
         else if (level == "L0")
         {
@@ -260,6 +271,11 @@ void MonitorServer::process_command(
         {
             oss << "L2: " << (shared_data->g_dump_L2 ? "true" : "false") << "\n"
                 << "L2_interval: " << shared_data->g_dump_L2_interval << "\n";
+        }
+        else if (level == "L3")
+        {
+            oss << "L3: " << (shared_data->g_dump_L3 ? "true" : "false") << "\n"
+                << "L3_interval: " << shared_data->g_dump_L3_interval << "\n";
         }
         else
         {
