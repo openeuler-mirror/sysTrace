@@ -3,15 +3,15 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：slow_node_detection.py
-Author: h00568282/huangbin
+Author: c00570162/congdechun
 Create Date: 2025/3/26 11:23
 Notes:
 
 """
+import sys
 import os
 import json
 import pandas as pd
-from convert_json2csv import convert_jsons2csv
 
 __all__ = ['convert_mspti_timeline']
 
@@ -61,21 +61,30 @@ def process_df(data_df, device_id, id2name_dict: dict):
         'Name': 'first',
     }).reset_index()
     df.columns = ['Id', 'start', 'end', 'Kind', 'SourceKind', 'Name']
-    df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split(',',
+    if len(df):
+        if "!" in df["Name"].iloc[0]:
+            df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split('!',
+                                                                                                        expand=True)
+        else:
+            df[['comm_op', 'comm_group', 'data_type', 'count']] = df['Name'].str.replace('comm:', '').str.split(',',
                                                                                                         expand=True)
     df = df.drop(columns=['Name'])
-    df['cat'] = "hccl"
-    df['name'] = df['comm_op']
-    df['cname'] = df['comm_op'].map(OP_COLORS)
-    df['end'] = df['end'] / 1000.
-    df['start'] = df['start'] / 1000.
-    df['dur'] = df['end'] - df['start']
-    df['ph'] = "X"
-    df['pid'] = f"rank_{device_id}"
-    df['tid'] = df["SourceKind"].map(MODE)
-    df['args'] = df.apply(create_args, axis=1)
-    result = df[['cat', 'name', 'ph', 'pid', 'tid', 'start', 'dur', 'cname', 'args']].rename(
-        columns={'start': 'ts'}).to_dict(orient='records')
+    try:
+        df['cat'] = "hccl"
+        df['name'] = df['comm_op']
+        df['cname'] = df['comm_op'].map(OP_COLORS)
+        df['end'] = df['end'] / 1000.
+        df['start'] = df['start'] / 1000.
+        df['dur'] = df['end'] - df['start']
+        df['ph'] = "X"
+        df['pid'] = f"rank_{device_id}"
+        df['tid'] = df["SourceKind"].map(MODE)
+        df['args'] = df.apply(create_args, axis=1)
+        result = df[['cat', 'name', 'ph', 'pid', 'tid', 'start', 'dur', 'cname', 'args']].rename(
+            columns={'start': 'ts'}).to_dict(orient='records')
+    except:
+        print(f"data is empty!")
+        result = {}
     return result
 
 
@@ -86,6 +95,8 @@ def process_files(root_path, debug: bool = False):
     csv_files = [file for file in os.listdir(root_path) if file.endswith("csv") and "device" not in file]
     all_ranks = []
     for csv_file in csv_files:
+        if "op_launch" in csv_file:
+            continue
         print(f"start file: {csv_file}")
         csv_file_path = os.path.join(root_path, csv_file)
         df = pd.read_csv(csv_file_path)
@@ -95,11 +106,13 @@ def process_files(root_path, debug: bool = False):
         id2name_dict = df[df['Name'].notna()].set_index('Id')['Name'].to_dict()
         # df['name'] = df.groupby('id')['name'].transform(lambda x: x.ffill().bfill())
         df_host, df_device = split_df(df)
-        device_id = df_device['msptiObjecId_Ds_DeviceId'].unique()[0]
+        device_id = int(csv_file.split(".")[-2])
         host_result = process_df(df_host, device_id, id2name_dict)
-        all_ranks.extend(host_result)
+        if host_result:
+            all_ranks.extend(host_result)
         device_result = process_df(df_device, device_id, id2name_dict)
-        all_ranks.extend(device_result)
+        if device_result:
+            all_ranks.extend(device_result)
     return all_ranks
 
 
@@ -117,13 +130,17 @@ def save_to_json(all_ranks, files_path):
 
 
 def convert_mspti_timeline(data_path: str):
-    convert_jsons2csv(data_path)
+    '''
+        @return:
+        @params:
+            data_path: mspti采集数据的路径
+    '''
     all_ranks = process_files(data_path)
     save_to_json(all_ranks, data_path)
 
 
 if __name__ == "__main__":
-    files_path = "D:\\startwork\\AOPS\\09-25年技术规划\\Code\\mspti_test-megatron-0224\\mspti_test-megatron-0224\\data\\log\\all_merge"
-    convert_jsons2csv(files_path)
-    all_ranks = process_files(files_path)
-    save_to_json(all_ranks, files_path)
+    if len(sys.argv) != 2:
+        print("Usage: python convert_mspti_timeline.py input_file_path")
+        sys.exit(1)
+    convert_mspti_timeline(sys.argv[1])
