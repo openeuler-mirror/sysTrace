@@ -68,10 +68,12 @@ def detect_step_time_anomalies(data_df: pd.DataFrame, model_args: Dict):
         anomaly_info["is_anomaly"] = True
         anomaly_info["anomaly_count_times"] = len(anomalies)
         anomaly_info["anomaly_info"] = anomalies
+        anomaly_info["anomaly_type"] = AnomalyType.fail_slow
     else:
         anomaly_info["is_anomaly"] = False
         anomaly_info["anomaly_count_times"] = 0
         anomaly_info["anomaly_info"] = []
+        anomaly_info["anomaly_type"] = AnomalyType.normal
     anomaly_info["start_time"] = int(timestamps.iloc[0])
     anomaly_info["end_time"] = int(timestamps.iloc[len(timestamps) - 1])
     return anomaly_info
@@ -187,9 +189,8 @@ def run_slow_node_perception(args: Dict):
             detecting_range_steps[0] = task_stable_step
         logger.info(f"Detection data: {detecting_range_steps}.")
         data = data.loc[detecting_range_steps[0]: detecting_range_steps[1]].reset_index(drop=True)
-        anomaly_info = detect_step_time_anomalies(data, model_args)
+        anomaly_info = detect_step_time_anomalies(data, args)
 
-        anomaly_info["anomaly_type"] = AnomalyType.fail_slow
         write_anomaly_info(anomaly_info, fail_slow_perception_result)
 
         fail_slow_stop_flag = os.getenv('FAIL_SLOW_STOP', 'False').lower() == "true"

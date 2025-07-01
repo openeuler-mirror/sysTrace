@@ -19,6 +19,7 @@ HOUR_TO_SECONDS = 3600
 MS_TO_NS = 1e6
 
 class AnomalyType:
+    normal = "normal"
     fail_slow = "failSlow"
     hang = "hang"
 
