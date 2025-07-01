@@ -6,7 +6,6 @@
 #include <condition_variable>
 #include <fstream>
 #include <iostream>
-#include <json/json.h>
 #include <mutex>
 #include <string.h>
 #include <thread>

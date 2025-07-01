@@ -72,6 +72,5 @@ target_link_libraries(sysTrace_hook
     ${CMAKE_THREAD_LIBS}
     pthread
     os_probe
-    jsoncpp
     -ldl
 )
