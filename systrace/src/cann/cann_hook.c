@@ -191,15 +191,11 @@ static void get_log_filename(time_t current, uint32_t pid, char *buf,
         if (mkdir(dir_path, 0755) != 0 && errno != EEXIST)
         {
             perror("Failed to create directory");
-            snprintf(buf, buf_size, "mem_trace_%04d%02d%02d_%02d_%u_rank%d.pb",
-                     tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                     tm->tm_hour, pid, rank);
+            snprintf(buf, buf_size, "mem_trace_rank%d.pb",rank);
             return;
         }
     }
-    snprintf(buf, buf_size, "%s/mem_trace_%04d%02d%02d_%02d_%u_rank%d.pb",
-             dir_path, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-             tm->tm_hour, pid, rank);
+    snprintf(buf, buf_size, "%s/mem_trace_rank%d.pb", dir_path, rank);
 }
 
 static char is_ready_to_write(ThreadData *td, time_t *current)
