@@ -138,6 +138,9 @@ static __always_inline int common_event_end(struct task_struct *task, void *ctx,
 KPROBE(handle_mm_fault, pt_regs)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     fault_event_start(task, EVENT_TYPE_MM_FAULT);
 
     return 0;
@@ -146,6 +149,9 @@ KPROBE(handle_mm_fault, pt_regs)
 KRETPROBE(handle_mm_fault, pt_regs)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     fault_event_end(task, ctx, EVENT_TYPE_MM_FAULT);
 
     return 0;
@@ -154,6 +160,9 @@ KRETPROBE(handle_mm_fault, pt_regs)
 KPROBE(do_swap_page, pt_regs)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     common_event_start(task, EVENT_TYPE_SWAP_PAGE);
     return 0;
 }
@@ -161,6 +170,9 @@ KPROBE(do_swap_page, pt_regs)
 KRETPROBE(do_swap_page, pt_regs)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     common_event_end(task, ctx, EVENT_TYPE_SWAP_PAGE);
     return 0;
 }
@@ -168,6 +180,9 @@ KRETPROBE(do_swap_page, pt_regs)
 KRAWTRACE(mm_compaction_begin, bpf_raw_tracepoint_args)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     common_event_start(task, EVENT_TYPE_COMPACTION);
     return 0;
 }
@@ -175,6 +190,9 @@ KRAWTRACE(mm_compaction_begin, bpf_raw_tracepoint_args)
 KRAWTRACE(mm_compaction_end, bpf_raw_tracepoint_args)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     common_event_end(task, ctx, EVENT_TYPE_COMPACTION);
     return 0;
 }
@@ -182,6 +200,9 @@ KRAWTRACE(mm_compaction_end, bpf_raw_tracepoint_args)
 KRAWTRACE(mm_vmscan_direct_reclaim_begin, bpf_raw_tracepoint_args)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     common_event_start(task, EVENT_TYPE_VMSCAN);
     return 0;
 }
@@ -189,6 +210,9 @@ KRAWTRACE(mm_vmscan_direct_reclaim_begin, bpf_raw_tracepoint_args)
 KRAWTRACE(mm_vmscan_direct_reclaim_end, bpf_raw_tracepoint_args)
 {
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
+    if (task == NULL) {
+        return 0;
+    }
     common_event_end(task, ctx, EVENT_TYPE_VMSCAN);
     return 0;
 }

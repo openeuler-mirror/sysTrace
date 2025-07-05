@@ -151,6 +151,7 @@ struct {
     __uint(max_entries, 128);
 } proc_filter_map SEC(".maps");
 
+#define MAX_COMM_LEN 16
 static __always_inline void emit_event(trace_event_data_t *event, void *ctx)
 {
     if (!event) {
@@ -201,23 +202,38 @@ static __always_inline void create_cur_event(trace_event_data_t *cur_event, int 
     cur_event->rank = rank;
 }
 
-static int strcase_match(const char *s1, const char *s2)
+static int strcase_match(const char *s1, const char *s2, int n)
 {
-    while (*s1 && *s2) {
-        char c1 = *s1;
-        char c2 = *s2;
+    unsigned char c1, c2;
+#pragma unroll
+    while (n--) {
+        c1 = *s1++;
+        c2 = *s2++;
 
-        if (c1 >= 'A' && c1 <= 'Z')
-            c1 += 'a' - 'A';
+        if (!c1 || !c2)
+            break;
 
-        if (c1 != c2)
-            return 0;
+        // 转换为小写进行比较
+        if (c1 == c2)
+            continue;
 
-        s1++;
-        s2++;
+        if ((c1 >= 'A' && c1 <= 'Z') && (c2 >= 'a' && c2 <= 'z') && (c1 + 32 == c2))
+            continue;
+
+        if ((c2 >= 'A' && c2 <= 'Z') && (c1 >= 'a' && c1 <= 'z') && (c2 + 32 == c1))
+            continue;
+
+        // 不相等
+        return (int)c1 - (int)c2;
     }
 
-    return (*s1 == '\0' && *s2 == '\0');
+    if (n == (size_t)-1) { /* 如果循环是因为n用完而不是遇到\0 */
+        // 检查最后一个字符是否都为 '\0'
+        if (!c1 && !c2)
+            return 0;
+    }
+
+    return (int)c1 - (int)c2;
 }
 
 static __always_inline int get_npu_id(struct task_struct *task)
@@ -243,7 +259,7 @@ static __always_inline int get_npu_id(struct task_struct *task)
 
     // 匹配ACL线程
     const char target[] = "acl_thread";
-    if (strcase_match(comm, target)) {
+    if (strcase_match(comm, target, MAX_COMM_LEN)) {
         u32 tgid = BPF_CORE_READ(task, tgid);
         rank = bpf_map_lookup_elem(&proc_filter_map, &tgid);
         if (rank) {
