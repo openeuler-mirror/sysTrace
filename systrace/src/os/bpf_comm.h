@@ -201,10 +201,23 @@ static __always_inline void create_cur_event(trace_event_data_t *cur_event, int 
     cur_event->rank = rank;
 }
 
-static __always_inline char is_filter_task(struct task_struct *task)
+static int strcase_match(const char *s1, const char *s2)
 {
-    unsigned int flags = BPF_CORE_READ(task, flags);
-    return (char)((flags & PF_IDLE) || (flags & PF_KTHREAD));
+    while (*s1 && *s2) {
+        char c1 = *s1;
+        char c2 = *s2;
+
+        if (c1 >= 'A' && c1 <= 'Z')
+            c1 += 'a' - 'A';
+
+        if (c1 != c2)
+            return 0;
+
+        s1++;
+        s2++;
+    }
+
+    return (*s1 == '\0' && *s2 == '\0');
 }
 
 static __always_inline int get_npu_id(struct task_struct *task)
@@ -229,15 +242,8 @@ static __always_inline int get_npu_id(struct task_struct *task)
     }
 
     // 匹配ACL线程
-    int match = 1;
-    const char target[] = "ACL_thread";
-    for (int i = 0; i < sizeof(target); i++) {
-        if (comm[i] != target[i]) {
-            match = 0;
-            break;
-        }
-    }
-    if (match) {
+    const char target[] = "acl_thread";
+    if (strcase_match(comm, target)) {
         u32 tgid = BPF_CORE_READ(task, tgid);
         rank = bpf_map_lookup_elem(&proc_filter_map, &tgid);
         if (rank) {

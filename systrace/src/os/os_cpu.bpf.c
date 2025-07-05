@@ -110,10 +110,7 @@ KRAWTRACE(sched_switch, bpf_raw_tracepoint_args)
 {
     struct task_struct *prev = (struct task_struct *)ctx->args[1];
     struct task_struct *current = (struct task_struct *)ctx->args[2];
-
-    if (is_filter_task(current)) {
-        return 0;
-    }
+    
     process_offcpu(prev, current, (void *)ctx);
     process_oncpu(current, (void *)ctx);
 

@@ -110,3 +110,10 @@ def aggregate_timeline_files(output_path):
         json.dump(cpu_trace_data, f, indent=None, separators=(',', ':'))
         
     print(f"Aggregated {len(trace_data['traceEvents'])} events to {output_path}")
+
+    
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Aggregate all *.timeline files into a single JSON')
+    parser.add_argument('--output', required=True, help='Output JSON file path')
+    args = parser.parse_args()
+    aggregate_timeline_files(args.output)
