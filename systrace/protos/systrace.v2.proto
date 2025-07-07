@@ -1,0 +1,76 @@
+syntax = "proto2";
+
+message StackFrame {
+    optional uint64 address = 1;
+    optional string so_name = 2;
+}
+
+message MemAllocEntry {
+  optional uint64 alloc_ptr = 1;
+  optional uint32 stage_id = 2;
+  optional StageType stage_type = 3;
+  optional uint64 mem_size = 4;
+  repeated StackFrame stack_frames = 5;
+}
+
+message MemFreeEntry {
+  optional uint64 alloc_ptr = 1;
+  optional uint32 stage_id = 2;
+  optional StageType stage_type = 3;
+}
+
+message ProcMem {
+  optional uint32 pid = 1;
+  repeated MemAllocEntry mem_alloc_stacks = 2;
+  repeated MemFreeEntry mem_free_stacks = 3;
+}
+
+enum StageType {
+  STAGE_UNKNOWN = 0;
+  STAGE_DATALOADER = 1;
+  STAGE_FORWARD = 2;
+  STAGE_BACKWARD = 3;
+  STAGE_SYNCHRONIZATION = 4;
+  STAGE_GC = 5;
+}
+
+message GcDebugData {
+  optional uint32 collected = 1;
+  optional uint32 uncollectable = 2;
+}
+
+message PytorchStage {
+  optional uint32 stage_id = 1;
+  optional string stage_type = 2;
+  optional uint64 start_us = 3;
+  optional uint64 end_us = 4;
+  repeated string stack_frames = 5;
+  optional GcDebugData gc_debug = 6;
+}
+
+message Pytorch {
+  repeated PytorchStage pytorch_stages = 1;
+  optional uint32 rank = 2;
+  optional uint32 step_id = 3;  
+  optional string comm = 4;  // 任务名
+}
+
+message Mem {
+  repeated ProcMem proc_mem = 1;
+}
+
+message OSprobe {
+  repeated OSprobeEntry OSprobe_entries = 1;
+}
+
+message OSprobeEntry {
+  optional uint32 key = 1;
+  optional uint64 start_us = 2;
+  optional uint64 dur = 3;
+  optional uint64 rundelay = 4;
+  optional uint32 OS_event_type = 5;
+  optional uint32 rank = 6;
+  optional string comm = 7;
+  optional string nxt_comm = 8;
+  optional uint32 nxt_pid = 9;
+}
