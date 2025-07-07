@@ -10,7 +10,6 @@
 # Examples:
 #   torch.utils.data.dataloader@_BaseDataLoaderIter@__next__
 # -------------------------------------------
-GC
 torch.utils.data.dataloader@_BaseDataLoaderIter@__next__
 torch_npu@npu@synchronize
 torch_npu.npu@Event@synchronize
