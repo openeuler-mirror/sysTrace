@@ -113,7 +113,7 @@ bool checkAndUpdateTimer(int level) {
     pthread_mutex_lock(&shared_data->g_trace_mutex);
 
     bool* dump_flag = NULL;
-    unsigned int* interval = NULL;
+    float* interval = NULL;
     bool* timer_active = NULL;
     time_t* start_time = NULL;
     const char* level_name = "";
