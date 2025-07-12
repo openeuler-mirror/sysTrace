@@ -182,6 +182,30 @@ static __always_inline void emit_event(trace_event_data_t *event, void *ctx)
     case 7:
         bpf_ringbuf_output(&osprobe_map_7, event, sizeof(*event), 0);
         break;
+    case 8:
+        bpf_ringbuf_output(&osprobe_map_8, event, sizeof(*event), 0);
+        break;
+    case 9:
+        bpf_ringbuf_output(&osprobe_map_9, event, sizeof(*event), 0);
+        break;
+    case 10:
+        bpf_ringbuf_output(&osprobe_map_10, event, sizeof(*event), 0);
+        break;
+    case 11:
+        bpf_ringbuf_output(&osprobe_map_11, event, sizeof(*event), 0);
+        break;
+    case 12:
+        bpf_ringbuf_output(&osprobe_map_12, event, sizeof(*event), 0);
+        break;
+    case 13:
+        bpf_ringbuf_output(&osprobe_map_13, event, sizeof(*event), 0);
+        break;
+    case 14:
+        bpf_ringbuf_output(&osprobe_map_14, event, sizeof(*event), 0);
+        break;
+    case 15:
+        bpf_ringbuf_output(&osprobe_map_15, event, sizeof(*event), 0);
+        break;
     default:
         break;
     }
