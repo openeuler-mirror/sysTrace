@@ -55,7 +55,9 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing.c
     ${PROJECT_SOURCE_DIR}/src/ascend/hook.cc
     ${PROJECT_SOURCE_DIR}/src/mspti/mspti_tracker.cpp
-    ${PROJECT_SOURCE_DIR}/src/cann/cann_hook.c
+    ${PROJECT_SOURCE_DIR}/src/cann/common_hook.c
+    ${PROJECT_SOURCE_DIR}/src/cann/mem_hook.c
+    ${PROJECT_SOURCE_DIR}/src/cann/io_hook.c
     ${PROJECT_SOURCE_DIR}/server/monitor_server.cpp
 )
 

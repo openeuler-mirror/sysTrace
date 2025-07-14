@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <functional>
 #include <string>
+#include <stdint.h> 
 
 #ifdef __cplusplus
 extern "C"

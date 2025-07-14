@@ -214,7 +214,7 @@ static void add_osprobe_entry(trace_event_data_t *evt_data)
     entry->comm = strdup(evt_data->comm);
 
 
-    if (entry->os_event_type == EVENT_TYPE_OFFCPU && evt_data->next_comm) {
+    if (entry->os_event_type == EVENT_TYPE_OFFCPU && evt_data->next_comm[0] != '\0') {
         entry->nxt_comm = strdup(evt_data->next_comm);
         entry->nxt_pid = evt_data->next_pid;
     }
@@ -440,8 +440,8 @@ int update_filter_map_by_kernel_thread() {
         return -1;
     }
     for (int dev_id = 0; dev_id < 16; ++dev_id) {
-        char send_key[16] = {0};
-        char task_key[16] = {0};
+        char send_key[32] = {0};
+        char task_key[32] = {0};
         snprintf(send_key, sizeof(send_key), "dev%d_sq_send_wq", dev_id);
         snprintf(task_key, sizeof(task_key), "dev%d_sq_task", dev_id);
 
