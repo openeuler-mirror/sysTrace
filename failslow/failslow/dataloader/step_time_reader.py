@@ -18,6 +18,9 @@ logger = get_default_logger(__name__)
 class StepReader:
     def __init__(self):
         self.save_path = None
+        self.former_first_event = None
+        self.is_update = True
+        self.debug = False
 
     def init_save_path(self, file_path):
         self.save_path = os.path.dirname(file_path)
@@ -32,7 +35,25 @@ class StepReader:
         before_start = None
         timestamps = []
         steps_time = []
+        if self.debug:
+            index = 1
+        else:
+            index = 0
+            
         for stage in pytorch_data.pytorch_stages:
+            if index == 0:
+                if self.former_first_event:
+                    # 表明torch数据未更新，则不用解析数据检测
+                    if self.former_first_event.start_us == stage.start_us:
+                        self.is_update = False
+                        logger.info(f"data not update.")
+                        break
+                    else:
+                        self.former_first_event = stage
+                else:
+                    self.former_first_event = stage
+            
+            index += 1
             if "dataloader" in stage.stage_type:
                 start_ms = int(stage.start_us / 1000)
                 end_ms = int(stage.end_us / 1000)
@@ -43,17 +64,19 @@ class StepReader:
                     steps_time.append(start_ms - before_start)
                     timestamps.append(start_ms)
                     before_start = start_ms
-        
         data = {
-            'time': timestamps,
-            'step_time': steps_time
-        }
+                'time': timestamps,
+                'step_time': steps_time
+            }
         df = pd.DataFrame(data)
-        logger.info(f"step time data: {steps_time}.")
-        save_file_path = os.path.join(self.save_path, "step_time.csv")
-        df.to_csv(save_file_path, index=False)
-        logger.info(f"Save file in {save_file_path}")
-
+        if self.is_update:
+            logger.info(f"step time data: {steps_time}.")
+            save_file_path = os.path.join(self.save_path, "step_time.csv")
+            df.to_csv(save_file_path, index=False)
+            logger.info(f"Save file in {save_file_path}")
+        else:
+            logger.info(f"data not update, not save.")
+        
         return df
 
     def get_step_data_from_training_log(self, log_file_path: str) -> pd.DataFrame:
