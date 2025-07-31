@@ -99,7 +99,7 @@ void PyTorchTrace::dumpPyTorchTracing()
 
     std::lock_guard<std::mutex> lock(trace_mutex_);
 
-    pytorch_trace_.set_rank(config::GlobalConfig::Instance().local_rank);
+    pytorch_trace_.set_rank(config::GlobalConfig::Instance().rank);
     pytorch_trace_.set_comm(config::GlobalConfig::Instance().job_name);
 
     for (size_t i = 0; i < pytorch_tracing_functions_.size(); ++i)
