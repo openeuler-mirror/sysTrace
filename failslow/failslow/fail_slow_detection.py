@@ -120,11 +120,25 @@ def update_queue_data(data: pd.DataFrame, max_data_queue_steps: int):
     else:
         DATA_QUEUE = data
 
+
+def check_input_file(training_log: str, log_type: str):
+    if log_type == "timeline":
+        if os.path.isfile(training_log):
+            return training_log
+        else:
+            dir_path = os.path.dirname(training_log)
+            for file in os.listdir(dir_path):
+                if file.endswith("00000.timeline"):
+                    return os.path.join(dir_path, file)
+            return training_log
+
+
 def run_slow_node_perception(args: Dict):
     training_log = args.get("training_log", "./log/rank0_mindformer.log")
     fail_slow_perception_result = args.get("fail_slow_perception_path", "/log")
     os.makedirs(fail_slow_perception_result, exist_ok=True)
     log_type = args.get("log_type", "timeline")
+    training_log = check_input_file(training_log, log_type)
 
     task_stable_step = args.get("task_stable_step", 2)  # just for first time detection
     fail_slow_span_mins = args.get("fail_slow_span_mins", 0.1)  # for detection interval
@@ -146,6 +160,8 @@ def run_slow_node_perception(args: Dict):
         if timer_flag:
             time.sleep(fail_slow_span_mins * 60)
         timer_flag = True
+        if not os.path.isfile(training_log):
+            raise ValueError(f"{training_log} is not exist. Pleas check intput data.")
         data = log_extract_func(training_log)
         update_queue_data(data, max_data_queue_steps)
 
