@@ -21,9 +21,9 @@ extern "C"
         bool g_dump_L1;
         bool g_dump_L2;
         bool g_dump_L3;
-        unsigned int g_dump_L1_interval;
-        unsigned int g_dump_L2_interval;
-        unsigned int g_dump_L3_interval;
+        float g_dump_L1_interval;
+        float g_dump_L2_interval;
+        float g_dump_L3_interval;
         bool g_L1_timer_active;
         bool g_L2_timer_active;
         bool g_L3_timer_active;

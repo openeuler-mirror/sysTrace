@@ -198,10 +198,10 @@ void MonitorServer::process_command(
         }
 
         std::string level = level_value.substr(0, eq_pos);
-        unsigned int value;
+        float value;
         try
         {
-            value = std::stoul(level_value.substr(eq_pos + 1));
+            value = std::stof(level_value.substr(eq_pos + 1));
         }
         catch (...)
         {
