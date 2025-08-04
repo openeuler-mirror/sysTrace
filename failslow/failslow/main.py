@@ -95,6 +95,7 @@ def main():
         json.dump(response, f)
     logger.info("==========finished slow node result record ========")
 
+    return response
 
 if __name__ == "__main__":
     try:
