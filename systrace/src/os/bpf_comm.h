@@ -274,16 +274,14 @@ static __always_inline int get_npu_id(struct task_struct *task)
     // 匹配内核dev线程
     char comm[16] = {};
     bpf_core_read_str(comm, sizeof(comm), &task->comm);
-    // bpf_get_current_comm(&comm, sizeof(comm));
     rank = bpf_map_lookup_elem(&kernel_filter_map, comm);
     if (rank) {
-        bpf_printk("is kernel thread:%s, pid is %lu", comm, pid);
         return *rank;
     }
 
     // 匹配ACL线程
     const char target[] = "acl_thread";
-    if (strcase_match(comm, target, MAX_COMM_LEN)) {
+    if (!strcase_match(comm, target, MAX_COMM_LEN)) {
         u32 tgid = BPF_CORE_READ(task, tgid);
         rank = bpf_map_lookup_elem(&proc_filter_map, &tgid);
         if (rank) {
