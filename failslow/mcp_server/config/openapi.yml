@@ -1,0 +1,36 @@
+openapi: 3.0.0
+info:
+  title: systrace运维接口
+  description: 实现性能劣化感知、慢节点定界及报告生成，返回包含专业解读的详细分析报告
+  version: 1.0.0
+servers:
+  - url: http://76.53.17.51:12140
+    description: 性能检测服务地址
+paths:
+  /slow-node/systrace:
+    get:
+      summary: 性能劣化感知定界生成报告
+      description: >-
+        检测机器（服务器）是否发生劣化，并分析结果生成报告
+      parameters:
+        - name: ip
+          in: query
+          required: true
+          schema:
+            type: string
+          example: "9.82.201.111"
+          description: 待采集指标的ip地址
+      responses:
+        '200':
+          description: 返回的结果
+          content:
+            application/json:
+              schema:
+                : '#/components/schemas/ApiResponse'
+components:
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        data:
+          type: object
