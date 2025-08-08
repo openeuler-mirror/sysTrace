@@ -161,7 +161,7 @@ def run_slow_node_perception(args: Dict):
             time.sleep(fail_slow_span_mins * 60)
         timer_flag = True
         if not os.path.isfile(training_log):
-            raise ValueError(f"{training_log} is not exist. Pleas check intput data.")
+            raise ValueError(f"{training_log} is not exist. Please check input data.")
         data = log_extract_func(training_log)
         update_queue_data(data, max_data_queue_steps)
 
