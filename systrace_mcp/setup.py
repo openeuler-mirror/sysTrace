@@ -20,8 +20,8 @@ ser = "/usr/lib/systemd/system/systrac-mcpserver.service"
 if os.path.isfile(ser):
     os.remove(ser)
 setup(
-    name="systrace_mcpserver",
-    version="1.0.0",
+    name="systrace_mcp",
+    version="1.1.1",
     author="xu hou",
     author_email="houxu5@h-partners.com",
     description="MCP Server for SystraceFail Slow Detection for AI Model Training and Inference",
@@ -34,13 +34,13 @@ setup(
     ],
     install_requires=[
         "systrace_failslow",
-        "mcp==1.10.1",
+        "mcp",
         "paramiko"
     ],
     entry_points={
         "console_scripts": [
-            "systrace-mcpserver=mcp_server.mcp_server:main",
-            "systrace-openapi=mcp_server.openapi_server:main"
+            "systrace-mcpserver=systrace_mcp.mcp_server:main",
+            "systrace-openapi=systrace_mcp.openapi_server:main"
         ]
     }
 )

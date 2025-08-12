@@ -11,10 +11,10 @@ from failslow.response.response import AIJobDetectResult
 from failslow.main import main as slow_node_detection_api
 from failslow.util.logging_utils import get_default_logger
 from failslow.util.constant import MODEL_CONFIG_PATH
-from mcp_server.mcp_data import PerceptionResult
-from mcp_server.fail_slow_detection_api import run_slow_node_perception
-from mcp_server.remote_file_fetcher import sync_server_by_ip_and_type
-from mcp_server.report_api import generate_normal_report, generate_degraded_report, generate_default_report
+from systrace_mcp.mcp_data import PerceptionResult
+from systrace_mcp.fail_slow_detection_api import run_slow_node_perception
+from systrace_mcp.remote_file_fetcher import sync_server_by_ip_and_type
+from systrace_mcp.report_api import generate_normal_report, generate_degraded_report, generate_default_report
 # 仅在 Linux 环境下强制使用 spawn 方式
 import multiprocessing
 
@@ -121,7 +121,7 @@ async def slow_node_perception(ip: str = Query("127.0.0.1", description="节点I
 
 def main():
     """启动服务"""
-    logger.info("启动性能调优数据采集接口服务...")
+    logger.info("启动systrace运维接口服务...")
     uvicorn.run(app, host="0.0.0.0", port=12146)
 
 
