@@ -1,8 +1,25 @@
 syntax = "proto3";
 
+/*****************************
+ *         Common Types      *
+ *****************************/
+
+enum StageType {
+  STAGE_UNKNOWN = 0;
+  STAGE_DATALOADER = 1;
+  STAGE_FORWARD = 2;
+  STAGE_BACKWARD = 3;
+  STAGE_SYNCHRONIZATION = 4;
+  STAGE_GC = 5;
+}
+
+/*****************************
+ *         Memory Tracing    *
+ *****************************/
+
 message StackFrame {
-    uint64 address = 1;
-    string so_name = 2;
+  uint64 address = 1;
+  string so_name = 2;
 }
 
 message MemAllocEntry {
@@ -25,14 +42,72 @@ message ProcMem {
   repeated MemFreeEntry mem_free_stacks = 3;
 }
 
-enum StageType {
-  STAGE_UNKNOWN = 0;
-  STAGE_DATALOADER = 1;
-  STAGE_FORWARD = 2;
-  STAGE_BACKWARD = 3;
-  STAGE_SYNCHRONIZATION = 4;
-  STAGE_GC = 5;
+message Mem {
+  repeated ProcMem proc_mem = 1;
 }
+
+/*****************************
+ *         I/O Tracing       *
+ *****************************/
+
+enum IOType {
+  IO_UNKNOWN = 0;
+  IO_READ = 1;
+  IO_WRITE = 2;
+  IO_FREAD = 3;
+  IO_FWRITE = 4;
+  IO_FOPEN = 5;
+  IO_FCLOSE = 6;
+  IO_FFLUSH = 7;
+  IO_REMOVE = 8;
+  IO_RENAME = 9;
+  IO_OPEN = 10;
+  IO_CLOSE = 11;
+  IO_FSYNC = 12;
+  IO_MKDIR = 13;
+  IO_RMDIR = 14;
+  IO_UNLINK = 15;
+  IO_OPENDIR = 16;
+  IO_CLOSEDIR = 17;
+}
+
+message IOEntry {
+  uint64 start_us = 1;
+  uint64 dur = 2;
+  uint32 stage_id = 3;
+  StageType stage_type = 4;
+  IOType io_type = 5;
+  uint32 rank = 6;
+  bytes file_name = 7;
+}
+
+message IO {
+  repeated IOEntry IO_entries = 1;
+}
+
+/*****************************
+ *         CPU Tracing       *
+ *****************************/
+
+message OSprobeEntry {
+  uint32 key = 1;
+  uint64 start_us = 2;
+  uint64 dur = 3;
+  uint64 rundelay = 4;
+  uint32 OS_event_type = 5;
+  uint32 rank = 6;
+  string comm = 7;
+  string nxt_comm = 8;
+  uint32 nxt_pid = 9;
+}
+
+message OSprobe {
+  repeated OSprobeEntry OSprobe_entries = 1;
+}
+
+/*****************************
+ *        Pytorch Tracing    *
+ *****************************/
 
 message GcDebugData {
   uint32 collected = 1;
@@ -53,26 +128,22 @@ message PytorchStage {
 message Pytorch {
   repeated PytorchStage pytorch_stages = 1;
   uint32 rank = 2;
-  uint32 step_id = 3;  
-  string comm = 4;  //任务名
+  uint32 step_id = 3;
+  string comm = 4;
 }
 
-message Mem {
-  repeated ProcMem proc_mem = 1;
+/*****************************
+ *        Mutex Tracing    *
+ *****************************/
+
+message MutexEntry {
+  uint64 start_us = 1;
+  uint64 dur = 2;
+  uint32 stage_id = 3;
+  StageType stage_type = 4;
+  repeated StackFrame stack_frames = 5;
 }
 
-message OSprobe {
-  repeated OSprobeEntry OSprobe_entries = 1;
-}
-
-message OSprobeEntry {
-  uint32 key = 1;
-  uint64 start_us = 2;
-  uint64 dur = 3;
-  uint64 rundelay = 4;
-  uint32 OS_event_type = 5;
-  uint32 rank = 6;
-  string comm = 7;
-  string nxt_comm = 8;
-  uint32 nxt_pid = 9;
+message Mutex {
+  repeated MutexEntry mutex_entries = 1;
 }

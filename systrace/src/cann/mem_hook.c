@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include "../../include/common/shared_constants.h"
 #include "../../protos/systrace.pb-c.h"
+#include "common_hook.h"
 #include <dlfcn.h>
 #include <errno.h>
 #include <google/protobuf-c/protobuf-c.h>
@@ -12,13 +13,6 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <unistd.h>
-#if defined(__aarch64__)
-#include "../../thirdparty/aarch64/libunwind/libunwind.h"
-#elif defined(__x86_64__)
-#include "../../thirdparty/x86_64/libunwind/libunwind.h"
-#else
-#error "Unsupported architecture - only aarch64 and x86_64 are supported"
-#endif
 
 // export LD_PRELOAD=/home/MindSpeed-LLM-1.0.RC3/libascend_hal_jack.so
 // cd /home/hbdir/mspti_test-megatron
@@ -31,9 +25,6 @@
 // halMemCreate(drv_mem_handle_t **handle, size_t size, const struct
 // drv_mem_prop *prop, uint64_t flag); drvError_t halMemRelease
 // (drv_mem_handle_t *handle);
-
-#define LOG_INTERVAL_SEC 120
-#define LOG_ITEMS_MIN 1000
 
 typedef int drvError_t;
 
@@ -83,17 +74,6 @@ typedef struct
     ProcMem *proc_mem;
     time_t last_log_time;
 } ThreadData;
-
-static void *load_symbol(void *lib, const char *symbol_name)
-{
-    void *sym = dlsym(lib, symbol_name);
-    if (!sym)
-    {
-        fprintf(stderr, "Failed to find symbol %s: %s\n", symbol_name,
-                dlerror());
-    }
-    return sym;
-}
 
 static void free_proc_mem(ProcMem *proc_mem)
 {
@@ -168,38 +148,6 @@ static ThreadData *get_thread_data()
     return td;
 }
 
-static const char *get_so_name(uint64_t ip)
-{
-    Dl_info info;
-    const char *so_name;
-    if (dladdr((void *)ip, &info))
-    {
-        so_name = strrchr(info.dli_fname, '/');
-        return (so_name != NULL) ? so_name + 1 : info.dli_fname;
-    }
-    return "unknown";
-}
-
-static void get_log_filename(time_t current, uint32_t pid, char *buf,
-                             size_t buf_size)
-{
-    const char *rank_str = getenv("RANK");
-    int rank = rank_str ? atoi(rank_str) : 0;
-    struct tm *tm = localtime(&current);
-
-    const char *dir_path = SYS_TRACE_ROOT_DIR "cann";
-    if (access(dir_path, F_OK) != 0)
-    {
-        if (mkdir(dir_path, 0755) != 0 && errno != EEXIST)
-        {
-            perror("Failed to create directory");
-            snprintf(buf, buf_size, "mem_trace_rank%d.pb",rank);
-            return;
-        }
-    }
-    snprintf(buf, buf_size, "%s/mem_trace_rank%d.pb", dir_path, rank);
-}
-
 static char is_ready_to_write(ThreadData *td, time_t *current)
 {
     ProcMem *proc_mem = td->proc_mem;
@@ -244,8 +192,7 @@ static void write_protobuf_to_file()
     if (pthread_mutex_trylock(&file_mutex) == 0)
     { // pthread_mutex_trylock or pthread_mutex_lock
         char filename[256];
-        get_log_filename(current, td->proc_mem->pid, filename,
-                         sizeof(filename));
+        get_log_filename(filename, sizeof(filename), "mem_trace");
 
         size_t len = proc_mem__get_packed_size(td->proc_mem);
         buf = malloc(len);
@@ -307,16 +254,6 @@ int init_mem_trace()
 
     atexit(exit_handler);
 
-    return 0;
-}
-
-unw_word_t get_so_base(unw_word_t addr)
-{
-    Dl_info info;
-    if (dladdr((void *)addr, &info) != 0)
-    {
-        return (unw_word_t)info.dli_fbase;
-    }
     return 0;
 }
 
