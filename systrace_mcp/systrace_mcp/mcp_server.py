@@ -4,13 +4,12 @@ import json
 
 from mcp.server import FastMCP
 
-from failslow.response.response import AIJobDetectResult
 from failslow.util.logging_utils import get_default_logger
 from failslow.util.constant import MODEL_CONFIG_PATH
 from failslow.main import main as slow_node_detection_api
 
-from systrace_mcp.report_api import generate_normal_report, generate_degraded_report, generate_default_report
-from systrace_mcp.mcp_data import PerceptionResult
+from systrace_mcp.report_api import generate_normal_report, generate_degraded_report
+from systrace_mcp.mcp_data import PerceptionResult,ReportType,AIJobDetectResult
 from systrace_mcp.fail_slow_detection_api import run_slow_node_perception
 from systrace_mcp.remote_file_fetcher import sync_server_by_ip_and_type
 
@@ -18,6 +17,7 @@ logger = get_default_logger(__name__)
 # 仅在 Linux 环境下强制使用 spawn 方式
 import multiprocessing
 import os
+
 if os.name == "posix":  # posix 表示 Linux/macOS
     multiprocessing.set_start_method("spawn", force=True)
 # 创建MCP Server
@@ -48,11 +48,13 @@ def slow_node_perception_tool(task_id: str) -> PerceptionResult:
     with open(MODEL_CONFIG_PATH, 'r', encoding='utf-8') as reader:
         model_args = json.load(reader)
     sync_server_by_ip_and_type(task_id, "perception")
-    res = run_slow_node_perception(model_args,task_id)
-    return res
+    _res = run_slow_node_perception(model_args, task_id)
+    _res = PerceptionResult.model_validate(_res)
+    return _res
 
 
-@mcp.prompt(description="调用逻辑:1. 仅在感知工具返回is_anomaly=True时调用。2. 接收感知工具的全量性能数据作为输入。 3. 本方法得到的结果必须再调用generate_report 生成报告给到用户")
+@mcp.prompt(
+    description="调用逻辑:1. 仅在感知工具返回is_anomaly=True时调用。2. 接收感知工具的全量性能数据作为输入。 3. 本方法得到的结果必须再调用generate_report 生成报告给到用户")
 @mcp.tool(name="slow_node_detection_tool")
 def slow_node_detection_tool(performance_data: PerceptionResult) -> AIJobDetectResult:
     """
@@ -63,15 +65,17 @@ def slow_node_detection_tool(performance_data: PerceptionResult) -> AIJobDetectR
     """
     print("慢卡定界工具")
     print("performance_data = " + str(performance_data))
-    sync_server_by_ip_and_type(performance_data["task_id"], "detection")
+    print("task_id = " + performance_data.task_id)
+    sync_server_by_ip_and_type(performance_data.task_id, "detection")
     _res = slow_node_detection_api()
-    print(json.dumps(_res))
+    _res = AIJobDetectResult.model_validate(_res)
+    print("result = " + str(_res))
     return _res
 
 
 @mcp.prompt(description="调用slow_node_perception_tool 或 slow_node_detection_tool 后把结果传入generate_report ")
 @mcp.tool()
-def generate_report_tool(source_data: Union[dict, str], report_type: str) -> dict:
+def generate_report_tool(source_data: Union[PerceptionResult, AIJobDetectResult], report_type: ReportType) -> dict:
     """
     使用 报告工具：生成最终Markdown格式报告
     输入:
@@ -87,18 +91,22 @@ def generate_report_tool(source_data: Union[dict, str], report_type: str) -> dic
     2、细节：每条节点的具体卡号{objectId}、异常指标{kpiId}（其中：HcclAllGather表示集合通信库的AllGather时序序列指标；HcclReduceScatter表示集合通信库的ReduceScatter时序序列指标；HcclAllReduce表示集合通信库的AllReduce时序序列指标；），检测方法{methodType}（SPACE 多节点空间对比检测器，TIME 单节点时间检测器），以表格形式呈现；
     3、针对这个节点给出检测建议，如果是计算类型，建议检测卡的状态，算子下发以及算子执行的代码，对慢节点进行隔离；如果是网络问题，建议检测组网的状态，使用压测节点之间的连通状态；如果是存储问题，建议检测存储的磁盘以及用户脚本中的dataloader和保存模型代码。
     """
-    print("调用了报告工具，report_type = " + report_type)
+    print("调用了报告工具，report_type = " + report_type.value)
     # 根据报告类型调用对应的生成方法
-    if report_type == "normal":
-        return json.dumps(generate_normal_report(source_data))
-    elif report_type == "anomaly":
-        return json.dumps(generate_degraded_report(source_data))
+    if report_type == ReportType.normal:
+        result = generate_normal_report(source_data)
+    elif report_type == ReportType.anomaly:
+        result = generate_degraded_report(source_data)
     else:
-        # 默认报告类型
-        return generate_default_report(source_data)
+        raise Exception("不支持的报告类型")
+    print("报告：", result)
+    return result
+
 
 def main():
     # 初始化并启动服务
     mcp.run(transport='sse')
+
+
 if __name__ == "__main__":
     main()

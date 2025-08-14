@@ -35,7 +35,8 @@ setup(
     install_requires=[
         "systrace_failslow",
         "mcp",
-        "paramiko"
+        "paramiko",
+        "fastapi"
     ],
     entry_points={
         "console_scripts": [

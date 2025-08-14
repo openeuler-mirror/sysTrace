@@ -1,10 +1,12 @@
 import json
 from datetime import datetime
 
+from systrace_mcp.mcp_data import PerceptionResult, AIJobDetectResult
 
-def generate_normal_report(data: dict) -> dict:
+
+def generate_normal_report(data: PerceptionResult) -> dict:
     """生成无劣化的正常报告"""
-    # 解析时间戳为可读格式
+    data = data.model_dump()
     timestamp = data.get("start_time")
     start_time = datetime.fromtimestamp(timestamp // 1000).strftime("%Y-%m-%d %H:%M:%S") if timestamp else "未知时间"
     timestamp = data.get("end_time")
@@ -15,7 +17,7 @@ def generate_normal_report(data: dict) -> dict:
     return data
 
 
-def generate_degraded_report(data: dict) -> dict:
+def generate_degraded_report(data: AIJobDetectResult) -> dict:
     """
         生成设备异常状态的JSON报告
 
@@ -26,12 +28,12 @@ def generate_degraded_report(data: dict) -> dict:
             格式化的JSON报告字典
         """
     # 解析时间戳为可读格式
+    data = data.model_dump()
     timestamp = data.get("timestamp")
     detect_time = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S") if timestamp else "未知时间"
     # 提取异常信息
-    abnormalDetail = data.get("abnormalDetail", [])
+    abnormalDetail = data.get("abnormal_detail", [])
     abnormal_count = len(abnormalDetail)
-
 
     # 整理异常节点详情
     abnormal_nodes = []
@@ -41,12 +43,12 @@ def generate_degraded_report(data: dict) -> dict:
             "serverIp": abnormal.get("serverIp"),
             "deviceInfo": abnormal.get("deviceInfo"),
             "methodType": abnormal.get("methodType"),
-            "kpiId":abnormal.get("kpiId"),
+            "kpiId": abnormal.get("kpiId"),
             "relaIds": abnormal.get("relaIds", [])
         })
 
     # 整理正常节点信息
-    normal_nodes = [item["deviceInfo"] for item in data.get("normalDetail", [])]
+    normal_nodes = [item["deviceInfo"] for item in data.get("normal_detail", [])]
 
     # 构建JSON报告
     report = {
@@ -54,9 +56,9 @@ def generate_degraded_report(data: dict) -> dict:
         "overview": {
             "detectTime": detect_time,
             "abnormalNodeCount": abnormal_count,
-            "compute": data.get("compute") ,
-            "network": data.get("network") ,
-            "storage": data.get("storage") ,
+            "compute": data.get("compute"),
+            "network": data.get("network"),
+            "storage": data.get("storage"),
         },
         "abnormalNodes": abnormal_nodes,
         "normalNodes": {
@@ -67,14 +69,4 @@ def generate_degraded_report(data: dict) -> dict:
     }
 
     return report
-
-
-def generate_default_report(data: dict) -> dict:
-    """生成默认报告（当类型不匹配时），返回JSON格式字典"""
-    return {
-        "report_title": "机器性能分析报告",
-        "warning": "报告类型未识别，以下是原始数据摘要",
-        "raw_data": data,
-        "report_type": "default"
-    }
 

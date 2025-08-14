@@ -63,8 +63,7 @@ def detect_step_time_anomalies(data_df: pd.DataFrame, model_args: Dict):
                 next_anomaly_degree = next_diff / anomaly_degree_thr
                 if next_anomaly_degree > anomaly_degree_thr:
                     anomalies.append(
-                        {"training_step": i,
-                         "anomaly_time": datetime.fromtimestamp(timestamps[i]/1000).strftime('%Y-%m-%d %H:%M:%S'),
+                        {"training_step": i, "anomaly_time": datetime.fromtimestamp(timestamps[i]/1000).strftime('%Y-%m-%d %H:%M:%S'),
                          "anomaly_degree": round(anomaly_degree, 3),
                          "anomaly_training_time": f"{current_step_time}ms",
                          "normal_training_time": f"{moving_average}ms"})
