@@ -1,22 +1,21 @@
 import json
 import os
-from time import sleep
 from typing import Union, Dict, Any, Optional
 from pydantic import BaseModel
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from failslow.response.response import AIJobDetectResult
 from failslow.main import main as slow_node_detection_api
 from failslow.util.logging_utils import get_default_logger
 from failslow.util.constant import MODEL_CONFIG_PATH
-from systrace_mcp.mcp_data import PerceptionResult
+from systrace_mcp.mcp_data import PerceptionResult, AIJobDetectResult
 from systrace_mcp.fail_slow_detection_api import run_slow_node_perception
 from systrace_mcp.remote_file_fetcher import sync_server_by_ip_and_type
-from systrace_mcp.report_api import generate_normal_report, generate_degraded_report, generate_default_report
+from systrace_mcp.report_api import generate_normal_report, generate_degraded_report
 # 仅在 Linux 环境下强制使用 spawn 方式
 import multiprocessing
+
 
 if os.name == "posix":  # posix 表示 Linux/macOS
     multiprocessing.set_start_method("spawn", force=True)
@@ -58,10 +57,11 @@ def slow_node_perception_tool(task_id: str) -> PerceptionResult:
 
     try:
         sync_server_by_ip_and_type(task_id, "perception")
-        res = run_slow_node_perception(model_args,task_id)
-        res["task_id"] = task_id
-        logger.info(f"性能感知结果: {str(res)}")
-        return res
+        _res = run_slow_node_perception(model_args, task_id)
+        _res["task_id"] = task_id
+        logger.info(f"性能感知结果: {str(_res)}")
+        _res = PerceptionResult.model_validate(_res)
+        return _res
     except Exception as e:
         logger.error(f"性能劣化感知工具出错: {str(e)}")
         raise HTTPException(status_code=500, detail=f"性能劣化感知工具出错: {str(e)}")
@@ -72,31 +72,27 @@ def slow_node_detection_tool(performance_data: PerceptionResult) -> AIJobDetectR
     logger.info(f"慢卡定界工具开启，performance_data = {str(performance_data)}")
 
     try:
-        sync_server_by_ip_and_type(performance_data["task_id"], "detection")
-        _res = slow_node_detection_api(performance_data)
+        sync_server_by_ip_and_type(performance_data.task_id, "detection")
+        _res = slow_node_detection_api()
         logger.info(f"慢卡定界结果: {json.dumps(_res)}")
+        _res = AIJobDetectResult.model_validate(_res)
         return _res
     except Exception as e:
         logger.error(f"慢卡定界工具出错: {str(e)}")
         raise HTTPException(status_code=500, detail=f"慢卡定界工具出错: {str(e)}")
 
 
-def generate_report_tool(source_data: Union[dict, str], report_type: str) -> Union[str, Dict[str, Any]]:
-    """生成最终报告的工具"""
-    logger.info(f"调用报告工具，report_type = {report_type}")
-
-    try:
-        if report_type == "normal":
-            report_content = generate_normal_report(source_data)
-        elif report_type == "anomaly":
-            report_content = generate_degraded_report(source_data)
-        else:
-            report_content = generate_default_report(source_data)
-
-        return report_content
-    except Exception as e:
-        logger.error(f"报告生成工具出错: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"报告生成工具出错: {str(e)}")
+def generate_report_tool(source_data: Union[PerceptionResult, AIJobDetectResult], report_type: str) -> dict:
+    print("调用了报告工具，report_type = " + report_type)
+    # 根据报告类型调用对应的生成方法
+    if report_type == "normal":
+        result = generate_normal_report(source_data)
+    elif report_type == "anomaly":
+        result = generate_degraded_report(source_data)
+    else:
+        raise Exception("不支持的报告类型")
+    print("报告：", result)
+    return result
 
 
 @app.get("/slow-node/systrace", response_model=ApiResponse)
@@ -106,8 +102,8 @@ async def slow_node_perception(ip: str = Query("127.0.0.1", description="节点I
     """
     result = slow_node_perception_tool(ip)
     # 判断是否劣化
-    report_type = "anomaly" if result.get("is_anomaly", True) else "normal"
-    if True is result["is_anomaly"]:
+    report_type = "anomaly" if result.is_anomaly else "normal"
+    if True is result.is_anomaly:
         result = slow_node_detection_tool(result)
     # 3. 自动调用报告生成
     report_content = generate_report_tool(result, report_type)
