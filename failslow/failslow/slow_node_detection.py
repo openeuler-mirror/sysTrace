@@ -3,7 +3,7 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：slow_node_detection.py
-Author: h00568282/huangbin
+Author: 
 Create Date: 2025/2/26 11:23
 Notes:
 

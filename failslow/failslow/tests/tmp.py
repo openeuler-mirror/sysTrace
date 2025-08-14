@@ -3,7 +3,7 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：tmp.py
-Author: c00570162/congdechun
+Author: 
 Create Date: 2025/3/7 17:03
 Notes:
 
