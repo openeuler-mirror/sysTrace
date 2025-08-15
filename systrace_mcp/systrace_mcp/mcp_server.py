@@ -9,7 +9,7 @@ from failslow.util.constant import MODEL_CONFIG_PATH
 from failslow.main import main as slow_node_detection_api
 
 from systrace_mcp.report_api import generate_normal_report, generate_degraded_report
-from systrace_mcp.mcp_data import PerceptionResult,ReportType,AIJobDetectResult
+from systrace_mcp.mcp_data import PerceptionResult, ReportType, AIJobDetectResult
 from systrace_mcp.fail_slow_detection_api import run_slow_node_perception
 from systrace_mcp.remote_file_fetcher import sync_server_by_ip_and_type
 
@@ -17,16 +17,20 @@ logger = get_default_logger(__name__)
 # 仅在 Linux 环境下强制使用 spawn 方式
 import multiprocessing
 import os
+import logging
+import sys
 
+# 配置日志系统
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("systrace_mcpserver")
 if os.name == "posix":  # posix 表示 Linux/macOS
     multiprocessing.set_start_method("spawn", force=True)
 # 创建MCP Server
 mcp = FastMCP("SysTrace MCP Server", host="0.0.0.0", port=12145)
-
-
-@mcp.prompt(description="工具定位")
-def self_introduction() -> str:
-    return "面向运维、开发人员，支持自然语言对接，实现启发式调优，实现3个工具接口，分别为性能劣化感知工具，慢卡定界工具，报告输出工具。"
 
 
 @mcp.prompt(description="调用逻辑:1. 当用户询问特定任务ID的机器性能是否劣化时调用。2. 检测结果将决定后续流程走向。\
@@ -42,8 +46,8 @@ def slow_node_perception_tool(task_id: str) -> PerceptionResult:
     入参 task_id ，如 192.168.2.122;
     返回 PerceptionResult 如果is_anomaly=false，该结果需要调用generate_report_tool再返回给用户;如果is_anomaly=True,该结果必须调用slow_node_detection_tool得到报告
     """
-    print("性能劣化感知工具 开启")
-    print("task_id = " + task_id)
+    logger.info("调用 性能劣化感知工具")
+    logger.info("task_id = " + task_id)
 
     with open(MODEL_CONFIG_PATH, 'r', encoding='utf-8') as reader:
         model_args = json.load(reader)
@@ -63,13 +67,13 @@ def slow_node_detection_tool(performance_data: PerceptionResult) -> AIJobDetectR
     performance_data: 感知工具返回的完整性能数据PerceptionResult；
     输出：AIJobDetectResult，该结果必须要调用generate_report_tool得到报告再返回给用户
     """
-    print("慢卡定界工具")
-    print("performance_data = " + str(performance_data))
-    print("task_id = " + performance_data.task_id)
+    logger.info("调用 慢卡定界工具")
+    logger.info("performance_data = " + str(performance_data))
+    logger.info("task_id = " + performance_data.task_id)
     sync_server_by_ip_and_type(performance_data.task_id, "detection")
     _res = slow_node_detection_api()
     _res = AIJobDetectResult.model_validate(_res)
-    print("result = " + str(_res))
+    logger.info("result = " + str(_res))
     return _res
 
 
@@ -91,7 +95,7 @@ def generate_report_tool(source_data: Union[PerceptionResult, AIJobDetectResult]
     2、细节：每条节点的具体卡号{objectId}、异常指标{kpiId}（其中：HcclAllGather表示集合通信库的AllGather时序序列指标；HcclReduceScatter表示集合通信库的ReduceScatter时序序列指标；HcclAllReduce表示集合通信库的AllReduce时序序列指标；），检测方法{methodType}（SPACE 多节点空间对比检测器，TIME 单节点时间检测器），以表格形式呈现；
     3、针对这个节点给出检测建议，如果是计算类型，建议检测卡的状态，算子下发以及算子执行的代码，对慢节点进行隔离；如果是网络问题，建议检测组网的状态，使用压测节点之间的连通状态；如果是存储问题，建议检测存储的磁盘以及用户脚本中的dataloader和保存模型代码。
     """
-    print("调用了报告工具，report_type = " + report_type.value)
+    logger.info("调用 报告工具，report_type = " + report_type.value)
     # 根据报告类型调用对应的生成方法
     if report_type == ReportType.normal:
         result = generate_normal_report(source_data)
@@ -99,7 +103,7 @@ def generate_report_tool(source_data: Union[PerceptionResult, AIJobDetectResult]
         result = generate_degraded_report(source_data)
     else:
         raise Exception("不支持的报告类型")
-    print("报告：", result)
+    logger.info(f"报告：{result}")
     return result
 
 

@@ -21,7 +21,12 @@ logger = get_default_logger(__name__)
 
 DATA_QUEUE = pd.DataFrame({'time': [], 'step_time': []})
 DROP_DATA_LENGTH = 0
+detecting_range_steps = [0, 0]
+first_flag = False
+hang_info = []
+hang_time_stamp = []
 
+step_reader = StepReader()
 
 def detect_step_time_anomalies(data_df: pd.DataFrame, model_args: Dict):
     """
@@ -148,19 +153,11 @@ def run_slow_node_perception(args: Dict, task_id: str):
     min_statup_detection_steps = args.get("min_startup_detection_steps", 10)
     hang_times_mins_thr = args.get("hang_times_mins_thr", 0.5)
 
-    detecting_range_steps = [0, 0]
-    first_flag = False
-    hang_info = []
-    hang_time_stamp = []
-    next_detection_timestamp = None
-    timer_flag = False
-
-    step_reader = StepReader()
+    global detecting_range_steps
+    global first_flag
+    global hang_info
+    global hang_time_stamp
     log_extract_func = getattr(step_reader, get_extract_func_str(log_type))
-
-    if timer_flag:
-        time.sleep(fail_slow_span_mins * 60)
-    timer_flag = True
 
     data = log_extract_func(training_log)
     update_queue_data(data, max_data_queue_steps)
@@ -181,6 +178,19 @@ def run_slow_node_perception(args: Dict, task_id: str):
         hang_info.append(now_time_str)
         hang_times = round((now_time_stamp - hang_time_stamp[0]) / 60, 2)
         logger.info(f"hang time min: {hang_times}")
+
+        anomaly_info = {}
+        anomaly_info["is_anomaly"] = True
+        anomaly_info["anomaly_count_times"] = 0
+        anomaly_info["anomaly_info"] = []
+        anomaly_info["anomaly_type"] = AnomalyType.hang
+        anomaly_info["start_time"] = int(hang_time_stamp[0] * 1000)
+        anomaly_info["end_time"] = int(hang_time_stamp[-1] * 1000)
+        anomaly_info["anomaly_info"] = [{
+                    "detect_point": hang_info,
+                    "hang_minutes": hang_times
+                }]
+        anomaly_info["task_id"] = task_id
         if hang_time_stamp and hang_times > hang_times_mins_thr:
             # record hang
             anomaly_info = {
@@ -192,11 +202,11 @@ def run_slow_node_perception(args: Dict, task_id: str):
                 }],
                 "anomaly_type": AnomalyType.hang,
                 "start_time": int(hang_time_stamp[0] * 1000),
-                "end_time": int(hang_time_stamp[1] * 1000)
+                "end_time": int(hang_time_stamp[-1] * 1000)
             }
             logger.info(f"hang detection find training process is hang at: {hang_info[0]}")
             write_anomaly_info(anomaly_info, fail_slow_perception_result)
-            return f"hang detection find training process is hang at: {hang_info[0]}"
+        return anomaly_info
     else:
         hang_info = []
         hang_time_stamp = []
@@ -217,7 +227,7 @@ def run_slow_node_perception(args: Dict, task_id: str):
     if range_steps < min_statup_detection_steps:
         logger.warning(
             f"[Warning] detecting range step {range_steps} should larger than {min_statup_detection_steps}.")
-        return f"[Warning] detecting range step {range_steps} should larger than {min_statup_detection_steps}."
+        raise f"[Warning] detecting range step {range_steps} should larger than {min_statup_detection_steps}."
 
     detecting_range_steps = new_detecting_range_steps
     if first_flag:
@@ -229,6 +239,5 @@ def run_slow_node_perception(args: Dict, task_id: str):
     anomaly_info = detect_step_time_anomalies(detected_data, args)
 
     write_anomaly_info(anomaly_info, fail_slow_perception_result)
-    fail_slow_stop_flag = os.getenv('FAIL_SLOW_STOP', 'False').lower() == "true"
     anomaly_info["task_id"] = task_id
     return anomaly_info

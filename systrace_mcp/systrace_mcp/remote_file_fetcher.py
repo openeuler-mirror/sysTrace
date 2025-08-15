@@ -7,7 +7,15 @@ import os
 from stat import S_ISDIR
 import sys
 from failslow.util.constant import  MODEL_CONFIG_PATH
-
+import logging
+import sys
+# 配置日志系统
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger("systrace_mcpserver")
 FTP_CONFIG_PATH = "/etc/systrace/config/ftp_config.json"
 
 class UnsupportedSyncTypeError(Exception):
@@ -32,7 +40,7 @@ def load_config(config_file):
 
         # 验证配置结构
         if "servers" not in config or not isinstance(config["servers"], list):
-            print("错误: 配置文件格式不正确，缺少servers数组")
+            logger.info("错误: 配置文件格式不正确，缺少servers数组")
             return None
 
         # 验证每个服务器配置的必要项
@@ -44,7 +52,7 @@ def load_config(config_file):
         for idx, server in enumerate(config["servers"]):
             for key in required_keys:
                 if key not in server:
-                    print(f"错误: 服务器配置 #{idx + 1} 缺少必要项 {key}")
+                    logger.info(f"错误: 服务器配置 #{idx + 1} 缺少必要项 {key}")
                     return None
 
             # 标准化远程目录路径
@@ -59,10 +67,10 @@ def load_config(config_file):
         return config["servers"]
 
     except json.JSONDecodeError:
-        print(f"错误: 配置文件 {config_file} 格式不正确")
+        logger.info(f"错误: 配置文件 {config_file} 格式不正确")
         return None
     except Exception as e:
-        print(f"加载配置文件时发生错误: {str(e)}")
+        logger.info(f"加载配置文件时发生错误: {str(e)}")
         return None
 
 
@@ -71,7 +79,7 @@ def get_server_config(servers, target_ip):
     for server in servers:
         if server["ip"] == target_ip:
             return server
-    print(f"错误: 未找到IP为 {target_ip} 的服务器配置")
+    logger.info(f"错误: 未找到IP为 {target_ip} 的服务器配置")
     return None
 
 
@@ -104,19 +112,19 @@ def init_local_dir(local_dir):
                 try:
                     if os.path.isfile(item_path) or os.path.islink(item_path):
                         os.unlink(item_path)  # 删除文件或软链接
-                        print(f"删除文件: {item_path}")
+                        logger.info(f"删除文件: {item_path}")
                     elif os.path.isdir(item_path):
                         shutil.rmtree(item_path)  # 删除子目录及其内容
-                        print(f"删除目录: {item_path}")
+                        logger.info(f"删除目录: {item_path}")
                 except Exception as e:
-                    print(f"删除 {item_path} 失败: {e}")
-            print(f"已清空目录: {normalized_dir}")
+                    logger.info(f"删除 {item_path} 失败: {e}")
+            logger.info(f"已清空目录: {normalized_dir}")
         else:
-            print(f"目录已存在且为空: {normalized_dir}")
+            logger.info(f"目录已存在且为空: {normalized_dir}")
     else:
         # 创建目录（包括必要的父目录）
         os.makedirs(normalized_dir, exist_ok=True)
-        print(f"创建本地根目录: {normalized_dir}")
+        logger.info(f"创建本地根目录: {normalized_dir}")
 
     return normalized_dir
 
@@ -151,7 +159,7 @@ def get_remote_files_recursive(sftp, remote_base_dir, current_dir):
         return all_files
 
     except Exception as e:
-        print(f"获取远程文件列表失败 (目录: {current_dir}): {e}")
+        logger.info(f"获取远程文件列表失败 (目录: {current_dir}): {e}")
         return []
 
 
@@ -169,16 +177,16 @@ def download_new_files(sftp, remote_files, local_root):
         # 确保本地目录存在
         if not os.path.exists(local_file_dir):
             os.makedirs(local_file_dir, exist_ok=True)
-            print(f"创建本地子目录: {local_file_dir}")
+            logger.info(f"创建本地子目录: {local_file_dir}")
 
         # 检查文件是否需要下载或更新
         if not os.path.exists(local_file_path):
-            print(f"下载新文件: {file['remote_path']} -> {local_file_path}")
+            logger.info(f"下载新文件: {file['remote_path']} -> {local_file_path}")
             sftp.get(file["remote_path"], local_file_path)
         else:
             local_mtime = datetime.fromtimestamp(os.path.getmtime(local_file_path))
             if file["mtime"] > local_mtime:
-                print(f"更新文件: {file['remote_path']} -> {local_file_path}")
+                logger.info(f"更新文件: {file['remote_path']} -> {local_file_path}")
                 sftp.get(file["remote_path"], local_file_path)
 
 
@@ -202,7 +210,7 @@ def getEnable_config():
         # 解析配置文件的绝对路径
         abs_config_path = os.path.abspath(FTP_CONFIG_PATH)
         if not os.path.exists(abs_config_path):
-            print(f"错误: 配置文件 {abs_config_path} 不存在")
+            logger.info(f"错误: 配置文件 {abs_config_path} 不存在")
             return None
 
         with open(abs_config_path, 'r') as f:
@@ -210,10 +218,10 @@ def getEnable_config():
             return config["enable"]
 
     except json.JSONDecodeError:
-        print(f"错误: 配置文件 {FTP_CONFIG_PATH} 格式不正确")
+        logger.info(f"错误: 配置文件 {FTP_CONFIG_PATH} 格式不正确")
         return None
     except Exception as e:
-        print(f"加载配置文件时发生错误: {str(e)}")
+        logger.info(f"加载配置文件时发生错误: {str(e)}")
         return None
 
 
@@ -222,7 +230,7 @@ def sync_server_by_ip_and_type(target_ip, sync_type)->bool:
     # 判断一下同步功能是否开启
     if getEnable_config() == 'False':
         return True
-    print(f"{datetime.now()} - 开始同步服务器 {target_ip} 的 {sync_type} 类型文件...")
+    logger.info(f"{datetime.now()} - 开始同步服务器 {target_ip} 的 {sync_type} 类型文件...")
 
     # 验证同步类型
     if sync_type not in ["perception", "detection"]:
@@ -244,7 +252,7 @@ def sync_server_by_ip_and_type(target_ip, sync_type)->bool:
 
         # 解析并初始化本地目录
         resolved_local_dir = resolve_local_dir(local_dir)
-        print(f"使用本地目录: {resolved_local_dir}")
+        logger.info(f"使用本地目录: {resolved_local_dir}")
         local_root = init_local_dir(resolved_local_dir)
 
         # 建立SSH连接
@@ -268,7 +276,7 @@ def sync_server_by_ip_and_type(target_ip, sync_type)->bool:
         )
 
         if remote_files:
-            print(f"发现 {len(remote_files)} 个远程文件（包括所有子目录），开始同步...")
+            logger.info(f"发现 {len(remote_files)} 个远程文件（包括所有子目录），开始同步...")
             download_new_files(sftp, remote_files, local_root)
         else:
             raise ValueError(f"未发现 {sync_type} 类型的远程文件")
@@ -276,7 +284,7 @@ def sync_server_by_ip_and_type(target_ip, sync_type)->bool:
         # 关闭连接
         sftp.close()
         ssh.close()
-        print(f"{datetime.now()} - 服务器 {target_ip} 的 {sync_type} 类型文件同步完成")
+        logger.info(f"{datetime.now()} - 服务器 {target_ip} 的 {sync_type} 类型文件同步完成")
         return True
 
     except Exception as e:
