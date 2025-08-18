@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 Type=exec
-ExecStart=/usr/bin/systrac-mcpserver
+ExecStart=/usr/bin/systrace-mcpserver
 Restart=on-failure
 RestartSec=1
 

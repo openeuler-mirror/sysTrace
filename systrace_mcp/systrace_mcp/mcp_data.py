@@ -1,7 +1,6 @@
-from typing import List
+from typing import List, Union
 from pydantic import BaseModel, Field
 from enum import Enum
-
 
 class ReportType(str, Enum):
     normal = "normal"
@@ -16,13 +15,16 @@ class AnomalyInfo(BaseModel):
     anomaly_training_time: str = Field(default="", description="劣化训练step时间（默认空字符串）")
     normal_training_time: str = Field(default="", description="正常训练step时间（默认空字符串）")
 
-
+class AnomalyInfo2(BaseModel):
+    """劣化详细信息结构"""
+    detect_point: str = Field(default="", description="检测点")
+    hang_minutes: str = Field(default="", description="hang的分钟数")
 class PerceptionResult(BaseModel):
     """慢节点感知结果结构"""
     is_anomaly: bool = Field(default=False, description="是否发生性能劣化（默认false）")
     anomaly_count_times: int = Field(default=0, description="劣化次数（默认0）")
     # 列表类型使用 default_factory 避免 mutable 默认值问题
-    anomaly_info: List[AnomalyInfo] = Field(
+    anomaly_info: Union[List[AnomalyInfo],List[AnomalyInfo2]] = Field(
         default_factory=list,
         description="劣化详细信息（默认空列表）"
     )
