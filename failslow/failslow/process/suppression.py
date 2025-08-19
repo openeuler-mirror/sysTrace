@@ -3,7 +3,7 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：suppression.py
-Author: c00570162/congdechun
+Author: 
 Create Date: 2025/4/19 15:38
 Notes:
 

@@ -194,7 +194,7 @@ def run_slow_node_perception(args: Dict):
                     }],
                     "anomaly_type": AnomalyType.hang,
                     "start_time": int(hang_time_stamp[0] * 1000),
-                    "end_time": int(hang_time_stamp[1] * 1000)
+                    "end_time": int(hang_time_stamp[-1] * 1000)
                 }
                 logger.info(f"hang detection find training process is hang at: {hang_info[0]}")
                 write_anomaly_info(anomaly_info, fail_slow_perception_result)

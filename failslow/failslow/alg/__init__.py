@@ -3,7 +3,7 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：__init__.py.py
-Author: h00568282/huangbin 
+Author: 
 Create Date: 2024/10/24 15:52
 Notes:
 
