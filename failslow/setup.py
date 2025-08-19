@@ -43,10 +43,9 @@ setup(
     install_requires=[
         "numpy",
         "pandas",
-        "matplotlib",
         "joblib",
         "scikit_learn",
-        "protobuf==3.20.3"
+        "protobuf"
     ],
     entry_points={
         "console_scripts": [
