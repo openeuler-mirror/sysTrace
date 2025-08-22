@@ -44,7 +44,12 @@ target_include_directories(common PUBLIC ${PROJECT_SOURCE_DIR}/include ${Python3
 
 
 add_subdirectory(protos)
-add_subdirectory(src/os)
+if(HAS_BTF_SUPPORT)
+    message(STATUS "Enabling BPF modules with BTF support")
+    add_subdirectory(src/os)
+else()
+    message(WARNING "Disabling BPF modules (no BTF support)")
+endif()
 
 add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/include/common/shared_constants.c
@@ -66,6 +71,11 @@ add_executable(sysTrace_cli
 )
 set_target_properties(sysTrace_hook PROPERTIES OUTPUT_NAME "sysTrace")
 
+if(HAS_BTF_SUPPORT)
+    target_compile_definitions(sysTrace_hook PRIVATE HAS_BTF_SUPPORT=1)
+endif()
+
+
 target_link_libraries(sysTrace_hook
     common
     general_pb2
@@ -73,6 +83,9 @@ target_link_libraries(sysTrace_hook
     protobuf::libprotobuf
     ${CMAKE_THREAD_LIBS}
     pthread
-    os_probe
     -ldl
 )
+if(HAS_BTF_SUPPORT)
+    target_link_libraries(sysTrace_hook os_probe)
+    message(STATUS "Linking osprobe library")
+endif()

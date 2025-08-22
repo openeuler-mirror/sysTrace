@@ -11,10 +11,12 @@
 int global_stage_id = 0;
 int global_stage_type = 0;
 
+#ifdef HAS_BTF_SUPPORT
 extern "C" {
     int run_osprobe();
     void cleanup_osprobe();
 }
+#endif
 
 namespace systrace
 {
@@ -206,7 +208,9 @@ SysTrace &SysTrace::getInstance()
 
 SysTrace::~SysTrace()
 {
+#ifdef HAS_BTF_SUPPORT
     stopOsProbePoller();
+#endif
     stopEventPoller();
 }
 
@@ -219,7 +223,9 @@ void SysTrace::initializeSystem()
     MonitorServer::getInstance();
     MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
+#ifdef HAS_BTF_SUPPORT
     os_probe_ = std::thread(&run_osprobe);
+#endif
 
     startEventPoller();
 }
@@ -234,6 +240,7 @@ void SysTrace::startEventPoller()
     STLOG(INFO) << "[SysTrace] Event poller started";
 }
 
+#ifdef HAS_BTF_SUPPORT
 void SysTrace::stopOsProbePoller()
 {
     cleanup_osprobe();
@@ -251,6 +258,7 @@ void SysTrace::stopEventPoller()
         event_poller_.join();
     }
 }
+#endif
 
 void SysTrace::eventPollerMain()
 {
