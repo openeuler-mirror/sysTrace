@@ -3,7 +3,7 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：convert_json2_csv.py
-Author: h00568282/huangbin 
+Author:
 Create Date: 2025/3/28 16:17
 Notes:
 
