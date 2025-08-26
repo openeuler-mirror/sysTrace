@@ -167,7 +167,7 @@ bool checkAndUpdateTimer(int level) {
         if (elapsed >= *interval) {
             *dump_flag = false;
             *timer_active = false;
-            if (!dumped) {
+            if (!*dumped) {
                 *need_dump_once = true;
             }
         } else {

@@ -3,7 +3,7 @@
 Copyright (c) Huawei Technologies Co., Ltd. 2020-2028. All rights reserved.
 Description:
 FileName：slow_node_detection.py
-Author: c00570162/congdechun
+Author:
 Create Date: 2025/3/26 11:23
 Notes:
     0726：完善通信算子连线，1 flow s ts 要小于f ts

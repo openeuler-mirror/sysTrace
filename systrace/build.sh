@@ -8,8 +8,8 @@ BUILD_DIR="build"
 
 cleanup() {
     mkdir -p "$BUILD_DIR" "$CONFIG_DIR"
-    sudo rm -rf "$BPF_MOUNT/sysTrace"
-    sudo mount -t bpf bpf "$BPF_MOUNT/" 2>/dev/null || true
+    rm -rf "$BPF_MOUNT/sysTrace"
+    mount -t bpf bpf "$BPF_MOUNT/" 2>/dev/null || true
     rm -f src/os/*.{o,skel.h}
 }
 
