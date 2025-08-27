@@ -43,7 +43,7 @@ public:
         std::string filenameWithRank = saveFilename;
         this->markerActivityBuffer = std::make_unique<std::vector<msptiActivityMarker>>();
 
-        const char* localRankCStr = std::getenv("RANK");
+        const char* localRankCStr = std::getenv("RANK") ? std::getenv("RANK") : std::getenv("RANK_ID");
         if (localRankCStr == nullptr) {
             localRankCStr = "-1";
         }

@@ -137,8 +137,8 @@ static __u64 get_unix_time_from_uptime(__u64 uptime)
 }
 
 void initialize_osprobe() {
-    const char *rank_str = getenv("RANK");
-    const char *local_rank_str = getenv("LOCAL_RANK");
+    const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
+    const char *local_rank_str = getenv("LOCAL_RANK") ? getenv("LOCAL_RANK") : getenv("DEVICE_ID");
     rank = rank_str ? atoi(rank_str) : 0;
     local_rank = local_rank_str? atoi(local_rank_str) : 0;
     get_sys_boot_time();

@@ -30,7 +30,6 @@ typedef int (*halFCloseFunc_t)(FILE *stream);
 typedef int (*halFFlushFunc_t)(FILE *stream);
 typedef int (*halRemoveFunc_t)(const char *filename);
 typedef int (*halRenameFunc_t)(const char *oldname, const char *newname);
-typedef int (*halOpenFunc_t)(const char *pathname, int flags, mode_t mode);
 typedef int (*halCloseFunc_t)(int fd);
 typedef int (*halFsyncFunc_t)(int fd);
 typedef int (*halMkdirFunc_t)(const char *path, mode_t mode);
@@ -48,7 +47,6 @@ static halFCloseFunc_t orig_fclose = NULL;
 static halFFlushFunc_t orig_fflush = NULL;
 static halRemoveFunc_t orig_remove = NULL;
 static halRenameFunc_t orig_rename = NULL;
-static halOpenFunc_t orig_open = NULL;
 static halCloseFunc_t orig_close = NULL;
 static halFsyncFunc_t orig_fsync = NULL;
 static halMkdirFunc_t orig_mkdir = NULL;
@@ -182,7 +180,7 @@ static void add_io_entry(int fd, uint64_t start_us, uint64_t duration, IOType op
     entry->file_name.data = (uint8_t *)filename;
     entry->file_name.len = strlen(filename);
 
-    const char *rank_str = getenv("RANK");
+    const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
     entry->rank = rank_str ? atoi(rank_str) : 0;
 
     td->io->n_io_entries++;
@@ -206,7 +204,6 @@ int init_io_trace() {
     orig_fflush = (halFFlushFunc_t)dlsym(lib, "fflush");
     orig_remove = (halRemoveFunc_t)dlsym(lib, "remove");
     orig_rename = (halRenameFunc_t)dlsym(lib, "rename");
-    orig_open = (halOpenFunc_t)dlsym(lib, "open");
     orig_close = (halCloseFunc_t)dlsym(lib, "close");
     orig_fsync = (halFsyncFunc_t)dlsym(lib, "fsync");
     orig_mkdir = (halMkdirFunc_t)dlsym(lib, "mkdir");
@@ -217,7 +214,7 @@ int init_io_trace() {
 
     if (!orig_fread || !orig_fwrite || !orig_read || !orig_write ||
         !orig_fopen || !orig_fclose || !orig_fflush || !orig_remove ||
-        !orig_rename || !orig_open || !orig_close || !orig_fsync ||
+        !orig_rename || !orig_close || !orig_fsync ||
         !orig_mkdir || !orig_rmdir || !orig_unlink || !orig_opendir || 
         !orig_closedir) {
         fprintf(stderr, "dlsym failed: %s\n", dlerror());
@@ -382,31 +379,6 @@ int rename(const char *oldname, const char *newname) {
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_RENAME);
-    }
-
-    write_protobuf_to_file();
-    return ret;
-}
-
-int open(const char *pathname, int flags, ...) {
-    if (!orig_open) {
-        init_io_trace();
-    }
-
-    mode_t mode = 0;
-    if (flags & O_CREAT) {
-        va_list ap;
-        va_start(ap, flags);
-        mode = va_arg(ap, mode_t);
-        va_end(ap);
-    }
-
-    uint64_t start_us = get_current_us();
-    int ret = orig_open(pathname, flags, mode);
-    uint64_t end_us = get_current_us();
-
-    if (ret >= 0) {
-        add_io_entry(ret, start_us, end_us - start_us, IOTYPE__IO_OPEN);
     }
 
     write_protobuf_to_file();

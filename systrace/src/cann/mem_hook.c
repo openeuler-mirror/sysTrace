@@ -138,7 +138,7 @@ static ThreadData *get_thread_data()
         td = calloc(1, sizeof(ThreadData));
         td->proc_mem = calloc(1, sizeof(ProcMem));
         proc_mem__init(td->proc_mem);
-        const char *rank_str = getenv("RANK");
+        const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
         int rank = rank_str ? atoi(rank_str) : 0;
         td->proc_mem->pid = rank;
         td->last_log_time = time(NULL);

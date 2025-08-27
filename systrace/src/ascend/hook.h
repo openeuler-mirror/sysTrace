@@ -37,6 +37,9 @@ extern "C"
     aclInitFn orig_aclInit = nullptr;
     aclrtMapMemFn orig_aclrtMapMem = nullptr;
     aclrtLaunchKernelFn orig_aclrtLaunchKernel = nullptr;
+
+    static std::once_flag init_flag;
+    static void (*original_Initialize)() = nullptr;
 #ifdef __cplusplus
 }
 #endif
