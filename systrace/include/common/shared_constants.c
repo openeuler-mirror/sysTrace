@@ -11,14 +11,12 @@ static int shm_fd = -1;
 int init_shared_memory()
 {
     shm_fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0666);
-    if (shm_fd == -1)
-    {
+    if (shm_fd == -1) {
         perror("shm_open failed");
         return -1;
     }
 
-    if (ftruncate(shm_fd, sizeof(SharedData)) == -1)
-    {
+    if (ftruncate(shm_fd, sizeof(SharedData)) == -1) {
         perror("ftruncate failed");
         close(shm_fd);
         return -1;
@@ -26,29 +24,34 @@ int init_shared_memory()
 
     shared_data = mmap(NULL, sizeof(SharedData), PROT_READ | PROT_WRITE,
                        MAP_SHARED, shm_fd, 0);
-    if (shared_data == MAP_FAILED)
-    {
+    if (shared_data == MAP_FAILED) {
         perror("mmap failed");
         close(shm_fd);
         return -1;
     }
 
+    pthread_mutex_lock(&shared_data->g_trace_mutex);
+    if (shared_data->initialized) {
+        pthread_mutex_unlock(&shared_data->g_trace_mutex);
+        return 0;
+    }
+
     static pthread_mutexattr_t mutex_attr;
-    if (pthread_mutexattr_init(&mutex_attr) != 0)
-    {
+    if (pthread_mutexattr_init(&mutex_attr) != 0) {
         perror("pthread_mutexattr_init failed");
+        pthread_mutex_unlock(&shared_data->g_trace_mutex);
         return -1;
     }
 
-    if (pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED) != 0)
-    {
+    if (pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED) != 0) {
         perror("pthread_mutexattr_setpshared failed");
+        pthread_mutex_unlock(&shared_data->g_trace_mutex);
         return -1;
     }
 
-    if (pthread_mutex_init(&shared_data->g_trace_mutex, &mutex_attr) != 0)
-    {
+    if (pthread_mutex_init(&shared_data->g_trace_mutex, &mutex_attr) != 0) {
         perror("pthread_mutex_init failed");
+        pthread_mutex_unlock(&shared_data->g_trace_mutex);
         return -1;
     }
 
@@ -72,9 +75,11 @@ int init_shared_memory()
     shared_data->need_dump_L2_once = false;
     shared_data->need_dump_L3_once = false;
     
+    shared_data->initialized = true;
+    
+    pthread_mutex_unlock(&shared_data->g_trace_mutex);
     return 0;
 }
-
 SharedData *get_shared_data()
 {
     if (shared_data == NULL)
@@ -117,8 +122,6 @@ bool checkAndUpdateTimer(int level) {
     bool* timer_active = NULL;
     time_t* start_time = NULL;
     const char* level_name = "";
-    bool *dumped = false;
-    bool *need_dump_once = NULL;
 
     switch(level) {
         case 1:  // L1
@@ -127,8 +130,6 @@ bool checkAndUpdateTimer(int level) {
             timer_active = &shared_data->g_L1_timer_active;
             start_time = &shared_data->g_L1_start_time;
             level_name = "L1";
-            dumped = &shared_data->dumped_L1;
-            need_dump_once = &shared_data->need_dump_L1_once;
             break;
         case 2:  // L2
             dump_flag = &shared_data->g_dump_L2;
@@ -136,17 +137,13 @@ bool checkAndUpdateTimer(int level) {
             timer_active = &shared_data->g_L2_timer_active;
             start_time = &shared_data->g_L2_start_time;
             level_name = "L2";
-            dumped = &shared_data->dumped_L2;
-            need_dump_once = &shared_data->need_dump_L2_once;
             break;
-        case 3:  // L2
+        case 3:  // L3
             dump_flag = &shared_data->g_dump_L3;
             interval = &shared_data->g_dump_L3_interval;
             timer_active = &shared_data->g_L3_timer_active;
             start_time = &shared_data->g_L3_start_time;
             level_name = "L3";
-            dumped = &shared_data->dumped_L3;
-            need_dump_once = &shared_data->need_dump_L3_once;
             break;
         default:
             pthread_mutex_unlock(&shared_data->g_trace_mutex);
@@ -162,14 +159,11 @@ bool checkAndUpdateTimer(int level) {
     }
     else if (*timer_active) {
         time_t now = time(NULL);
-        double elapsed = difftime(now, *start_time) / 60;
+        double elapsed = difftime(now, *start_time) / 60.0;
         
         if (elapsed >= *interval) {
             *dump_flag = false;
             *timer_active = false;
-            if (!*dumped) {
-                *need_dump_once = true;
-            }
         } else {
             result = true;
         }

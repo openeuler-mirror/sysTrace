@@ -4,6 +4,7 @@
 #include "../include/common/shared_constants.h"
 #include <functional>
 #include <mutex>
+#include <atomic>
 #include <thread>
 
 class MonitorServer
@@ -13,6 +14,14 @@ class MonitorServer
 
     void start();
     void stop();
+    static void cleanup()
+    {
+        if (instance_)
+        {
+            instance_->stop();
+            cleanup_shared_memory();
+        }
+    }
 
     MonitorServer(const MonitorServer &) = delete;
     MonitorServer &operator=(const MonitorServer &) = delete;
@@ -31,6 +40,7 @@ class MonitorServer
 
     int server_fd_{-1};
     std::thread server_thread_;
+    std::atomic<bool> should_run_{true};
 
     static MonitorServer *instance_;
     inline static std::once_flag init_flag_;

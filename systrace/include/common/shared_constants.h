@@ -37,6 +37,7 @@ extern "C"
         time_t g_L2_start_time;
         time_t g_L3_start_time;
         pthread_mutex_t g_trace_mutex;
+        bool initialized; 
     } SharedData;
 
     int init_shared_memory();

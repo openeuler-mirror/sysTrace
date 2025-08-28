@@ -14,7 +14,7 @@ cleanup() {
 }
 
 setup_config() {
-    [ -f "$PY_FUNC_LIST" ] && sudo cp -f "$PY_FUNC_LIST" "$CONFIG_DIR/"
+    [ -f "$PY_FUNC_LIST" ] && cp -f "$PY_FUNC_LIST" "$CONFIG_DIR/"
 }
 
 compile_proto() {

@@ -16,6 +16,7 @@ MonitorServer &MonitorServer::getInstance()
                    {
                        instance_ = new MonitorServer();
                        instance_->start();
+                       std::atexit(cleanup);
                    });
     return *instance_;
 }
@@ -75,8 +76,10 @@ void MonitorServer::start()
 
 void MonitorServer::stop()
 {
+    should_run_ = false;
     if (server_fd_ != -1)
     {
+        shutdown(server_fd_, SHUT_RDWR);
         close(server_fd_);
         server_fd_ = -1;
     }
@@ -91,7 +94,7 @@ void MonitorServer::stop()
 
 void MonitorServer::server_thread_func()
 {
-    while (true)
+    while (should_run_)
     {
         struct sockaddr_un client_addr;
         socklen_t client_len = sizeof(client_addr);

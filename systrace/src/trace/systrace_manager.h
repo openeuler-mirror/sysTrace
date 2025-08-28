@@ -67,6 +67,12 @@ class SysTrace
     void startEventPoller();
     void stopEventPoller();
     void eventPollerMain();
+    static void cleanup() {
+      #ifdef HAS_BTF_SUPPORT
+        stopOsProbePoller();
+      #endif
+        instance_->stopEventPoller();
+    }
 
     inline static SysTrace *instance_ = nullptr;
     inline static std::once_flag init_flag_;
