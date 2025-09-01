@@ -202,6 +202,7 @@ SysTrace &SysTrace::getInstance()
                    {
                        instance_ = new SysTrace();
                        instance_->initializeSystem();
+                       std::atexit(cleanup);
                    });
     return *instance_;
 }
@@ -249,6 +250,7 @@ void SysTrace::stopOsProbePoller()
         os_probe_.join();
     }
 }
+#endif
 
 void SysTrace::stopEventPoller()
 {
@@ -258,7 +260,6 @@ void SysTrace::stopEventPoller()
         event_poller_.join();
     }
 }
-#endif
 
 void SysTrace::eventPollerMain()
 {

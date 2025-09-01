@@ -123,11 +123,11 @@ void LoadEnvironmentVariables()
     auto loadStr = [](const char *name)
     { return env::EnvVarRegistry::GetEnvVar<std::string>(name); };
 
-    config.rank = loadInt("RANK");
+    config.rank = loadInt("RANK") ? loadInt("RANK") : loadInt("RANK_ID");
     config.job_name = loadStr("ENV_ARGO_WORKFLOW_NAME");
-    config.local_rank = loadInt("LOCAL_RANK");
+    config.local_rank = loadInt("LOCAL_RANK") ? loadInt("LOCAL_RANK") : loadInt("DEVICE_ID");
     config.local_world_size = loadInt("LOCAL_WORLD_SIZE");
-    config.world_size = loadInt("WORLD_SIZE");
+    config.world_size = loadInt("WORLD_SIZE") ? loadInt("WORLD_SIZE") : loadInt("RANK_SIZE");
     config.rank_str = "[RANK " + std::to_string(config.rank) + "] ";
 }
 

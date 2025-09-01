@@ -1,8 +1,56 @@
-#include "hook.h"
-#include "../src/trace/systrace_manager.h"
-#include <cstdlib>
 #include <dlfcn.h>
+#include <stdio.h>
+#include <mutex>
+#include <cstdlib>
 #include <iostream>
+#include <string>
+#include <unistd.h>
+#include "../src/trace/systrace_manager.h"
+#include "hook.h"
+
+static std::string get_mindspore_lib_path() {
+    const char* cmd = "python -c \"import mindspore as ms; import os; print(os.path.join(os.path.dirname(ms.__file__), 'lib/libmindspore_backend.so'))\"";
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) return "";
+
+    char buffer[1024];
+    std::string result;
+    if (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        result = buffer;
+        result.erase(result.find_last_not_of("\n") + 1);
+    }
+    pclose(pipe);
+    return result;
+}
+
+extern "C" void _ZN9mindspore11distributed10InitializeEv() {
+    std::call_once(init_flag, []() {
+        std::string so_path = get_mindspore_lib_path();
+        if (so_path.empty()) {
+            fprintf(stderr, "[ERROR] Failed to find libmindspore_backend.so\n");
+            return;
+        }
+
+        void* handle = dlopen(so_path.c_str(), RTLD_LAZY);
+        if (!handle) {
+            fprintf(stderr, "[ERROR] dlopen failed: %s\n", dlerror());
+            return;
+        }
+
+        original_Initialize = (void (*)())dlsym(handle, "_ZN9mindspore11distributed10InitializeEv");
+        if (!original_Initialize) {
+            fprintf(stderr, "[ERROR] dlsym failed: %s\n", dlerror());
+            return;
+        }
+        ::systrace::SysTrace::getInstance();
+    });
+
+    if (!original_Initialize) {
+        fprintf(stderr, "[ERROR] Original function not loaded\n");
+        return;
+    }
+    original_Initialize();
+}
 
 #ifdef __cplusplus
 extern "C"

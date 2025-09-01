@@ -35,7 +35,7 @@ unw_word_t get_so_base(unw_word_t addr)
 }
 
 void get_log_filename(char *buf, size_t buf_size, const char *path_suffix) {
-    const char *rank_str = getenv("RANK");
+    const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
     int rank = rank_str ? atoi(rank_str) : 0;
 
     char path[PATH_MAX] = {0};

@@ -1,15 +1,21 @@
-# PyTorch Tracing Functions Configuration File
-# -------------------------------------------
-# This file lists Python functions that should be traced by sysTrace.
-# Each line represents one function to be traced, specified in the format:
+# ============================================
+#        PyTorch Tracing Functions
+#               Configuration File
+# ============================================
+#
+# This file lists Python functions to be traced by sysTrace.
+# Specify functions using the format:
 #
 #   module.path@ClassName@method_name  (for class methods)
-#   or
-#   module.path@function_name          (for standalone functions)
+#   module.path@function_name           (for standalone functions)
 #
-# Examples:
+# Example:
 #   torch.utils.data.dataloader@_BaseDataLoaderIter@__next__
-# -------------------------------------------
+# ============================================
+
+# ============================================
+#             TORCH_NPU FUNCTIONS
+# ============================================
 torch.utils.data.dataloader@_BaseDataLoaderIter@__next__
 torch_npu@npu@synchronize
 torch_npu.npu@Event@synchronize
@@ -21,3 +27,27 @@ torch@autograd@backward
 torch@autograd@grad
 megatron.core.pipeline_parallel@schedules@forward_step
 megatron.core.pipeline_parallel@schedules@backward_step
+
+# ============================================
+#             MINDSPORE FUNCTIONS
+# ============================================
+mindspore.dataset.engine.datasets@Dataset@__iter__
+mindspore.hal@synchronize
+mindspore.hal@Event@synchronize
+mindspore.hal@Event@wait
+mindspore.hal@Stream@synchronize
+mindspore.hal@Stream@wait_event
+mindspore.hal@Stream@wait_stream
+mindspore.ops@GradOperation@__call__
+mindspore.ops@GradOperation@__call__
+mindspore.nn@Cell@__call__
+mindspore.ops@GradOperation@__call__
+mindspore.nn.TrainOneStepCell@__call__
+mindspore.parallel.nn.Pipeline@__call__
+mindspore.nn.PipelineCell@__call__
+mindspore.train.model@Model@_train_dataset_sink_process
+mindspore.train.model@Model@_train_process
+mindspore.train.model@Model@_train_network
+mindspore.train.model@Model@_exec_preprocess
+mindformers.core@MFLossMonitor@print_output_info   
+mindspore.train@Callback@on_train_step_begin
