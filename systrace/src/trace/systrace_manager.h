@@ -69,7 +69,7 @@ class SysTrace
     void eventPollerMain();
     static void cleanup() {
       #ifdef HAS_BTF_SUPPORT
-        stopOsProbePoller();
+        instance_->stopOsProbePoller();
       #endif
         instance_->stopEventPoller();
     }
