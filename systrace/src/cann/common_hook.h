@@ -22,6 +22,7 @@
 
 #define LOG_INTERVAL_SEC 5
 #define LOG_ITEMS_MIN 10
+#define PATH_LEN 256
 
 uint64_t get_current_us();
 const char *get_so_name(uint64_t ip);

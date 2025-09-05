@@ -2,6 +2,7 @@ import json
 import systrace_pb2
 import argparse
 import glob
+import os
 
 def process_timeline_file(input_path, trace_data):
     with open(input_path, "rb") as f:
@@ -26,14 +27,17 @@ def process_timeline_file(input_path, trace_data):
             }
         })
 
-def aggregate_timeline_files(output_path):
+def aggregate_timeline_files(input_dir, output_path):
     trace_data = {
         "traceEvents": [],
         "displayTimeUnit": "ns",
         "metadata": {"format": "Pytorch Profiler"}
     }
 
-    for timeline_file in glob.glob("*timeline"):
+    timeline_files = glob.glob(os.path.join(input_dir, "*timeline"))
+    print(f"Found {len(timeline_files)} timeline files to process")
+
+    for timeline_file in timeline_files:
         print(f"Processing {timeline_file}")
         process_timeline_file(timeline_file, trace_data)
     
@@ -45,6 +49,7 @@ def aggregate_timeline_files(output_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Aggregate all *.timeline files into a single JSON')
+    parser.add_argument('--input', default='.', help='Input directory containing timeline files (default: current directory)')
     parser.add_argument('--output', required=True, help='Output JSON file path')
     args = parser.parse_args()
-    aggregate_timeline_files(args.output)
+    aggregate_timeline_files(args.input, args.output)
