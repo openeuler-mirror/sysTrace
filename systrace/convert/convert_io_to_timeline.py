@@ -45,14 +45,14 @@ def process_io_file(input_path, trace_data):
         })
 
 
-def aggregate_io_files(output_path):
+def aggregate_io_files(input_dir, output_path):
     trace_data = {
         "traceEvents": [],
         "displayTimeUnit": "us",
         "metadata": {"format": "IO Profiler"}
     }
 
-    pb_files = glob.glob("*.pb")
+    pb_files = glob.glob(os.path.join(input_dir, "*.pb"))
     print(f"Found {len(pb_files)} .pb files to process")
 
     for pb_file in pb_files:
@@ -69,7 +69,8 @@ def aggregate_io_files(output_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Aggregate all *.pb files into a Chrome Trace JSON')
+    parser.add_argument('--input', default='.', help='Input directory containing .pb files (default: current directory)')
     parser.add_argument('--output', required=True, help='Output JSON file path')
     args = parser.parse_args()
 
-    aggregate_io_files(args.output)
+    aggregate_io_files(args.input, args.output)

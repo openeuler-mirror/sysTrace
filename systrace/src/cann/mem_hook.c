@@ -192,7 +192,7 @@ static void write_protobuf_to_file()
     if (pthread_mutex_trylock(&file_mutex) == 0)
     { // pthread_mutex_trylock or pthread_mutex_lock
         char filename[256];
-        get_log_filename(filename, sizeof(filename), "mem_trace");
+        get_log_filename(filename, sizeof(filename), "hbm_trace");
 
         size_t len = proc_mem__get_packed_size(td->proc_mem);
         buf = malloc(len);

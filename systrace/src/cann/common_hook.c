@@ -4,8 +4,6 @@
 #include <dlfcn.h>
 #include <stdio.h>
 
-#define PATH_MAX 100
-
 uint64_t get_current_us() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -38,7 +36,7 @@ void get_log_filename(char *buf, size_t buf_size, const char *path_suffix) {
     const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
     int rank = rank_str ? atoi(rank_str) : 0;
 
-    char path[PATH_MAX] = {0};
+    char path[PATH_LEN] = {0};
     int ret = snprintf(path, sizeof(path), "%s/%s", SYS_TRACE_ROOT_DIR, path_suffix);
     if (ret < 0 || (size_t)ret >= sizeof(path)) {
         snprintf(buf, buf_size, "%s_trace_rank%d.pb", path_suffix, rank);

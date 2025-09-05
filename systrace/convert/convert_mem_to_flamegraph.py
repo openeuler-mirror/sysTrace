@@ -298,16 +298,17 @@ class FixedFlameGraphConverter:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Aggregate all *.pb files into a single JSON')
+    parser.add_argument('--input', default='.', help='Input directory containing .pb files (default: current directory)')
     parser.add_argument('--output', required=True, help='Output JSON file path')
     args = parser.parse_args()
     output_path = args.output
     all_events = []
 
-    pb_files = glob.glob("*.pb")
+    pb_files = glob.glob(os.path.join(args.input, "*.pb"))
     for i, _ in enumerate(pb_files):
         processed_files[i] = False
 
-    for pb_file in glob.glob("*.pb"):
+    for pb_file in pb_files:
         print(f"Processing {pb_file}")
         converter = FixedFlameGraphConverter()
         tmp_output = f"{os.path.splitext(pb_file)[0]}_tmp.json"
@@ -324,7 +325,7 @@ if __name__ == "__main__":
             "displayTimeUnit": "ns",
             "metadata": {
                 "format": "FixedFlameGraph (Aggregated)",
-                "source_files": glob.glob("*.pb")
+                "source_files": pb_files
             }
         }, f, indent=2)
 

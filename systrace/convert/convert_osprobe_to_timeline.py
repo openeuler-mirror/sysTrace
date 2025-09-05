@@ -4,6 +4,7 @@ import glob
 import json
 import argparse
 import systrace_pb2
+import os
 from collections import defaultdict
 
 event_type_dic = {
@@ -32,13 +33,13 @@ def process_single_file(input_path):
         return []
 
     for entry in osprobe_data.OSprobe_entries:
-        if entry.OS_event_type  in [1, 2, 3]:
+        if entry.OS_event_type in [1, 2, 3]:
             cpu_trace_events.append({
                 "name": event_type_dic[entry.OS_event_type],
                 "cat": "osprobe",
                 "ph": "X",
                 "pid": entry.rank if entry.OS_event_type in [0, 4] else f"Rank: {entry.rank} CPU: {entry.key}",
-                "tid":  f"{entry.comm}: {entry.key}" if entry.OS_event_type in [0, 4] else entry.key ,
+                "tid": f"{entry.comm}: {entry.key}" if entry.OS_event_type in [0, 4] else entry.key,
                 "ts": entry.start_us,
                 "dur": entry.dur,
                 "args": {
@@ -82,7 +83,7 @@ def process_single_file(input_path):
     return trace_events, cpu_trace_events
 
 
-def aggregate_timeline_files(output_path):
+def aggregate_timeline_files(input_dir, output_path):
     trace_data = {
         "traceEvents": [],
         "displayTimeUnit": "ns",
@@ -94,26 +95,29 @@ def aggregate_timeline_files(output_path):
         "displayTimeUnit": "ns",
         "metadata": {"format": "eBPF OSProbe"}
     }
-    timeline_files = glob.glob("*.pb")
-    print(f"Found {len(timeline_files)} timeline files.")
+    
+    timeline_files = glob.glob(os.path.join(input_dir, "*.pb"))
+    print(f"Found {len(timeline_files)} timeline files in {input_dir}")
 
     with Pool(processes=cpu_count()) as pool:
-        # tqdm 结合 imap_unordered 实现进度显示
-        for result, cpu_result in tqdm(pool.imap_unordered(process_single_file, timeline_files), total=len(timeline_files), desc="Processing .pb files"):
+        for result, cpu_result in tqdm(pool.imap_unordered(process_single_file, timeline_files), 
+                                     total=len(timeline_files), 
+                                     desc="Processing .pb files"):
             trace_data["traceEvents"].extend(result)
             cpu_trace_data["traceEvents"].extend(cpu_result)
 
     with open(output_path, "w") as f:
         json.dump(trace_data, f, indent=None, separators=(',', ':'))
     
-    with open(f"cpu_{output_path}", "w") as f:
+    with open(f"{output_path}_cpu", "w") as f:
         json.dump(cpu_trace_data, f, indent=None, separators=(',', ':'))
         
     print(f"Aggregated {len(trace_data['traceEvents'])} events to {output_path}")
 
     
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Aggregate all *.timeline files into a single JSON')
+    parser = argparse.ArgumentParser(description='Aggregate all *.pb files into JSON traces')
+    parser.add_argument('--input', default='.', help='Input directory containing .pb files (default: current directory)')
     parser.add_argument('--output', required=True, help='Output JSON file path')
     args = parser.parse_args()
-    aggregate_timeline_files(args.output)
+    aggregate_timeline_files(args.input, args.output)
