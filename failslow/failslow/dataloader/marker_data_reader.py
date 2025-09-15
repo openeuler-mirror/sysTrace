@@ -4,7 +4,6 @@ import datetime
 import multiprocessing
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from collections import Counter
 from typing import List, Dict, Tuple
 
@@ -412,32 +411,6 @@ class MarkerDataloader:
 
         return selected_indices, comm_ops
 
-    def get_broadcast_ops(self, broadcast_ops="HcclBroadcast"):
-        ''' Use broadcast time estimate step time '''
-        # for csv_file in self.csv_files:
-        #     csv_path = os.path.join(self._root_path, csv_file)
-        #     data_df = self.read_csv(csv_path)
-        #     data_df['start_stamp'] = data_df['start'].apply(self.convert_timestamp2datetime)
-        #     data_df['end_stamp'] = data_df['end'].apply(self.convert_timestamp2datetime)
-        #     data_df.to_csv(f"new_{csv_file}", index=False)
-
-        csv_path = os.path.join(self._root_path, self.csv_files[0])
-        data_df = self.read_csv(csv_path)
-        data_df['start_stamp'] = data_df[TableItem.ex_start_ts].apply(self.convert_timestamp2datetime)
-        # data_df.to_csv("./broadcast_df.csv", index=False)
-        # n = len(data_df)
-        # quarter = n // 4
-        # data_df = data_df[quarter:]
-        mask = data_df[TableItem.name] == broadcast_ops
-        broadcast_df = data_df[mask]
-        logger.info(f"broadcast df length: {len(broadcast_df)}")
-        broadcast_df['start_stamp'] = broadcast_df[TableItem.ex_start_ts].apply(self.convert_timestamp2datetime)
-        # broadcast_df.to_csv("./broadcast_df.csv", index=False)
-        broadcast_df = self._filter_conti_index(broadcast_df)
-        step_time = np.array(broadcast_df[TableItem.ex_start_ts].diff() / 1e6)[2:]
-        logger.info(f"estimate length: {len(broadcast_df)}")
-
-        self.plot_step_time(step_time)
 
     def convert_timestamp2datetime(self, data):
 
@@ -446,21 +419,6 @@ class MarkerDataloader:
         date_time = dt_object.strftime('%Y-%m-%d %H:%M:%S')
         return date_time
 
-    def plot_step_time(self, data):
-        step_time = extract_step_time_from_log(self._root_path)
-        mean_value = np.mean(data)
-        plt.figure(figsize=(10, 6))
-        plt.plot(step_time[10:110], label='GT', marker='^')
-        plt.plot(data[10:110], label='extimate_time', marker='o')
-        # 绘制均值线
-        # plt.axhline(y=mean_value, color='r', linestyle='--', label='Mean')
-        # 设置图表标题和坐标轴标签
-        plt.title('Estimate step time by dataloader.')
-        plt.xlabel('step index')
-        plt.ylabel('latency(ms)')
-        plt.legend()
-        plt.grid(True)
-        plt.show()
 
     @staticmethod
     def _filter_deviation_data(data):
@@ -503,7 +461,6 @@ if __name__ == "__main__":
 
     convert_jsons2csv(_root_path)
     dataloader = MarkerDataloader(_root_path)
-    # all_comm_groups = dataloader.get_broadcast_ops()
     logger.info(f"{dataloader.csv_files}")
     from restore_comm import RestoreComm
 
