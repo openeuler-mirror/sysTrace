@@ -33,6 +33,7 @@ struct GlobalConfig
     uint32_t local_rank{0};
     uint32_t world_size{0};
     uint32_t local_world_size{0};
+    pid_t pid{0};
     std::string job_name;
     bool enable{true};
     std::vector<uint64_t> devices;
