@@ -49,6 +49,7 @@ setup(
     ],
     entry_points={
         "console_scripts": [
+            "systrace-slow=failslow.main:service_main",
             "systrace-failslow=failslow.main:main",
         ]
     }
