@@ -9,6 +9,7 @@
 #include <thread>
 #include <unistd.h>
 
+extern pid_t g_hooked_pid;
 namespace systrace
 {
 namespace util
@@ -54,7 +55,7 @@ std::string GenerateClusterUniqueFilename(const std::string &suffix)
         gethostname(hostname, sizeof(hostname));
         std::ostringstream oss;
         oss << hostname << "--" << std::setw(5) << std::setfill('0')
-            << config::GlobalConfig::Instance().rank << suffix;
+            << config::GlobalConfig::Instance().rank << "--" << config::GlobalConfig::Instance().pid << suffix;
         return oss.str();
     }
     catch (const std::exception &e)
@@ -124,6 +125,7 @@ void LoadEnvironmentVariables()
     { return env::EnvVarRegistry::GetEnvVar<std::string>(name); };
 
     config.rank = loadInt("RANK") ? loadInt("RANK") : loadInt("RANK_ID");
+    config.pid = g_hooked_pid;
     config.job_name = loadStr("ENV_ARGO_WORKFLOW_NAME");
     config.local_rank = loadInt("LOCAL_RANK") ? loadInt("LOCAL_RANK") : loadInt("DEVICE_ID");
     config.local_world_size = loadInt("LOCAL_WORLD_SIZE");

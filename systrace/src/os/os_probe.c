@@ -23,6 +23,7 @@
 #include <pthread.h>
 #include <unistd.h>
 
+
 #ifdef BPF_PROG_KERN
 #undef BPF_PROG_KERN
 #endif
@@ -79,6 +80,7 @@
 static pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
 int g_stop = 0;
 
+extern pid_t g_hooked_pid;
 static pthread_key_t thread_data_key;
 static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 static int rank;
@@ -239,15 +241,15 @@ static void get_log_filename(time_t current, char *buf,
         if (mkdir(dir_path, 0755) != 0 && errno != EEXIST)
         {
             perror("Failed to create directory");
-            snprintf(buf, buf_size, "os_trace_%04d%02d%02d_%02d_rank_%d.pb",
+            snprintf(buf, buf_size, "os_trace_%04d%02d%02d_%02d_rank_%d_%d.pb",
                      tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                     tm->tm_hour, rank);
+                     tm->tm_hour, rank, g_hooked_pid);
             return;
         }
     }
-    snprintf(buf, buf_size, "%s/os_trace_%04d%02d%02d_%02d_rank_%d.pb",
+    snprintf(buf, buf_size, "%s/os_trace_%04d%02d%02d_%02d_rank_%d_%d.pb",
              dir_path, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-             tm->tm_hour, rank);
+             tm->tm_hour, rank, g_hooked_pid);
 }
 
 static char is_ready_to_write(OSprobe_ThreadData *td, time_t *current)
