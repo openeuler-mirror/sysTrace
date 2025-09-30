@@ -1,0 +1,211 @@
+// 使用方式：bpftrace bpftrace_all_mutex.bt -p {pid} > trace.json
+// 指定CPU的话要修改指定的target_cpu变， -p 参数可选，配置了就采集配的pid，没有配置就采集全部的pid
+#!/usr/bin/env bpftrace
+
+BEGIN
+{
+    @target_pid = 0;   // 0：不过滤，采集全部
+    @target_cpu = -1;  // -1:不过滤，采集全部
+    @start_time = nsecs;  // 归零开始时间
+    printf("{\"traceEvents\":[\n");
+    @first = 1;
+}
+
+//
+// pthread_mutex_lock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_lock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_lock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first)
+    {
+        printf("{\"name\":\"pthread_mutex_lock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}",
+            pid, comm, $start_us, $dur_us, comm, cpu, $lock);
+        @first = 0;
+    }
+    else
+    {
+        printf(",\n{\"name\":\"pthread_mutex_lock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}",
+            pid, comm, $start_us, $dur_us, comm, cpu, $lock);
+    }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// pthread_mutex_unlock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_unlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_unlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"pthread_mutex_unlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"pthread_mutex_unlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// pthread_rwlock_wrlock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_wrlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_wrlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"pthread_rwlock_wrlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"pthread_rwlock_wrlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// pthread_rwlock_rdlock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_rdlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_rdlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"pthread_rwlock_rdlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"pthread_rwlock_rdlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// pthread_mutex_timedlock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_timedlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_timedlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"pthread_mutex_timedlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"pthread_mutex_timedlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// pthread_rwlock_unlock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_unlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_unlock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"pthread_rwlock_unlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"pthread_rwlock_unlock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// sem_wait
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:sem_wait
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:sem_wait
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"sem_wait\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"sem_wait\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+//
+// pthread_spin_lock
+//
+uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_spin_lock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
+{
+    @start[tid] = nsecs;
+    @lock_addr[tid] = arg0;
+}
+uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_spin_lock
+/(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
+{
+    $start_us = (@start[tid] - @start_time) / 1000;
+    $dur_us   = (nsecs - @start[tid]) / 1000;
+    $lock     = @lock_addr[tid];
+
+    if (@first) { printf("{\"name\":\"pthread_spin_lock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); @first=0; }
+    else { printf(",\n{\"name\":\"pthread_spin_lock\",\"cat\":\"lock\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"%s\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"cpu\":%d,\"lock_address\":\"0x%x\"}}", pid, comm, $start_us, $dur_us, comm, cpu, $lock); }
+
+    delete(@start[tid]);
+    delete(@lock_addr[tid]);
+}
+
+END
+{
+    printf("\n]}\n");
+}
+

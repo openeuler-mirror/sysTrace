@@ -1,0 +1,117 @@
+#!/usr/bin/env bpftrace
+
+BEGIN
+{
+    @target_pid = 0;   // 0: 采集全部 pid
+    @target_cpu = -1;  // -1: 采集全部 CPU
+    @start_time = nsecs;
+    printf("{\"traceEvents\":[\n");
+    @first = 1;
+}
+
+//
+// pthread_create
+//
+uprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_create
+/(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu)/
+{
+    @pthread_start[tid] = nsecs;
+    @pthread_comm[tid]  = comm;
+    @pthread_cpu[tid]   = cpu;
+}
+
+uretprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_create
+/(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu) && @pthread_start[tid]/
+{
+    $start_us = (@pthread_start[tid] - @start_time)/1000;
+    $dur_us   = (nsecs - @pthread_start[tid])/1000;
+    $cpu_id   = @pthread_cpu[tid];
+
+    $ustack = ustack(10);
+
+    if (@first) {
+        printf("{\"name\":\"%s\",\"cat\":\"thread\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"pthread_create\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"ustack\":\"%s\"}}",
+               @pthread_comm[tid], $cpu_id, $start_us, $dur_us, @pthread_comm[tid], $ustack);
+        @first = 0;
+    } else {
+        printf(",\n{\"name\":\"%s\",\"cat\":\"thread\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"pthread_create\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"ustack\":\"%s\"}}",
+               @pthread_comm[tid], $cpu_id, $start_us, $dur_us, @pthread_comm[tid], $ustack);
+    }
+
+    delete(@pthread_start[tid]);
+    delete(@pthread_comm[tid]);
+    delete(@pthread_cpu[tid]);
+}
+
+//
+// pthread_join
+//
+uprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_join
+/(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu)/
+{
+    @pthread_join_start[tid] = nsecs;
+    @pthread_join_comm[tid]  = comm;
+    @pthread_join_cpu[tid]   = cpu;
+}
+
+uretprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_join
+/(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu) && @pthread_join_start[tid]/
+{
+    $start_us = (@pthread_join_start[tid] - @start_time)/1000;
+    $dur_us   = (nsecs - @pthread_join_start[tid])/1000;
+    $cpu_id   = @pthread_join_cpu[tid];
+
+    $ustack = ustack(10);
+
+    if (@first) {
+        printf("{\"name\":\"%s\",\"cat\":\"thread\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"pthread_join\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"ustack\":\"%s\"}}",
+               @pthread_join_comm[tid], $cpu_id, $start_us, $dur_us, @pthread_join_comm[tid], $ustack);
+        @first = 0;
+    } else {
+        printf(",\n{\"name\":\"%s\",\"cat\":\"thread\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"pthread_join\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"ustack\":\"%s\"}}",
+               @pthread_join_comm[tid], $cpu_id, $start_us, $dur_us, @pthread_join_comm[tid], $ustack);
+    }
+
+    delete(@pthread_join_start[tid]);
+    delete(@pthread_join_comm[tid]);
+    delete(@pthread_join_cpu[tid]);
+}
+
+//
+// sched_switch
+//
+tracepoint:sched:sched_switch
+/(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu)/
+{
+    if (@sched_start[args->prev_pid]) {
+        $start_us = (@sched_start[args->prev_pid] - @start_time)/1000;
+        $dur_us   = (nsecs - @sched_start[args->prev_pid])/1000;
+        $cpu_id   = @sched_cpu[args->prev_pid];
+
+        $ustack = ustack(10);
+        $kstack = kstack(10);
+
+        if (@first) {
+            printf("{\"name\":\"%s\",\"cat\":\"sched\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"sched_switch\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"ustack\":\"%s\",\"kstack\":\"%s\"}}",
+                   @sched_comm[args->prev_pid], $cpu_id, $start_us, $dur_us, @sched_comm[args->prev_pid], $ustack, $kstack);
+            @first = 0;
+        } else {
+            printf(",\n{\"name\":\"%s\",\"cat\":\"sched\",\"ph\":\"X\",\"pid\":%d,\"tid\":\"sched_switch\",\"ts\":%d,\"dur\":%d,\"args\":{\"comm\":\"%s\",\"ustack\":\"%s\",\"kstack\":\"%s\"}}",
+                   @sched_comm[args->prev_pid], $cpu_id, $start_us, $dur_us, @sched_comm[args->prev_pid], $ustack, $kstack);
+        }
+
+        delete(@sched_start[args->prev_pid]);
+        delete(@sched_comm[args->prev_pid]);
+        delete(@sched_cpu[args->prev_pid]);
+    }
+
+    @sched_start[args->next_pid] = nsecs;
+    @sched_comm[args->next_pid]  = args->next_comm;
+    @sched_cpu[args->next_pid]   = cpu;
+}
+
+END
+{
+    printf("\n]}\n");
+}
+
