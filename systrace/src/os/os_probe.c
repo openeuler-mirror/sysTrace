@@ -506,11 +506,12 @@ int bpf_buffer_init_from_pin(struct bpf_buffer **buffer_ptr, const char *map_pat
         return -1;
     }
     *buffer_ptr = buffer;
-    close(map_fd); // 不再需要，buffer 内部已经引用 fd 或 dup
+    close(map_fd);
     return 0;
 }
 
 void cleanup_osprobe() {
+    sig_int();
     FILE *fp;
     fp = popen(RM_MAP_PATH, "r");
     if (fp != NULL) {
@@ -598,7 +599,6 @@ int run_osprobe() {
         }
     }    
 
-    fprintf(stderr, "[OS_PROBE RANK_%d] sysTrace ebpf trace finished\n", local_rank);
 err:
     cleanup_osprobe();
     return ret;

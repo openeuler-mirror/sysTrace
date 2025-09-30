@@ -115,7 +115,9 @@ bool checkAndUpdateTimer(int level) {
         return false;
     }
 
-    pthread_mutex_lock(&shared_data->g_trace_mutex);
+    if (pthread_mutex_trylock(&shared_data->g_trace_mutex) != 0) {
+        return false;
+    }
 
     bool* dump_flag = NULL;
     float* interval = NULL;
