@@ -96,6 +96,7 @@ extern "C"
 
     EXPOSE_API aclError aclInit(const char *configPath)
     {
+        g_hooked_pid = getpid();
         HOOKED_FUNCTION(orig_aclInit, "aclInit", configPath);
     }
 

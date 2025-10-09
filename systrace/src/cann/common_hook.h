@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <errno.h>
 #include <dlfcn.h>
+
 #if defined(__aarch64__)
 #include "../../thirdparty/aarch64/libunwind/libunwind.h"
 #elif defined(__x86_64__)
@@ -24,6 +25,7 @@
 #define LOG_ITEMS_MIN 10
 #define PATH_LEN 256
 
+extern pid_t g_hooked_pid;
 uint64_t get_current_us();
 const char *get_so_name(uint64_t ip);
 unw_word_t get_so_base(unw_word_t addr);
