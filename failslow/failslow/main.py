@@ -97,6 +97,17 @@ def main():
 
     return response
 
+def service_main():
+    while True:
+        try:
+            logger.info(f"Start detecting fail slow task,")
+            response = main()
+            logger.info(f"fail slow task result: {json.dumps(response)}.")
+            logger.info(f"Finish detecting fail slow task.")
+        except Exception as e:
+            logger.error("Fail slow task run error.")
+        time.sleep(3600)
+        
 if __name__ == "__main__":
     try:
         main()
