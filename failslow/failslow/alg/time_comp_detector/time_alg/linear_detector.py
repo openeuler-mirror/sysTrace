@@ -55,7 +55,7 @@ class LinearDetector():
         x = self.min_max_processing(x)
         filtered_data = self.min_max_processing(filtered_data)
 
-        logger.info("linear input and output:", x.shape, filtered_data.shape)
+        logger.info(f"linear input {x.shape} and output {filtered_data.shape}.")
         x = x.reshape(-1, 1)
         filtered_data = filtered_data.reshape(-1, 1)
 
@@ -67,8 +67,9 @@ class LinearDetector():
 
         self.detector = {"weight": weight, "bias": bias}
 
-    def get_anomaly_info(self) -> dict:
+    def get_anomaly_info(self, rank: int) -> dict:
         anomaly_info = {
+            "rank": rank,
             "linear_weight": self.detector.get("weight", None),
             "linear_detector_threshold": self.thr
         }
@@ -80,10 +81,10 @@ class LinearDetector():
         weight = self.detector.get("weight", None)
         if weight and weight > self.thr:
             logger.info(f"linear weight: {weight}, status is anomaly.")
-            return False
+            return True
         else:
             logger.info(f"linear weight: {weight}, status is normal.")
-            return True
+            return False
 
 
 def main():

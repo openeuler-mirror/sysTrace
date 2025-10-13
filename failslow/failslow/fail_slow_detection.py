@@ -8,6 +8,7 @@ import re
 import json
 import os
 import time
+import numpy as np
 from datetime import datetime, timezone
 import pandas as pd
 from typing import Dict
@@ -16,11 +17,43 @@ from failslow.util.constant import AnomalyType
 from failslow.util.logging_utils import get_default_logger
 from failslow.util.constant import MODEL_CONFIG_PATH
 from failslow.dataloader.step_time_reader import StepReader
+from failslow.dataloader.hbm_dataloader import HBM_Dataloader
+
+from failslow.alg.time_comp_detector.time_alg import LinearDetector
 
 logger = get_default_logger(__name__)
 
 DATA_QUEUE = pd.DataFrame({'time': [], 'step_time': []})
 DROP_DATA_LENGTH = 0
+
+
+def detect_hbm_leak_anomalies(data_dfs: Dict[int, pd.DataFrame], model_args: Dict):
+    anomaly_info = {}
+    detector = LinearDetector(cfg=model_args)
+
+    anomaly_info["is_anomaly"] = False
+    anomaly_info["anomaly_count_times"] = 0
+    anomaly_info["anomaly_info"] = []
+    anomaly_info["anomaly_type"] = AnomalyType.normal
+    
+    for device_id, data_df in data_dfs.items():
+        hbm_util_value = np.array(data_df["HBM_util"])
+        timestamps = data_df["time"]
+
+        detector.fit(hbm_util_value)
+        anomaly_status = detector.detect()
+
+        if anomaly_status:
+            anomaly_info["is_anomaly"] = True
+            anomaly_info["anomaly_count_times"] += 1
+            anomaly_info["anomaly_info"].append(detector.get_anomaly_info(device_id))
+            anomaly_info["anomaly_type"] = AnomalyType.hbm_leak
+
+    anomaly_info["start_time"] = int(timestamps.iloc[0])
+    anomaly_info["end_time"] = int(timestamps.iloc[len(timestamps) - 1])
+
+    return anomaly_info
+
 
 def detect_step_time_anomalies(data_df: pd.DataFrame, model_args: Dict):
     """
@@ -127,6 +160,8 @@ def check_input_file(training_log: str, log_type: str):
             return training_log
         else:
             dir_path = os.path.dirname(training_log)
+            if not os.path.isdir(dir_path):
+                return None
             for file in os.listdir(dir_path):
                 if file.endswith("00000.timeline"):
                     return os.path.join(dir_path, file)
@@ -135,10 +170,15 @@ def check_input_file(training_log: str, log_type: str):
 
 def run_slow_node_perception(args: Dict):
     training_log = args.get("training_log", "./log/rank0_mindformer.log")
+    hbm_data_path = args.get("hbm_data_path", "./hbm_data.csv")
+    enable_hbm_detect = args.get("enable_hbm_detect", False)
     fail_slow_perception_result = args.get("fail_slow_perception_path", "/log")
     os.makedirs(fail_slow_perception_result, exist_ok=True)
     log_type = args.get("log_type", "timeline")
     training_log = check_input_file(training_log, log_type)
+    if not training_log:
+        logger.info(f"{training_log} is not exist. Please check input data.")
+        return  
 
     task_stable_step = args.get("task_stable_step", 2)  # just for first time detection
     fail_slow_span_mins = args.get("fail_slow_span_mins", 0.1)  # for detection interval
@@ -154,6 +194,7 @@ def run_slow_node_perception(args: Dict):
     timer_flag = False
 
     step_reader = StepReader()
+    hbm_dataloader = HBM_Dataloader(hbm_data_path)
     log_extract_func = getattr(step_reader, get_extract_func_str(log_type))
 
     while True:
@@ -169,6 +210,16 @@ def run_slow_node_perception(args: Dict):
         if not training_steps:
             logger.info(f"training data is empty.")
             continue
+        
+        # hbm leak detection
+        # get before and cur timestamp to get hbm data
+        if enable_hbm_detect:
+            hbm_data_dfs = hbm_dataloader.get_hbm_data_from_csv()
+            if hbm_data_dfs:
+                hbm_anomaly_info = detect_hbm_leak_anomalies(hbm_data_dfs, model_args)
+                logger.info(f"hbm detection finish.")
+                if hbm_anomaly_info["is_anomaly"]:
+                    write_anomaly_info(hbm_anomaly_info, fail_slow_perception_result)
 
         # if data not training, record not training times
         # remove model init process
