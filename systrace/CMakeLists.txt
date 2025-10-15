@@ -28,14 +28,6 @@ find_package(Python3 REQUIRED COMPONENTS Development)
 find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 
-find_library(ASCEND_MSPTI 
-    NAMES mspti
-    HINTS ${MSPTI_LIB}
-)
-if(NOT ASCEND_MSPTI)
-    message(FATAL_ERROR "Ascend mspti library not found!")
-endif()
-
 add_library(common STATIC
     ${PROJECT_SOURCE_DIR}/include/common/logging.cc
     ${PROJECT_SOURCE_DIR}/include/common/util.cc
