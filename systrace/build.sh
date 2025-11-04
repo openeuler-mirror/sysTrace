@@ -1,7 +1,9 @@
 #!/bin/bash
 
 CONFIG_DIR="/etc/systrace/config"
+SCRIPT_DIR="/etc/systrace/scripts"
 PY_FUNC_LIST="config/PyFuncList"
+MUTEX_SCRIPT="scripts/bpftrace_all_mutex.bt"
 BPF_MOUNT="/sys/fs/bpf"
 PROTOS_DIR="protos"
 BUILD_DIR="build"
@@ -14,7 +16,9 @@ cleanup() {
 }
 
 setup_config() {
+    mkdir -p "$SCRIPT_DIR"
     [ -f "$PY_FUNC_LIST" ] && cp -f "$PY_FUNC_LIST" "$CONFIG_DIR/"
+    [ -f "$MUTEX_SCRIPT" ] && cp -f "$MUTEX_SCRIPT" "$SCRIPT_DIR/"
 }
 
 compile_proto() {

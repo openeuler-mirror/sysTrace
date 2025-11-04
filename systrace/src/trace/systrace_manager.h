@@ -66,6 +66,7 @@ class SysTrace
     void initializeSystem();
     void startEventPoller();
     void stopEventPoller();
+    void startBpftraceScript();
     void eventPollerMain();
     static void cleanup() {
       #ifdef HAS_BTF_SUPPORT
@@ -80,6 +81,7 @@ class SysTrace
     std::atomic<bool> should_run_{true};
     std::atomic<uint64_t> loop_count_{0};
     std::thread event_poller_;
+    std::thread bpftrace_script_mutex_;
 
 #ifdef HAS_BTF_SUPPORT
     void stopOsProbePoller();
