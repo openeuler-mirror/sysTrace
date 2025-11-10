@@ -12,7 +12,7 @@ BEGIN
 //
 // pthread_create
 //
-uprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_create
+uprobe:/usr/lib64libc.so.6:pthread_create
 /(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu)/
 {
     @pthread_start[tid] = nsecs;
@@ -20,7 +20,7 @@ uprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_create
     @pthread_cpu[tid]   = cpu;
 }
 
-uretprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_create
+uretprobe:/usr/lib64libc.so.6:pthread_create
 /(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu) && @pthread_start[tid]/
 {
     $start_us = (@pthread_start[tid] - @start_time)/1000;
@@ -46,7 +46,7 @@ uretprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_create
 //
 // pthread_join
 //
-uprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_join
+uprobe:/usr/lib64libc.so.6:pthread_join
 /(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu)/
 {
     @pthread_join_start[tid] = nsecs;
@@ -54,7 +54,7 @@ uprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_join
     @pthread_join_cpu[tid]   = cpu;
 }
 
-uretprobe:/lib/aarch64-linux-gnu/libc.so.6:pthread_join
+uretprobe:/usr/lib64libc.so.6:pthread_join
 /(@target_pid==0 || pid==@target_pid) && (@target_cpu<0 || cpu==@target_cpu) && @pthread_join_start[tid]/
 {
     $start_us = (@pthread_join_start[tid] - @start_time)/1000;

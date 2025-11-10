@@ -22,6 +22,11 @@ class MonitorServer
             cleanup_shared_memory();
         }
     }
+    
+    static void signalHandler(int signal) {
+        cleanup();
+        std::exit(EXIT_FAILURE);
+    }
 
     MonitorServer(const MonitorServer &) = delete;
     MonitorServer &operator=(const MonitorServer &) = delete;

@@ -14,13 +14,13 @@ BEGIN
 //
 // pthread_mutex_lock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_lock
+uprobe:/usr/lib64/libc.so.6:pthread_mutex_lock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_lock
+uretprobe:/usr/lib64/libc.so.6:pthread_mutex_lock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -46,13 +46,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_lock
 //
 // pthread_mutex_unlock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_unlock
+uprobe:/usr/lib64/libc.so.6:pthread_mutex_unlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_unlock
+uretprobe:/usr/lib64/libc.so.6:pthread_mutex_unlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -69,13 +69,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_unlock
 //
 // pthread_rwlock_wrlock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_wrlock
+uprobe:/usr/lib64/libc.so.6:pthread_rwlock_wrlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_wrlock
+uretprobe:/usr/lib64/libc.so.6:pthread_rwlock_wrlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -92,13 +92,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_wrlock
 //
 // pthread_rwlock_rdlock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_rdlock
+uprobe:/usr/lib64/libc.so.6:pthread_rwlock_rdlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_rdlock
+uretprobe:/usr/lib64/libc.so.6:pthread_rwlock_rdlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -115,13 +115,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_rdlock
 //
 // pthread_mutex_timedlock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_timedlock
+uprobe:/usr/lib64/libc.so.6:pthread_mutex_timedlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_timedlock
+uretprobe:/usr/lib64/libc.so.6:pthread_mutex_timedlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -138,13 +138,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_mutex_timedlock
 //
 // pthread_rwlock_unlock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_unlock
+uprobe:/usr/lib64/libc.so.6:pthread_rwlock_unlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_unlock
+uretprobe:/usr/lib64/libc.so.6:pthread_rwlock_unlock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -161,13 +161,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_rwlock_unlock
 //
 // sem_wait
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:sem_wait
+uprobe:/usr/lib64/libc.so.6:sem_wait
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:sem_wait
+uretprobe:/usr/lib64/libc.so.6:sem_wait
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;
@@ -184,13 +184,13 @@ uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:sem_wait
 //
 // pthread_spin_lock
 //
-uprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_spin_lock
+uprobe:/usr/lib64/libc.so.6:pthread_spin_lock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu)/
 {
     @start[tid] = nsecs;
     @lock_addr[tid] = arg0;
 }
-uretprobe:/usr/lib/aarch64-linux-gnu/libc.so.6:pthread_spin_lock
+uretprobe:/usr/lib64/libc.so.6:pthread_spin_lock
 /(@target_pid == 0 || pid == @target_pid) && (@target_cpu < 0 || cpu == @target_cpu) && @start[tid]/
 {
     $start_us = (@start[tid] - @start_time) / 1000;

@@ -6,6 +6,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <vector>
+#include <csignal>
 
 MonitorServer *MonitorServer::instance_ = nullptr;
 
@@ -17,6 +18,9 @@ MonitorServer &MonitorServer::getInstance()
                        instance_ = new MonitorServer();
                        instance_->start();
                        std::atexit(cleanup);
+                       std::signal(SIGTERM, signalHandler);
+                       std::signal(SIGINT, signalHandler);
+                       std::signal(SIGSEGV, signalHandler);
                    });
     return *instance_;
 }

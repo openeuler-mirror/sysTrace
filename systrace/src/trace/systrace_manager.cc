@@ -6,7 +6,7 @@
 #include "../../include/common/constant.h"
 #include "../../include/common/shared_constants.h"
 #include "systrace_manager.h"
-// #include "../../src/os/os_probe.h"
+#include <unistd.h>
 
 int global_stage_id = 0;
 int global_stage_type = 0;
@@ -229,6 +229,46 @@ void SysTrace::initializeSystem()
 #endif
 
     startEventPoller();
+    startBpftraceScript();
+}
+
+void SysTrace::startBpftraceScript()
+{
+    const std::string &dump_path = 
+        std::string("/home/sysTrace/mutex");
+    if (util::fs_utils::CreateDirectoryIfNotExists(dump_path))
+    {
+        STLOG(ERROR) << "[PyTorchTrace] Failed to create dump directory";
+        return;
+    }
+    std::string file_path =
+        dump_path + "/" +
+        util::fs_utils::GenerateClusterUniqueFilename(".json");
+    
+    int bpftrace_check = std::system("bpftrace --version > /dev/null 2>&1");
+    if (bpftrace_check != 0) {
+        std::cerr << "bpftrace is not available or not working properly." << std::endl;
+        return;
+    }
+    const std::string script_path = "/etc/systrace/scripts/bpftrace_all_mutex.bt";
+    if (access(script_path.c_str(), F_OK) == -1) {
+        std::cerr << "Bpftrace script not found: " << script_path << std::endl;
+        return;
+    }
+
+    std::string command = "bpftrace " + script_path + "-p" + config::GlobalConfig::Instance().pid + " > " + file_path + " 2>&1";
+    bpftrace_script_mutex_ = std::thread([command]() {
+        std::cout << "Starting bpftrace script: " << command << std::endl;
+        
+        int result = std::system(command.c_str());
+        if (result != 0) {
+            std::cerr << "Failed to execute bpftrace script, error code: " << result << std::endl;
+        } else {
+            std::cout << "Bpftrace script completed successfully" << std::endl;
+        }
+    });
+
+    bpftrace_script_mutex_.detach();
 }
 
 void SysTrace::startEventPoller()
