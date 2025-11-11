@@ -57,6 +57,15 @@ extern "C"
 {
 #endif
 
+    EXPOSE_API bool start() {
+    	::systrace::SysTrace::getInstance();
+        return true;
+    }
+    EXPOSE_API bool stop() {
+        ::systrace::SysTrace::cleanup();
+        return true;
+    }
+
     static void *load_symbol(const char *func_name)
     {
         if (!g_hal_lib)
