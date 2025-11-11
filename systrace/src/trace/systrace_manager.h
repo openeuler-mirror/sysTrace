@@ -4,12 +4,13 @@
 #include <pthread.h>
 #include <thread>
 #include <vector>
+#include <queue>
+#include <condition_variable>
+#include <nlohmann/json.hpp>
 
 #include "../../include/common/logging.h"
 #include "../../include/common/util.h"
 #include "../../include/common/shared_constants.h"
-#include "../../protos/systrace.pb.h"
-#include "../mspti/mspti_tracker.hpp"
 #include "../../server/monitor_server.hpp"
 #include "library_loader.h"
 #include "python/pytorch_tracing_loader.h"
@@ -17,10 +18,11 @@
 namespace systrace
 {
 using namespace util;
+using json = nlohmann::json;
 
 class PyTorchTrace
 {
-  public:
+public:
     static PyTorchTrace &getInstance();
 
     void dumpPyTorchTracing();
@@ -30,36 +32,50 @@ class PyTorchTrace
     PyTorchTrace(const PyTorchTrace &) = delete;
     PyTorchTrace &operator=(const PyTorchTrace &) = delete;
 
-  private:
-    PyTorchTrace() = default;
-    ~PyTorchTrace() = default;
+private:
+    PyTorchTrace();
+    ~PyTorchTrace();
 
     void initialize();
     void registerTracingFunctions();
     void processFunctionTracingData(size_t function_index);
-    void writeTraceToFile();
+    void enqueueTraceEntry(json &&entry);
+    void writerLoop();
+    void writeTraceEntryToFile(const json &entry);
 
     inline static PyTorchTrace *instance_ = nullptr;
     inline static std::once_flag init_flag_;
 
-    Pytorch pytorch_trace_;
     std::atomic<bool> has_trigger_trace_{false};
-    std::mutex trace_mutex_;
 
     std::vector<std::string> pytorch_tracing_functions_;
     std::string PyFuncListPath_ = "/etc/systrace/config/PyFuncList";
     pytorch_tracing::PyTorchTracingLibrary *pytorch_tracing_library_;
+
+    std::queue<json> trace_queue_;
+    std::mutex queue_mutex_;
+    std::condition_variable queue_cv_;
+    std::thread writer_thread_;
+    std::atomic<bool> stop_writer_{false};
 };
 
 class SysTrace
 {
-  public:
+public:
     static SysTrace &getInstance();
 
     SysTrace(const SysTrace &) = delete;
     SysTrace &operator=(const SysTrace &) = delete;
+    static void cleanup() {
+      if (!instance_) {
+        return;
+      }
+        instance_->stopEventPoller();
+      // delete instance_;
+      instance_ = nullptr;
+    }
 
-  private:
+private:
     SysTrace() = default;
     ~SysTrace();
 
@@ -67,12 +83,6 @@ class SysTrace
     void startEventPoller();
     void stopEventPoller();
     void eventPollerMain();
-    static void cleanup() {
-      #ifdef HAS_BTF_SUPPORT
-        instance_->stopOsProbePoller();
-      #endif
-        instance_->stopEventPoller();
-    }
 
     inline static SysTrace *instance_ = nullptr;
     inline static std::once_flag init_flag_;

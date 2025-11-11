@@ -8,24 +8,8 @@ set(CMAKE_SKIP_RPATH TRUE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
-    set(UNWIND_LIB "unwind-aarch64")
-    set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/include")
-    set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/lib64")
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    set(UNWIND_LIB "unwind")
-    set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/include")
-    set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/lib64")
-else()
-    message(WARNING "Unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
-    set(UNWIND_LIB "unwind")
-endif()
-include_directories(
-    ${MSPTI_INCLUDE}
-)
 
 find_package(Python3 REQUIRED COMPONENTS Development)
-find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 
 add_library(common STATIC
@@ -34,8 +18,6 @@ add_library(common STATIC
 )
 target_include_directories(common PUBLIC ${PROJECT_SOURCE_DIR}/include ${Python3_INCLUDE_DIRS})
 
-
-add_subdirectory(protos)
 if(HAS_BTF_SUPPORT)
     message(STATUS "Enabling BPF modules with BTF support")
     add_subdirectory(src/os)
@@ -51,32 +33,23 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_manager.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing.c
     ${PROJECT_SOURCE_DIR}/src/ascend/hook.cc
-    ${PROJECT_SOURCE_DIR}/src/mspti/mspti_tracker.cpp
-    ${PROJECT_SOURCE_DIR}/src/cann/common_hook.c
-    ${PROJECT_SOURCE_DIR}/src/cann/mem_hook.c
-    ${PROJECT_SOURCE_DIR}/src/cann/io_hook.c
     ${PROJECT_SOURCE_DIR}/server/monitor_server.cpp
 )
 
 add_executable(sysTrace_cli
     ${PROJECT_SOURCE_DIR}/client/sysTracecli.cpp
 )
+
 set_target_properties(sysTrace_hook PROPERTIES OUTPUT_NAME "sysTrace")
-
-if(HAS_BTF_SUPPORT)
-    target_compile_definitions(sysTrace_hook PRIVATE HAS_BTF_SUPPORT=1)
-endif()
-
 
 target_link_libraries(sysTrace_hook
     common
-    general_pb2
     ${Python3_LIBRARIES}
-    protobuf::libprotobuf
     ${CMAKE_THREAD_LIBS}
     pthread
     -ldl
 )
+
 if(HAS_BTF_SUPPORT)
     target_link_libraries(sysTrace_hook os_probe)
     message(STATUS "Linking osprobe library")
