@@ -22,6 +22,7 @@ class AnomalyType:
     normal = "normal"
     fail_slow = "failSlow"
     hang = "hang"
+    hbm_leak = "hbm_leak"
 
 class SlowType:
     slow_cal = 0

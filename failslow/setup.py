@@ -45,6 +45,7 @@ setup(
         "pandas",
         "joblib",
         "scikit_learn",
+        "prometheus_client",
         "protobuf"
     ],
     entry_points={

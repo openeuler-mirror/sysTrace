@@ -87,8 +87,7 @@ class SlidingWindowKSigmaDetector():
                 label, lower_bound, upper_bound = detector.online_detecting(data_point, noisy_labels[i])
                 # if label and self.metric_name == "gala_gopher_disk_wspeed_kB":
                 #     label = self.check_ws_metric(label, data_point, upper_bound)
-                if device_label == 5 or device_label == 7:
-                    label = 1
+
                 detect_result[i] = label
                 lower_bounds[i] = lower_bound
                 upper_bounds[i] = upper_bound

@@ -147,7 +147,6 @@ class PostProcess():
                     most_anomaly_ranks.append(rank)
 
         filter_anomaly_ranks = []
-        slow_groups = ['[6,7]']
         for rank in most_anomaly_ranks:
             for slow_group in slow_groups:
                 if rank in eval(slow_group):
