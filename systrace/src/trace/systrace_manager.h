@@ -12,7 +12,10 @@
 #include "../mspti/mspti_tracker.hpp"
 #include "library_loader.h"
 #include "python/pytorch_tracing_loader.h"
+#include "../plugins/manager/ControlManager.hpp"
+#include "../plugins/HbmPlugin.hpp"
 
+class ControlManager;
 namespace systrace
 {
 using namespace util;
@@ -63,6 +66,9 @@ class SysTrace
     ~SysTrace();
 
     void initializeSystem();
+
+    void registerPlugins();
+
     void startEventPoller();
     void stopEventPoller();
     void eventPollerMain();

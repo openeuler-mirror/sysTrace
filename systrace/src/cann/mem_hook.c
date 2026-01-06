@@ -14,18 +14,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-// export LD_PRELOAD=/home/MindSpeed-LLM-1.0.RC3/libascend_hal_jack.so
-// cd /home/hbdir/mspti_test-megatron
-// conda activate mspti10
-// python -m torch.distributed.launch --nproc_per_node=8 nqq_train_fsdp.py
-// protoc --c_out=. tmp.proto
-
-// drvError_t halMemAlloc(void **pp, unsigned long long size, unsigned long long
-// flag); drvError_t halMemFree(void *pp); drvError_t
-// halMemCreate(drv_mem_handle_t **handle, size_t size, const struct
-// drv_mem_prop *prop, uint64_t flag); drvError_t halMemRelease
-// (drv_mem_handle_t *handle);
-
 typedef int drvError_t;
 
 typedef enum aclrtMemMallocPolicy
@@ -68,12 +56,17 @@ static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
 extern int global_stage_id;
 extern int global_stage_type;
+static bool g_hbm_trace_enabled = false;
 
 typedef struct
 {
     ProcMem *proc_mem;
     time_t last_log_time;
 } ThreadData;
+
+void hbm_trace_set_enabled(bool enabled) {
+    g_hbm_trace_enabled = enabled;
+}
 
 static void free_proc_mem(ProcMem *proc_mem)
 {
@@ -172,7 +165,7 @@ static char is_ready_to_write(ThreadData *td, time_t *current)
 
 static void write_protobuf_to_file()
 {
-    if (!checkAndUpdateTimer(2))
+    if (!g_hbm_trace_enabled)
     {
         return; 
     }
@@ -292,7 +285,7 @@ static void collect_stack_frames(MemAllocEntry *entry)
 
 static void add_mem_alloc_entry(void *pp, size_t size)
 {
-    if (!checkAndUpdateTimer(2))
+    if (!g_hbm_trace_enabled)
     {
         return; 
     }
@@ -319,7 +312,7 @@ static void add_mem_alloc_entry(void *pp, size_t size)
 
 static void add_mem_free_entry(void *pp)
 {
-    if (!checkAndUpdateTimer(2))
+    if (!g_hbm_trace_enabled)
     {
         return; 
     }

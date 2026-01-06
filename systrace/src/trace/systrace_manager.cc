@@ -203,6 +203,7 @@ SysTrace &SysTrace::getInstance()
 
 SysTrace::~SysTrace()
 {
+    ControlManager::getInstance().stop();
 #ifdef HAS_BTF_SUPPORT
     stopOsProbePoller();
 #endif
@@ -215,6 +216,8 @@ void SysTrace::initializeSystem()
         return;
 
     systrace::util::InitializeSystemUtilities();
+    registerPlugins();
+    ControlManager::getInstance().start();
     
     MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
@@ -245,6 +248,12 @@ void SysTrace::stopOsProbePoller()
     }
 }
 #endif
+
+void SysTrace::registerPlugins() {
+    auto& cm = ControlManager::getInstance();
+    cm.register_plugin(std::make_shared<HbmPlugin>());
+}
+
 
 void SysTrace::stopEventPoller()
 {

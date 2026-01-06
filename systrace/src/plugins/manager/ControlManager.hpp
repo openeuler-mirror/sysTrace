@@ -3,7 +3,7 @@
 #include <memory>
 #include <thread>
 #include <atomic>
-#include "ICollector.hpp" 
+#include "../../../include/common/ICollector.hpp" 
 
 class ControlManager {
 public:
@@ -14,6 +14,7 @@ public:
 
     void register_plugin(std::shared_ptr<ICollector> col);
     void start();
+    void stop();
 
 private:
     ControlManager() = default;

@@ -31,6 +31,7 @@ find_package(Threads REQUIRED)
 add_library(common STATIC
     ${PROJECT_SOURCE_DIR}/include/log/logging.cc
     ${PROJECT_SOURCE_DIR}/include/utils/util.cc
+    ${PROJECT_SOURCE_DIR}/include/utils/TimerManager.hpp
 )
 target_include_directories(common PUBLIC ${PROJECT_SOURCE_DIR}/include ${Python3_INCLUDE_DIRS})
 
@@ -54,6 +55,9 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/cann/common_hook.c
     ${PROJECT_SOURCE_DIR}/src/cann/mem_hook.c
     ${PROJECT_SOURCE_DIR}/src/cann/io_hook.c
+    ${PROJECT_SOURCE_DIR}/src/plugins/manager/ControlManager.cpp
+    ${PROJECT_SOURCE_DIR}/src/plugins/HbmPlugin.hpp
+    
 )
 
 add_executable(sysTrace_cli
