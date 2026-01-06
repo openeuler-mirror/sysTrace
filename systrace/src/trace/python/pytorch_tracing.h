@@ -5,7 +5,7 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "../../../include/common/shared_constants.h"
+#include "../../../include/common/constant.h"
 #include "../../../thirdparty/uthash.h"
 #include "pytorch_tracing_data.h"
 

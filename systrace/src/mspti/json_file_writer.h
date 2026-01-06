@@ -1,6 +1,6 @@
 #pragma once
-#include "../../include/common/shared_constants.h"
-#include "../../include/common/util.h"
+#include "../../include/common/constant.h"
+#include "../../include/utils/util.h"
 #include "mspti.h"
 #include <atomic>
 #include <condition_variable>

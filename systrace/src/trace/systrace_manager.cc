@@ -4,9 +4,7 @@
 #include <vector>
 
 #include "../../include/common/constant.h"
-#include "../../include/common/shared_constants.h"
 #include "systrace_manager.h"
-// #include "../../src/os/os_probe.h"
 
 int global_stage_id = 0;
 int global_stage_type = 0;
@@ -81,11 +79,7 @@ void PyTorchTrace::registerTracingFunctions()
 
 bool PyTorchTrace::triggerTrace() 
 {
-    SharedData* shared_data = get_shared_data();
-    if (!shared_data) {
-        return false;
-    }
-    return has_trigger_trace_.exchange(true) && shared_data->g_dump_L0; 
+    return has_trigger_trace_.exchange(true); 
 }
 
 void PyTorchTrace::dumpPyTorchTracing()
@@ -221,7 +215,7 @@ void SysTrace::initializeSystem()
         return;
 
     systrace::util::InitializeSystemUtilities();
-    MonitorServer::getInstance();
+    
     MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
 #ifdef HAS_BTF_SUPPORT

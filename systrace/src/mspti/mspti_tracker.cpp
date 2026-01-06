@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <iostream>
 #include <stdlib.h>
-#include "../../include/common/util.h"
+#include "../../include/utils/util.h"
 
 constexpr size_t KB = 1 * 1024;
 constexpr size_t MB = 1 * 1024 * KB;

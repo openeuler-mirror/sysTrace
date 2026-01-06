@@ -32,7 +32,10 @@
 #undef BPF_PROG_USER
 #endif
 
-#include "../../include/common/shared_constants.h"
+#ifndef SYS_TRACE_ROOT_DIR
+#define SYS_TRACE_ROOT_DIR "/home/sysTrace/"
+#endif
+
 #include "../../protos/systrace.pb-c.h"
 #include "bpf.h"
 #include "os_probe.h"

@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "../../include/common/shared_constants.h"
+#include "../../include/common/constant.h"
 #include "../../protos/systrace.pb-c.h"
 #include "common_hook.h"
 #include <dlfcn.h>

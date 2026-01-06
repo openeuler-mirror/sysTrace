@@ -1,5 +1,5 @@
 #include "common_hook.h"
-#include "../../include/common/shared_constants.h"
+#include "../../include/common/constant.h"
 #include <errno.h>
 #include <dlfcn.h>
 #include <stdio.h>
