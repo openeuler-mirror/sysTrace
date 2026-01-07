@@ -1,5 +1,5 @@
 #pragma once
-#include "json_file_writer.h"
+#include "json_file_writer.hpp"
 #include "mspti.h"
 #include <atomic>
 #include <memory>
