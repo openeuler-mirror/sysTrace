@@ -252,6 +252,7 @@ void SysTrace::stopOsProbePoller()
 void SysTrace::registerPlugins() {
     auto& cm = ControlManager::getInstance();
     cm.register_plugin(std::make_shared<HbmPlugin>());
+    cm.register_plugin(std::make_shared<MsptiPlugin>());
 }
 
 

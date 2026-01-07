@@ -1,3 +1,4 @@
+#pragma once
 #include "json_file_writer.h"
 #include "mspti.h"
 #include <atomic>
@@ -15,6 +16,7 @@ class MSPTITracker
     std::thread mspti_monitor_thread;
     std::atomic<bool> is_collecting_{false}; 
     std::atomic<bool> should_run_{true};
+    std::atomic<bool> external_enabled_{false};
 
     MSPTITracker();
     ~MSPTITracker();
@@ -34,4 +36,5 @@ class MSPTITracker
     static void UserBufferComplete(uint8_t *buffer, size_t size,
                                    size_t validSize);
     void collect();
+    void setExternalEnable(bool enable);
 };

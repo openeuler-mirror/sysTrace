@@ -135,9 +135,6 @@ public:
     }
 
     void hcclActivityFormatToCSV() {
-        if (!checkAndUpdateTimer(1)) {
-            return;
-        }
         std::lock_guard<std::mutex> lock(this->buffermtx);
         if (this->file.is_open()) {
             // enumerate the buffer and write to file

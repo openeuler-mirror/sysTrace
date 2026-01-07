@@ -14,6 +14,7 @@
 #include "python/pytorch_tracing_loader.h"
 #include "../plugins/manager/ControlManager.hpp"
 #include "../plugins/HbmPlugin.hpp"
+#include "../plugins/MsptiTrackerPlugin.hpp"
 
 class ControlManager;
 namespace systrace
