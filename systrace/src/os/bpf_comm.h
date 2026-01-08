@@ -1,18 +1,3 @@
-/******************************************************************************
- * Copyright (c) Huawei Technologies Co., Ltd. 2025. All rights reserved.
- * sysTrace licensed under the Mulan PSL v2.
- * You can use this software according to the terms and conditions of the Mulan PSL v2.
- * You may obtain a copy of Mulan PSL v2 at:
- *     http://license.coscl.org.cn/MulanPSL2
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
- * PURPOSE.
- * See the Mulan PSL v2 for more details.
- * Author: curry
- * Create: 2025-06-20
- * Description: 
- ******************************************************************************/
-
 #ifndef __BPF_COMMON_H__
 #define __BPF_COMMON_H__
 #include "bpf.h"
@@ -151,6 +136,19 @@ struct {
     __uint(max_entries, 128);
 } proc_filter_map SEC(".maps");
 
+struct {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(key_size, sizeof(u32)); // trace_cfg_key_e
+    __uint(value_size, sizeof(u32)); // 0: disable, 1: enable
+    __uint(max_entries, 128);
+} trace_cfg_map SEC(".maps");
+
+
+enum trace_cfg_key_e {
+    TRACE_CFG_SCHED_SWITCH = 0,
+    TRACE_CFG_MEM       = 1,
+};
+
 #define MAX_COMM_LEN 16
 static __always_inline void emit_event(trace_event_data_t *event, void *ctx)
 {
@@ -237,7 +235,6 @@ static int strcase_match(const char *s1, const char *s2, int n)
         if (!c1 || !c2)
             break;
 
-        // 转换为小写进行比较
         if (c1 == c2)
             continue;
 
@@ -247,12 +244,10 @@ static int strcase_match(const char *s1, const char *s2, int n)
         if ((c2 >= 'A' && c2 <= 'Z') && (c1 >= 'a' && c1 <= 'z') && (c2 + 32 == c1))
             continue;
 
-        // 不相等
         return (int)c1 - (int)c2;
     }
 
-    if (n == (size_t)-1) { /* 如果循环是因为n用完而不是遇到\0 */
-        // 检查最后一个字符是否都为 '\0'
+    if (n == (size_t)-1) {
         if (!c1 && !c2)
             return 0;
     }
@@ -292,6 +287,15 @@ static __always_inline int get_npu_id(struct task_struct *task)
     // 全都不匹配返回-1
     return -1;
 
+}
+
+static __always_inline int trace_cfg_enabled(u32 key)
+{
+    u32 *enable = bpf_map_lookup_elem(&trace_cfg_map, &key);
+    if (!enable || *enable == 0) {
+        return 0;
+    }
+    return 1;
 }
 
 #endif

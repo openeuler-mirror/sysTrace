@@ -16,6 +16,7 @@
 #include "../plugins/HbmPlugin.hpp"
 #include "../plugins/MsptiTrackerPlugin.hpp"
 #include "../plugins/IOPlugin.hpp"
+#include "../plugins/EbpfPlugin.hpp"
 
 class ControlManager;
 namespace systrace

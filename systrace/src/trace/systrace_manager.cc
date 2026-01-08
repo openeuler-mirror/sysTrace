@@ -254,6 +254,8 @@ void SysTrace::registerPlugins() {
     cm.register_plugin(std::make_shared<HbmPlugin>());
     cm.register_plugin(std::make_shared<MsptiPlugin>());
     cm.register_plugin(std::make_shared<IOPlugin>());
+    cm.register_plugin(std::make_shared<MemoryPlugin>());
+    cm.register_plugin(std::make_shared<CpuPlugin>());
 }
 
 

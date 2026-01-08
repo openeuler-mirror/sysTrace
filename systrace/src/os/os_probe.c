@@ -47,6 +47,7 @@
 #define RM_MAP_PATH                         "/usr/bin/rm -rf /sys/fs/bpf/sysTrace*"
 #define PROC_FILTER_MAP_PATH                "/sys/fs/bpf/sysTrace/__osprobe_proc_filter"
 #define KERNEL_FILTER_MAP_PATH              "/sys/fs/bpf/sysTrace/__osprobe_kernel_filter"
+#define TRACE_CFG_MAP_PATH                  "/sys/fs/bpf/sysTrace/__osprobe_trace_cfg"
 #define LOG_ITEMS_MIN 10
 
 #define MAP_SET_COMMON_PIN_PATHS(probe_name, end, load) \
@@ -70,6 +71,7 @@
     MAP_SET_PIN_PATH(probe_name, osprobe_map_15, "/sys/fs/bpf/sysTrace/__osprobe_map_15" , load); \
     MAP_SET_PIN_PATH(probe_name, proc_filter_map, PROC_FILTER_MAP_PATH, load); \
     MAP_SET_PIN_PATH(probe_name, kernel_filter_map, KERNEL_FILTER_MAP_PATH, load); \
+    MAP_SET_PIN_PATH(probe_name, trace_cfg_map, TRACE_CFG_MAP_PATH, load); \
 
 #define OPEN_OSPROBE(probe_name, end, load, buffer) \
     MAP_SET_COMMON_PIN_PATHS(probe_name, end, load); \
@@ -527,6 +529,30 @@ void cleanup_osprobe() {
     }
 }
 
+void os_probe_enable_event(os_probe_type_e type)
+{
+    int trace_cfg_map_fd = bpf_obj_get(TRACE_CFG_MAP_PATH);
+    int value = 1;
+    if (trace_cfg_map_fd < 0) {
+        fprintf(stderr, "[OS_PROBE RANK_%d] Failed to get bpf prog trace_cfg map: %s.\n", rank, strerror(errno));
+        return;
+    }
+    bpf_map_update_elem(trace_cfg_map_fd, &type, &value, BPF_ANY);
+    close(trace_cfg_map_fd);
+}
+
+void os_probe_disable_event(os_probe_type_e type)
+{
+    int value = 0;
+    int trace_cfg_map_fd = bpf_obj_get(TRACE_CFG_MAP_PATH);
+    if (trace_cfg_map_fd < 0) {
+        fprintf(stderr, "[OS_PROBE RANK_%d] Failed to get bpf prog trace_cfg map: %s.\n", rank, strerror(errno));
+        return;
+    }
+    bpf_map_update_elem(trace_cfg_map_fd, &type, &value, BPF_ANY);
+    close(trace_cfg_map_fd);
+}
+
 int run_osprobe() {
     int ret = 0;
     struct bpf_buffer *buffer = NULL;
@@ -559,7 +585,7 @@ int run_osprobe() {
         }
         while (!g_stop) {
             sleep(1);
-            if (!checkAndUpdateTimer(3)) {
+            if (1) {
                 continue; 
             }
             for (int i = 0; i < prog->num; i++) {
@@ -591,7 +617,7 @@ int run_osprobe() {
             goto err;
         }
         while (!g_stop) {
-            if (!checkAndUpdateTimer(3)) {
+            if (1) {
                 continue; 
             }
             if (((ret = bpf_buffer__poll(buffer, THOUSAND)) < 0)

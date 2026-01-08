@@ -32,14 +32,6 @@
 #define EINTR 4
 #endif
 
-static __always_inline int libbpf_print_fn(enum libbpf_print_level level, const char *format, va_list args)
-{
-    if (level == LIBBPF_WARN)
-        return vfprintf(stderr, format, args);
-
-    return 0;
-}
-
 static __always_inline int set_memlock_rlimit(unsigned long limit)
 {
     struct rlimit rlim_new = {
@@ -55,35 +47,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
 }
 
 #define GET_MAP_OBJ(probe_name, map_name) (probe_name##_skel->maps.map_name)
-#define GET_MAP_FD(probe_name, map_name) bpf_map__fd(probe_name##_skel->maps.map_name)
-#define GET_PROG_FD(probe_name, prog_name) bpf_program__fd(probe_name##_skel->progs.prog_name)
-#define GET_PROGRAM_OBJ(probe_name, prog_name) (probe_name##_skel->progs.prog_name)
-
-#define GET_MAP_FD_BY_SKEL(skel, probe_name, map_name) \
-    bpf_map__fd(((struct probe_name##_bpf *)(skel))->maps.map_name)
-#define GET_PROG_OBJ_BY_SKEL(skel, probe_name) \
-    (((struct probe_name##_bpf *)(skel))->obj)
-
-#define BPF_OBJ_GET_MAP_FD(obj, map_name)   \
-            ({ \
-                int __fd = -1; \
-                struct bpf_map *__map = bpf_object__find_map_by_name((obj), (map_name)); \
-                if (__map) { \
-                    __fd = bpf_map__fd(__map); \
-                } \
-                __fd; \
-            })
-
-#define BPF_OBJ_PIN_MAP_PATH(obj, map_name, path)   \
-            ({ \
-                int __ret = -1; \
-                struct bpf_map *__map = bpf_object__find_map_by_name((obj), (map_name)); \
-                if (__map) { \
-                    __ret = bpf_map__set_pin_path(__map, path); \
-                } \
-                __ret; \
-            })
-
 
 #define __MAP_SET_PIN_PATH(probe_name, map_name, map_path) \
     do { \
@@ -95,15 +58,10 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
         printf("======>SHARE map(" #map_name ") set pin path \"%s\"(ret=%d).\n", map_path, ret); \
     } while (0)
 
-#define GET_PROC_MAP_PIN_PATH(app_name) ("/sys/fs/bpf/sysTrace/__"#app_name"_proc_map")
-
 #define INIT_BPF_APP(app_name, limit) \
     static char __init = 0; \
     do { \
         if (!__init) { \
-            /* Set up libbpf printfs and printf printf callback */ \
-            (void)libbpf_set_print(libbpf_print_fn); \
-            \
             /* Bump RLIMIT_MEMLOCK  allow BPF sub-system to do anything */ \
             if (set_memlock_rlimit(limit) == 0) { \
                 printf("BPF app(" #app_name ") failed to set mem limit.\n"); \
@@ -113,32 +71,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
         } \
     } while (0)
 
-#define LOAD(app_name, probe_name, end) \
-    struct probe_name##_bpf *probe_name##_skel = NULL;           \
-    struct bpf_link *probe_name##_link[PATH_NUM] __maybe_unused = {NULL}; \
-    int probe_name##_link_current = 0;    \
-    do { \
-        int err; \
-        /* Open load and verify BPF application */ \
-        probe_name##_skel = probe_name##_bpf__open(); \
-        if (!probe_name##_skel) { \
-            printf("Failed to open BPF " #probe_name " skeleton\n"); \
-            goto end; \
-        } \
-        if (probe_name##_bpf__load(probe_name##_skel)) { \
-            printf("Failed to load BPF " #probe_name " skeleton\n"); \
-            goto end; \
-        } \
-        /* Attach tracepoint handler */ \
-        err = probe_name##_bpf__attach(probe_name##_skel); \
-        if (err) { \
-            printf("Failed to attach BPF " #probe_name " skeleton\n"); \
-            probe_name##_bpf__destroy(probe_name##_skel); \
-            probe_name##_skel = NULL; \
-            goto end; \
-        } \
-        printf("Succeed to load and attach BPF " #probe_name " skeleton\n"); \
-    } while (0)
 
 #define __OPEN_OPTS(probe_name, end, load, opts) \
     struct probe_name##_bpf *probe_name##_skel = NULL;           \
@@ -156,7 +88,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
         }\
     } while (0)
 
-#define OPEN(probe_name, end, load) __OPEN_OPTS(probe_name, end, load, NULL)
 
 #define OPEN_OPTS(probe_name, end, load) __OPEN_OPTS(probe_name, end, load, &probe_name##_open_opts)
 
@@ -165,16 +96,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
         if (load) \
         { \
             __MAP_SET_PIN_PATH(probe_name, map_name, map_path); \
-        } \
-    } while (0)
-
-#define MAP_INIT_BPF_BUFFER(probe_name, map_name, buffer, load) \
-    do { \
-        if (load) { \
-            buffer = bpf_buffer__new(probe_name##_skel->maps.map_name, probe_name##_skel->maps.heap); \
-            if (buffer == NULL) { \
-                printf("Failed to initialize bpf_buffer for " #map_name " in " #probe_name "\n"); \
-            } \
         } \
     } while (0)
 
@@ -226,16 +147,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
 
 #define INIT_OPEN_OPTS(probe_name) \
     LIBBPF_OPTS(bpf_object_open_opts, probe_name##_open_opts)
-
-static __always_inline __maybe_unused void poll_pb(struct perf_buffer *pb, int timeout_ms)
-{
-    int ret;
-
-    while ((ret = perf_buffer__poll(pb, timeout_ms)) >= 0 || ret == -EINTR) {
-        ;
-    }
-    return;
-}
 
 #define SKEL_MAX_NUM  20
 typedef void (*skel_destroy_fn)(void *);
