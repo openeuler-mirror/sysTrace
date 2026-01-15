@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-#include "../../include/common/shared_constants.h"
+#include "../../include/common/constant.h"
 #include "../../protos/systrace.pb-c.h"
 #include "common_hook.h"
 #include <dlfcn.h>
@@ -60,6 +60,11 @@ static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
 extern int global_stage_id;
 extern int global_stage_type;
+static bool g_io_trace_enabled = false;
+
+void io_trace_set_enabled(bool enabled) {
+    g_io_trace_enabled = enabled;
+}
 
 static void make_key() {
     pthread_key_create(&thread_data_key, NULL);
@@ -156,7 +161,7 @@ static void write_protobuf_to_file() {
 static void exit_handler(void) { write_protobuf_to_file(); }
 
 static void add_io_entry(int fd, uint64_t start_us, uint64_t duration, IOType operation) {
-    if (!checkAndUpdateTimer(2))
+    if (!g_io_trace_enabled)
     {
         return; 
     }

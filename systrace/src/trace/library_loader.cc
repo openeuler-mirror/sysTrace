@@ -1,5 +1,5 @@
 #include "library_loader.h"
-#include "../../include/common/logging.h"
+#include "../../include/log/logging.h"
 #include <dlfcn.h>
 
 namespace systrace

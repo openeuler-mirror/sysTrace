@@ -18,6 +18,12 @@
 #pragma once
 
 #define THREAD_COMM_LEN     16
+typedef enum {
+    OS_PROBE_NONE = 0,
+    OS_PROBE_CPU  = 1 << 0,
+    OS_PROBE_MEM  = 1 << 1,
+    OS_PROBE_ALL  = (OS_PROBE_CPU | OS_PROBE_MEM)
+} os_probe_type_e;
 
 typedef enum {
     EVENT_TYPE_MM_FAULT = 0,
@@ -31,14 +37,28 @@ typedef enum {
 typedef struct {
     int key;
     int rank;
-    long long unsigned int start_time;
-    long long unsigned int end_time;
-    long long unsigned int duration; 
+    unsigned long long start_time;
+    unsigned long long end_time;
+    unsigned long long duration; 
     event_type_e type;
-    long long unsigned int delay;
+    unsigned long long delay;
     char comm[THREAD_COMM_LEN];
     char next_comm[THREAD_COMM_LEN];
-    long unsigned int next_pid;
+    int pid;
+    int next_pid;
 } trace_event_data_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+int os_probe_init(void);
+void os_probe_enable_event(os_probe_type_e type);
+void os_probe_disable_event(os_probe_type_e type);
+void os_probe_exit(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -1,5 +1,5 @@
 #include "pytorch_tracing_loader.h"
-#include "../../../include/common/logging.h"
+#include "../../../include/log/logging.h"
 #include <cstring>
 #include <dlfcn.h>
 

@@ -5,15 +5,20 @@
 #include <thread>
 #include <vector>
 
-#include "../../include/common/logging.h"
-#include "../../include/common/util.h"
-#include "../../include/common/shared_constants.h"
+#include "../../include/log/logging.h"
+#include "../../include/utils/util.h"
+#include "../../include/common/constant.h"
 #include "../../protos/systrace.pb.h"
 #include "../mspti/mspti_tracker.hpp"
-#include "../../server/monitor_server.hpp"
 #include "library_loader.h"
 #include "python/pytorch_tracing_loader.h"
+#include "../plugins/manager/ControlManager.hpp"
+#include "../plugins/HbmPlugin.hpp"
+#include "../plugins/MsptiTrackerPlugin.hpp"
+#include "../plugins/IOPlugin.hpp"
+#include "../plugins/EbpfPlugin.hpp"
 
+class ControlManager;
 namespace systrace
 {
 using namespace util;
@@ -64,6 +69,9 @@ class SysTrace
     ~SysTrace();
 
     void initializeSystem();
+
+    void registerPlugins();
+
     void startEventPoller();
     void stopEventPoller();
     void eventPollerMain();

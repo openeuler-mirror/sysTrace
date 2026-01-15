@@ -12,9 +12,6 @@
  * Create: 2025-06-20
  * Description: bpf header
  ******************************************************************************/
-#ifndef __GOPHER_BPF_H__
-#define __GOPHER_BPF_H__
-
 #pragma once
 
 #include "common.h"
@@ -26,5 +23,3 @@
 #include "__bpf_kern.h"
 #include "__feat_probe.h"
 #include "__compat.h"
-
-#endif

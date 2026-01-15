@@ -12,9 +12,6 @@
  * Create: 2025-06-20
  * Description: bpf header
  ******************************************************************************/
-#ifndef __GOPHER_BPF_KERN_H__
-#define __GOPHER_BPF_KERN_H__
-
 #ifdef BPF_PROG_KERN
 
 #include "vmlinux.h"
@@ -36,5 +33,4 @@
     bpf_section("raw_tracepoint/" #func) \
     int bpf_raw_trace_##func(struct type *ctx)
 
-#endif
 #endif

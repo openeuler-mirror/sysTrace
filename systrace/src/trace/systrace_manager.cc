@@ -4,9 +4,7 @@
 #include <vector>
 
 #include "../../include/common/constant.h"
-#include "../../include/common/shared_constants.h"
 #include "systrace_manager.h"
-// #include "../../src/os/os_probe.h"
 
 int global_stage_id = 0;
 int global_stage_type = 0;
@@ -81,11 +79,7 @@ void PyTorchTrace::registerTracingFunctions()
 
 bool PyTorchTrace::triggerTrace() 
 {
-    SharedData* shared_data = get_shared_data();
-    if (!shared_data) {
-        return false;
-    }
-    return has_trigger_trace_.exchange(true) && shared_data->g_dump_L0; 
+    return has_trigger_trace_.exchange(true); 
 }
 
 void PyTorchTrace::dumpPyTorchTracing()
@@ -209,6 +203,7 @@ SysTrace &SysTrace::getInstance()
 
 SysTrace::~SysTrace()
 {
+    ControlManager::getInstance().stop();
 #ifdef HAS_BTF_SUPPORT
     stopOsProbePoller();
 #endif
@@ -221,7 +216,9 @@ void SysTrace::initializeSystem()
         return;
 
     systrace::util::InitializeSystemUtilities();
-    MonitorServer::getInstance();
+    registerPlugins();
+    ControlManager::getInstance().start();
+    
     MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
 #ifdef HAS_BTF_SUPPORT
@@ -251,6 +248,16 @@ void SysTrace::stopOsProbePoller()
     }
 }
 #endif
+
+void SysTrace::registerPlugins() {
+    auto& cm = ControlManager::getInstance();
+    cm.register_plugin(std::make_shared<HbmPlugin>());
+    cm.register_plugin(std::make_shared<MsptiPlugin>());
+    cm.register_plugin(std::make_shared<IOPlugin>());
+    cm.register_plugin(std::make_shared<MemoryPlugin>());
+    cm.register_plugin(std::make_shared<CpuPlugin>());
+}
+
 
 void SysTrace::stopEventPoller()
 {

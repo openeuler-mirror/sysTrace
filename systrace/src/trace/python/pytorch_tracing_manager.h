@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "../../../include/common/util.h"
+#include "../../../include/utils/util.h"
 #include "pytorch_tracing.h"
 #include "pytorch_tracing_data.h"
 

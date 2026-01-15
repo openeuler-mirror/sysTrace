@@ -2,7 +2,7 @@
 #include <dlfcn.h>
 #include <iostream>
 #include <stdlib.h>
-#include "../../include/common/util.h"
+#include "../../include/utils/util.h"
 
 constexpr size_t KB = 1 * 1024;
 constexpr size_t MB = 1 * 1024 * KB;
@@ -10,6 +10,10 @@ constexpr size_t ALIGN_SIZE = 8;
 
 std::mutex MSPTITracker::mtx;
 using namespace systrace::util;
+
+void MSPTITracker::setExternalEnable(bool enable) {
+    external_enabled_.store(enable);
+}
 
 inline uint8_t *align_buffer(uint8_t *buffer, size_t align)
 {
@@ -31,14 +35,17 @@ MSPTITracker::MSPTITracker()
 void MSPTITracker::collect()
 {
     while (should_run_) {
-        bool should_collect = checkAndUpdateTimer(1);
+        bool should_collect = external_enabled_.load();
+
         if (should_collect && !is_collecting_.load()) {
             msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
             is_collecting_.store(true);
+            std::cout << "[MSPTITracker] Start collecting..." << std::endl;
         } 
         else if (!should_collect && is_collecting_.load()) {
             msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
             is_collecting_.store(false);
+            std::cout << "[MSPTITracker] Stop collecting..." << std::endl;
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));

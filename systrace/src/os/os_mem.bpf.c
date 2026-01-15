@@ -1,33 +1,9 @@
-/******************************************************************************
- * Copyright (c) Huawei Technologies Co., Ltd. 2023. All rights reserved.
- * sysTrace licensed under the Mulan PSL v2.
- * You can use this software according to the terms and conditions of the Mulan PSL v2.
- * You may obtain a copy of Mulan PSL v2 at:
- *     http://license.coscl.org.cn/MulanPSL2
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
- * PURPOSE.
- * See the Mulan PSL v2 for more details.
- * Author: curry
- * Create: 2025-06-20
- * Description: 
- ******************************************************************************/
-#ifdef BPF_PROG_USER
-#undef BPF_PROG_USER
-#endif
 #define BPF_PROG_KERN
 #include "bpf.h"
 #include "bpf_comm.h"
 #include "os_probe.h"
 
 char g_license[] SEC("license") = "GPL";
-
-#define BPF_F_INDEX_MASK    0xffffffffULL
-#define BPF_F_ALL_CPU   BPF_F_INDEX_MASK
-
-#ifndef __PERF_OUT_MAX
-#define __PERF_OUT_MAX (64)
-#endif
 
 #define PAGE_SIZE 4096
 #define DEFAULT_RANK 0
@@ -48,8 +24,8 @@ struct {
 
 static __always_inline int fault_event_start(struct task_struct *task, event_type_e event)
 {
-    u32 pid = BPF_CORE_READ(task, pid);  // 获取 TGID
-    u32 tgid = BPF_CORE_READ(task, tgid);  // 获取 PID
+    u32 pid = BPF_CORE_READ(task, pid);
+    u32 tgid = BPF_CORE_READ(task, tgid);
     int rank = 0;
     rank = get_npu_id(task);
     if (rank < 0) {
@@ -74,8 +50,8 @@ static __always_inline int fault_event_start(struct task_struct *task, event_typ
 
 static __always_inline int fault_event_end(struct task_struct *task, void *ctx, event_type_e event)
 {
-    u32 pid = BPF_CORE_READ(task, pid);  // 获取 TGID
-    u32 tgid = BPF_CORE_READ(task, tgid);  // 获取 PID
+    u32 pid = BPF_CORE_READ(task, pid);
+    u32 tgid = BPF_CORE_READ(task, tgid);
     fault_task_key_s fault_task_key = {0};
     fault_task_key.event = event;
     fault_task_key.pid = pid;
@@ -87,7 +63,6 @@ static __always_inline int fault_event_end(struct task_struct *task, void *ctx, 
         if (now > task_mem_event->start_ts) {
             trace_event_data_t cur_event;
             create_cur_event(&cur_event, task_mem_event->key, task_mem_event->start_ts, now, task_mem_event->rank, event);
-            // bpf_get_current_comm(&cur_event.comm, sizeof(cur_event.comm));
             bpf_core_read_str(cur_event.comm, sizeof(cur_event.comm), &task->comm);
             emit_event(&cur_event, ctx);
         }
@@ -137,6 +112,9 @@ static __always_inline int common_event_end(struct task_struct *task, void *ctx,
 
 KPROBE(handle_mm_fault, pt_regs)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -148,6 +126,9 @@ KPROBE(handle_mm_fault, pt_regs)
 
 KRETPROBE(handle_mm_fault, pt_regs)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -159,6 +140,9 @@ KRETPROBE(handle_mm_fault, pt_regs)
 
 KPROBE(do_swap_page, pt_regs)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -169,6 +153,9 @@ KPROBE(do_swap_page, pt_regs)
 
 KRETPROBE(do_swap_page, pt_regs)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -179,6 +166,9 @@ KRETPROBE(do_swap_page, pt_regs)
 
 KRAWTRACE(mm_compaction_begin, bpf_raw_tracepoint_args)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -189,6 +179,9 @@ KRAWTRACE(mm_compaction_begin, bpf_raw_tracepoint_args)
 
 KRAWTRACE(mm_compaction_end, bpf_raw_tracepoint_args)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -199,6 +192,9 @@ KRAWTRACE(mm_compaction_end, bpf_raw_tracepoint_args)
 
 KRAWTRACE(mm_vmscan_direct_reclaim_begin, bpf_raw_tracepoint_args)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;
@@ -209,6 +205,9 @@ KRAWTRACE(mm_vmscan_direct_reclaim_begin, bpf_raw_tracepoint_args)
 
 KRAWTRACE(mm_vmscan_direct_reclaim_end, bpf_raw_tracepoint_args)
 {
+    if (!trace_cfg_enabled(OS_PROBE_MEM)) {
+        return 0;
+    }
     struct task_struct *task = (struct task_struct *)bpf_get_current_task();
     if (task == NULL) {
         return 0;

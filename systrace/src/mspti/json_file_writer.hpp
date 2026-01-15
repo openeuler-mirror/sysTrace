@@ -1,6 +1,6 @@
 #pragma once
-#include "../../include/common/shared_constants.h"
-#include "../../include/common/util.h"
+#include "../../include/common/constant.h"
+#include "../../include/utils/util.h"
 #include "mspti.h"
 #include <atomic>
 #include <condition_variable>
@@ -135,9 +135,6 @@ public:
     }
 
     void hcclActivityFormatToCSV() {
-        if (!checkAndUpdateTimer(1)) {
-            return;
-        }
         std::lock_guard<std::mutex> lock(this->buffermtx);
         if (this->file.is_open()) {
             // enumerate the buffer and write to file
