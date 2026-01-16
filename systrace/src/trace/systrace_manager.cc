@@ -2,8 +2,11 @@
 #include <fstream>
 #include <memory>
 #include <vector>
+#include <cstdlib>
+#include <cstring>
 
 #include "../../include/common/constant.h"
+#include "../../include/log/logging.h"
 #include "systrace_manager.h"
 
 int global_stage_id = 0;
@@ -39,12 +42,12 @@ PyTorchTrace &PyTorchTrace::getInstance()
 void PyTorchTrace::initialize()
 {
     pytorch_trace_.set_rank(config::GlobalConfig::Instance().rank);
-    STLOG(INFO) << "[PyTorchTrace] Rank set to: "
+    LOG_MODULE(INFO, "PyTorchTrace") << "Rank set to: "
                 << config::GlobalConfig::Instance().rank;
 
     pytorch_tracing_library_ =
         new pytorch_tracing::PyTorchTracingLibrary("libsysTrace.so");
-    STLOG(INFO) << "[PyTorchTrace] Tracing library loaded";
+    LOG_MODULE(INFO, "PyTorchTrace") << "Tracing library loaded";
 
     registerTracingFunctions();
 }
@@ -55,7 +58,7 @@ void PyTorchTrace::registerTracingFunctions()
     std::string line;
     if (!funcListFile.is_open())
     {
-        STLOG(ERROR) << "Failed to open PyFuncList file";
+        LOG_MODULE(ERROR, "PyTorchTrace") << "Failed to open PyFuncList file";
         return;
     }
     while (std::getline(funcListFile, line))
@@ -72,8 +75,8 @@ void PyTorchTrace::registerTracingFunctions()
         pytorch_tracing_library_->Register(pytorch_tracing_functions_);
     for (size_t i = 0; i < pytorch_tracing_functions_.size(); ++i)
     {
-        STLOG(INFO) << "Registered function: " << pytorch_tracing_functions_[i]
-                    << ", status: " << errors[i] << std::endl;
+        LOG_MODULE(INFO, "PyTorchTrace") << "Registered function: " << pytorch_tracing_functions_[i]
+                    << ", status: " << errors[i];
     }
 }
 
@@ -89,7 +92,7 @@ void PyTorchTrace::dumpPyTorchTracing()
 
     if (util::fs_utils::CreateDirectoryIfNotExists(dump_path))
     {
-        STLOG(ERROR) << "[PyTorchTrace] Failed to create dump directory";
+        LOG_MODULE(ERROR, "PyTorchTrace") << "[PyTorchTrace] Failed to create dump directory";
         return;
     }
 
@@ -175,14 +178,14 @@ void PyTorchTrace::writeTraceToFile()
     std::ofstream file(file_path, std::ios::binary | std::ios::out);
     if (!file)
     {
-        STLOG(ERROR) << "[PyTorchTrace] Failed to open file: " << file_path;
+        LOG_MODULE(ERROR, "PyTorchTrace") << "Failed to open file: " << file_path;
         return;
     }
 
     std::string binary_data;
     if (!pytorch_trace_.SerializeToString(&binary_data))
     {
-        STLOG(ERROR) << "[PyTorchTrace] Failed to serialize trace data";
+        LOG_MODULE(ERROR, "PyTorchTrace") << "Failed to serialize trace data";
         return;
     }
 
@@ -215,6 +218,12 @@ void SysTrace::initializeSystem()
     if (!config::GlobalConfig::Instance().enable)
         return;
 
+    const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");
+    std::string log_path = (log_path_env && strlen(log_path_env) > 0) 
+                           ? std::string(log_path_env) 
+                           : "/var/log/systrace.log";
+    systrace::setLoggingPath(log_path);
+
     systrace::util::InitializeSystemUtilities();
     registerPlugins();
     ControlManager::getInstance().start();
@@ -235,7 +244,7 @@ void SysTrace::startEventPoller()
     event_poller_ = std::thread(&SysTrace::eventPollerMain, this);
     pthread_setname_np(event_poller_.native_handle(), "systrace_poller");
 #endif
-    STLOG(INFO) << "[SysTrace] Event poller started";
+    LOG_MODULE(INFO, "SysTrace") << "Event poller started";
 }
 
 #ifdef HAS_BTF_SUPPORT

@@ -20,14 +20,14 @@ ControlManager::~ControlManager() {
 void ControlManager::register_plugin(std::shared_ptr<ICollector> col) {
     if (col) {
         registry_[col->get_id()] = col;
-        std::cout << "[Control] Registered plugin: " << col->get_id() << std::endl;
+        LOG_MODULE(INFO, "Control") << "Registered plugin: " << col->get_id();
     }
 }
 
 void ControlManager::start() {
     if (is_running_.exchange(true)) return;
     server_thread_ = std::thread(&ControlManager::uds_worker, this);
-    std::cout << "[Control] Service thread started." << std::endl;
+    LOG_MODULE(INFO, "Control") << "Service thread started.";
 }
 
 void ControlManager::stop() {
@@ -38,7 +38,6 @@ void ControlManager::stop() {
                             std::to_string(getpid()) + 
                             CliConst::SOCK_EXT;
 
-    // 自连接唤醒 accept
     int wakeup_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (wakeup_fd >= 0) {
         struct sockaddr_un addr;
@@ -55,13 +54,12 @@ void ControlManager::stop() {
 
     unlink(sock_path.c_str());
     
-    // 停止所有插件并清理
     for (auto& [id, plugin] : registry_) {
         plugin->stop();
     }
     registry_.clear();
 
-    std::cout << "[Control] Service stopped and socket unlinked." << std::endl;
+    LOG_MODULE(INFO, "Control") << "Service stopped and socket unlinked.";
 }
 
 void ControlManager::uds_worker() {
@@ -72,7 +70,7 @@ void ControlManager::uds_worker() {
 
     int fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd < 0) {
-        std::cerr << "[Control] Failed to create socket: " << strerror(errno) << std::endl;
+        LOG_MODULE(ERROR, "Control") << "Failed to create socket: " << strerror(errno);
         return;
     }
 
@@ -83,13 +81,13 @@ void ControlManager::uds_worker() {
 
     unlink(sock_path.c_str());
     if (bind(fd, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
-        std::cerr << "[Control] Bind failed: " << strerror(errno) << std::endl;
+        LOG_MODULE(ERROR, "Control") << "Bind failed: " << strerror(errno);
         close(fd);
         return;
     }
 
     listen(fd, 5);
-    std::cout << "[Control] Listening on: " << sock_path << std::endl;
+    LOG_MODULE(INFO, "Control") << "Listening on: " << sock_path;
 
     while (is_running_) {
         int cfd = accept(fd, nullptr, nullptr);
@@ -106,10 +104,10 @@ void ControlManager::uds_worker() {
         char buf[CliConst::MAX_BUF_SIZE] = {0};
         ssize_t n = read(cfd, buf, sizeof(buf) - 1);
         if (n > 0) {
-            std::cout << "[Control] Received cmd: " << buf << std::endl;
+            LOG_MODULE(INFO, "Control") << "Received cmd: " << buf;
             std::string res = handle_msg(buf);
             write(cfd, res.c_str(), res.size());
-            std::cout << "[Control] Response sent: " << res << std::endl;
+            LOG_MODULE(INFO, "Control") << "Response sent: " << res;
         }
         close(cfd);
     }
@@ -125,14 +123,14 @@ std::string ControlManager::handle_msg(const std::string& raw) {
             clean_raw.pop_back();
         }
         if (clean_raw.empty()) {
-            std::cerr << "[Control] Received empty message after cleaning." << std::endl;
+            LOG_MODULE(ERROR, "Control") << "Received empty message after cleaning.";
             return "ACK_EMPTY";
         }
 
         auto data = json::parse(clean_raw);
 
         if (!data.contains(CliConst::KEY_PATH) || !data.contains(CliConst::KEY_ACTION)) {
-            std::cerr << "[Control] Missing 'path' or 'action' in JSON: " << clean_raw << std::endl;
+            LOG_MODULE(ERROR, "Control") << "Missing 'path' or 'action' in JSON: " << clean_raw;
             return "ACK_JSON_MISSING_FIELDS";
         }
 
@@ -143,31 +141,31 @@ std::string ControlManager::handle_msg(const std::string& raw) {
         if (registry_.count(path)) {
             bool success = false;
             if (act == CliConst::ACT_ENABLE) {
-                std::cout << "[Control] Enabling plugin: " << path << " with params: " << params.dump() << std::endl;
+                LOG_MODULE(INFO, "Control") << "Enabling plugin: " << path << " with params: " << params.dump();
                 success = registry_[path]->start(params);
             } else if (act == CliConst::ACT_DISABLE) {
-                std::cout << "[Control] Disabling plugin: " << path << std::endl;
+                LOG_MODULE(INFO, "Control") << "Disabling plugin: " << path;
                 registry_[path]->stop();
                 success = true;
             } else {
-                std::cerr << "[Control] Unknown action: " << act << std::endl;
+                LOG_MODULE(ERROR, "Control") << "Unknown action: " << act;
                 return "ACK_UNKNOWN_ACTION";
             }
             return success ? "ACK_OK" : "ACK_FAIL";
         }
 
-        std::cerr << "[Control] Plugin not found: " << path << std::endl;
+        LOG_MODULE(ERROR, "Control") << "Plugin not found: " << path;
         return "ACK_NOT_FOUND";
 
     } catch (const json::parse_error& e) {
-        std::cerr << "[Control] JSON Parse Error: " << e.what() << std::endl;
-        std::cerr << "[Control] Problematic Raw Data: [" << clean_raw << "]" << std::endl;
-        std::cerr << "[Control] Raw Data (HEX): ";
+        LOG_MODULE(ERROR, "Control") << "JSON Parse Error: " << e.what();
+        LOG_MODULE(ERROR, "Control") << "[Control] Problematic Raw Data: [" << clean_raw << "]";
+        LOG_MODULE(ERROR, "Control") << "[Control] Raw Data (HEX): ";
         for (unsigned char c : clean_raw) fprintf(stderr, "%02x ", c);
         fprintf(stderr, "\n");
         return "ACK_JSON_ERR";
     } catch (const std::exception& e) {
-        std::cerr << "[Control] Exception: " << e.what() << std::endl;
+        LOG_MODULE(ERROR, "Control") << "Exception: " << e.what();
         return "ACK_INTERNAL_ERR";
     }
 }

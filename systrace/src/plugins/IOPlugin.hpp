@@ -1,6 +1,6 @@
 #include "../../include/common/ICollector.hpp"
 #include "../../include/utils/TimerManager.hpp"
-#include <iostream>
+#include "../../include/log/logging.h"
 #include <atomic>
 
 extern "C" {
@@ -25,7 +25,7 @@ public:
         }
 
         io_trace_set_enabled(true);
-        std::cout << "[IOPlugin] IO trace started." << std::endl;
+        LOG_MODULE(INFO, "IOPlugin") << "IO trace started.";
 
         if (duration > 0) {
             systrace::utils::TimerManager::getInstance().startTimer(get_id(), duration, [this]() {
@@ -46,7 +46,7 @@ public:
             
             systrace::utils::TimerManager::getInstance().stopTimer(get_id());
             
-            std::cout << "[IOPlugin] IO trace stopped." << std::endl;
+            LOG_MODULE(INFO, "IOPlugin") << "IO trace stopped.";
         }
         
         stop_latched_.clear(std::memory_order_release);

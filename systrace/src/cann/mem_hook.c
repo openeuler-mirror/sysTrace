@@ -268,7 +268,7 @@ static void collect_stack_frames(MemAllocEntry *entry)
 
         // Get the SO name and base address for this IP
         const char *so_name = get_so_name(ip);
-        unw_word_t so_base = get_so_base(ip); // You'll need to implement this
+        unw_word_t so_base = get_so_base(ip);
 
         StackFrame *frame = malloc(sizeof(StackFrame));
         stack_frame__init(frame);

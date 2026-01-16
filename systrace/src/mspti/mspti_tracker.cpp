@@ -23,7 +23,7 @@ inline uint8_t *align_buffer(uint8_t *buffer, size_t align)
 
 MSPTITracker::MSPTITracker()
 {
-    std::cout << "Logging initialized from preloaded library." << std::endl;
+    LOG_MODULE(INFO, "MSPTI") << "Logging initialized from preloaded library.";
     std::string file_name = "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.csv"; 
     hcclFileWriter =
         std::make_unique<MSPTIHcclFileWriter>(file_name);
@@ -40,12 +40,12 @@ void MSPTITracker::collect()
         if (should_collect && !is_collecting_.load()) {
             msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
             is_collecting_.store(true);
-            std::cout << "[MSPTITracker] Start collecting..." << std::endl;
+            LOG_MODULE(INFO, "MSPTI") << "Start collecting...";
         } 
         else if (!should_collect && is_collecting_.load()) {
             msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
             is_collecting_.store(false);
-            std::cout << "[MSPTITracker] Stop collecting..." << std::endl;
+            LOG_MODULE(INFO, "MSPTI") << "Stop collecting...";
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -71,7 +71,7 @@ MSPTITracker &MSPTITracker::getInstance()
 
 void MSPTITracker::finish()
 {
-    std::cout << "Finishing MSPTI Tracker" << std::endl;
+    LOG_MODULE(INFO, "MSPTI") << "Finishing MSPTI Tracker";
     if (hcclFileWriter)
     {
         hcclFileWriter->stopWriter();

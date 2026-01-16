@@ -35,13 +35,13 @@ int CreateDirectoryIfNotExists(const std::string &path)
         }
         if (!std::filesystem::is_directory(d_path))
         {
-            LOG(ERROR) << "Path exists but is not a directory: " << path;
+            LOG_MODULE(ERROR, "Utils")<< "Path exists but is not a directory: " << path;
             return 1;
         }
     }
     catch (const std::filesystem::filesystem_error &e)
     {
-        LOG(ERROR) << "Failed to create directory " << path << ": " << e.what();
+        LOG_MODULE(ERROR, "Utils")<< "Failed to create directory " << path << ": " << e.what();
         return 1;
     }
     return 0;
@@ -60,7 +60,7 @@ std::string GenerateClusterUniqueFilename(const std::string &suffix)
     }
     catch (const std::exception &e)
     {
-        LOG(ERROR) << "Filename generation failed: " << e.what();
+        LOG_MODULE(ERROR, "Utils")<< "Filename generation failed: " << e.what();
         return "error_" + std::to_string(std::time(nullptr)) + suffix;
     }
 }
@@ -89,7 +89,7 @@ class DeviceManager
                 available_devices.push_back(device_index);
                 if (config::GlobalConfig::Instance().local_rank == 0)
                 {
-                    LOG(INFO)
+                    LOG_MODULE(INFO, "Utils")
                         << "Found device: " << GetDevicePath(device_index);
                 }
             }
@@ -140,13 +140,13 @@ void ValidateDeviceConfiguration()
     if (config.devices.empty())
     {
         config.enable = false;
-        LOG(WARNING) << "No devices found, disabling tracing";
+        LOG_MODULE(WARNING, "Utils")<< "No devices found, disabling tracing";
         return;
     }
 
     if (config.local_world_size != config.devices.size())
     {
-        LOG(WARNING) << "Local world size mismatch, disabling hook";
+        LOG_MODULE(WARNING, "Utils")<< "Local world size mismatch, disabling hook";
         config.enable = false;
     }
 }
@@ -155,17 +155,17 @@ void ValidateDeviceConfiguration()
 
 void InitializeGlobalConfiguration()
 {
-    LOG(INFO) << "Initializing global configuration";
+    LOG_MODULE(INFO, "Utils") << "Initializing global configuration";
 
     try
     {
         LoadEnvironmentVariables();
         ValidateDeviceConfiguration();
-        LOG(INFO) << "Global configuration initialized successfully";
+        LOG_MODULE(INFO, "Utils") << "Global configuration initialized successfully";
     }
     catch (const std::exception &e)
     {
-        LOG(ERROR) << "Global config initialization failed: " << e.what();
+        LOG_MODULE(ERROR, "Utils")<< "Global config initialization failed: " << e.what();
         throw;
     }
 }
@@ -238,7 +238,7 @@ void RegisterRequiredEnvironmentVariables()
     }
     catch (const std::exception &e)
     {
-        LOG(ERROR) << "Environment variable registration failed: " << e.what();
+        LOG_MODULE(ERROR, "Utils")<< "Environment variable registration failed: " << e.what();
         throw;
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "../../include/common/constant.h"
 #include "../../include/utils/util.h"
+#include "../../include/log/logging.h"
 #include "mspti.h"
 #include <atomic>
 #include <condition_variable>
@@ -32,7 +33,7 @@ public:
         std::string savePath = path ? path : SYS_TRACE_ROOT_DIR "mspti/";
         if (systrace::util::fs_utils::CreateDirectoryIfNotExists(savePath))
         {
-            STLOG(ERROR) << "[MSPTI] Failed to create dump directory";
+            LOG_MODULE(ERROR, "MSPTI") << "Failed to create dump directory";
             return;
         }
         std::string savePathStr = savePath;
@@ -55,7 +56,7 @@ public:
         } else {
             filenameWithRank = saveFilename + "." + std::to_string(rank);
         }
-        std::cout << "Filename: " << filenameWithRank << std::endl;
+        LOG_MODULE(INFO, "MSPTI") << "Filename: " << filenameWithRank;
 
         // if file does not exists
         // create it and write header
@@ -85,7 +86,7 @@ public:
                 this->writerThread.join();
             }
             // write the remaining buffer
-            std::cout << "Closing file" << std::endl;
+            LOG_MODULE(INFO, "MSPTI") << "Closing file";
             this->file.close();
             this->opened.store(false);
         }
@@ -154,7 +155,7 @@ public:
             }
             this->markerActivityBuffer->clear();
         } else {
-            std::cout << "File is not open" << std::endl;
+            LOG_MODULE(ERROR, "MSPTI") << "File is not open";
         }
     }
 };

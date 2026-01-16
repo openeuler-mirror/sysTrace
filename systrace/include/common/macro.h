@@ -9,7 +9,7 @@
         const char *dlsym_error = dlerror();                                   \
         if (dlsym_error)                                                       \
         {                                                                      \
-            STLOG(WARNING) << "Load fn `" << symbol << "` error in " << msg    \
+            LOG(WARNING) << "Load fn `" << symbol << "` error in " << msg    \
                            << dlsym_error;                                     \
             is_usable_ = false;                                                \
             return;                                                            \

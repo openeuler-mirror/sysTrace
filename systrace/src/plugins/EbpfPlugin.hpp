@@ -1,7 +1,7 @@
 #include "../../include/common/ICollector.hpp"
 #include "../../include/utils/TimerManager.hpp"
 #include "../os/os_probe.h"
-#include <iostream>
+#include "../../include/log/logging.h"
 #include <atomic>
 
 extern "C" {
@@ -27,7 +27,7 @@ class MemoryPlugin : public ICollector {
             }
     
             os_probe_enable_event(OS_PROBE_MEM);
-            std::cout << "[MemoryPlugin] Memory trace started." << std::endl;
+            LOG_MODULE(INFO, "MemoryPlugin") << "Memory trace started.";
     
             if (duration > 0) {
                 systrace::utils::TimerManager::getInstance().startTimer(get_id(), duration, [this]() {
@@ -48,7 +48,7 @@ class MemoryPlugin : public ICollector {
                 
                 systrace::utils::TimerManager::getInstance().stopTimer(get_id());
                 
-                std::cout << "[MemoryPlugin] Memory trace stopped." << std::endl;
+                LOG_MODULE(INFO, "MemoryPlugin") << "Memory trace stopped.";
             }
             
             stop_latched_.clear(std::memory_order_release);
@@ -77,7 +77,7 @@ class CpuPlugin : public ICollector {
         }
 
         os_probe_enable_event(OS_PROBE_CPU);
-        std::cout << "[CPUPlugin] CPU trace started." << std::endl;
+        LOG_MODULE(INFO, "CPUPlugin") << "CPU trace started.";
 
         if (duration > 0) {
             systrace::utils::TimerManager::getInstance().startTimer(get_id(), duration, [this]() {
@@ -98,7 +98,7 @@ class CpuPlugin : public ICollector {
             
             systrace::utils::TimerManager::getInstance().stopTimer(get_id());
             
-            std::cout << "[CPUPlugin] CPU trace stopped." << std::endl;
+            LOG_MODULE(INFO, "CPUPlugin") << "CPU trace stopped.";
         }
         
         stop_latched_.clear(std::memory_order_release);

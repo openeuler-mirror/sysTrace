@@ -55,7 +55,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
         \
         __map = GET_MAP_OBJ(probe_name, map_name); \
         ret = bpf_map__set_pin_path(__map, map_path); \
-        printf("======>SHARE map(" #map_name ") set pin path \"%s\"(ret=%d).\n", map_path, ret); \
     } while (0)
 
 #define INIT_BPF_APP(app_name, limit) \
@@ -126,7 +125,6 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
                 probe_name##_skel = NULL; \
                 goto end; \
             } \
-            printf("Succeed to load and attach BPF " #probe_name " skeleton\n"); \
         } \
     } while (0)
 

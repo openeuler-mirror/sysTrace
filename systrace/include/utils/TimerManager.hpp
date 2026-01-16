@@ -8,6 +8,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include "../../include/log/logging.h"
 
 namespace systrace {
 namespace utils {
