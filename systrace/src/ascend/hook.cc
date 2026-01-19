@@ -6,6 +6,7 @@
 #include <string>
 #include <unistd.h>
 #include "../src/trace/systrace_manager.h"
+#include "../../include/log/logging.h"
 #include "hook.h"
 
 static std::string get_mindspore_lib_path() {
@@ -27,26 +28,27 @@ extern "C" void _ZN9mindspore11distributed10InitializeEv() {
     std::call_once(init_flag, []() {
         std::string so_path = get_mindspore_lib_path();
         if (so_path.empty()) {
-            fprintf(stderr, "[ERROR] Failed to find libmindspore_backend.so\n");
+            LOG_MODULE(ERROR, "Hook") << "Failed to find libmindspore_backend.so\n";
             return;
         }
 
         void* handle = dlopen(so_path.c_str(), RTLD_LAZY);
         if (!handle) {
-            fprintf(stderr, "[ERROR] dlopen failed: %s\n", dlerror());
+            LOG_MODULE(ERROR, "Hook") << "Failed to dlopen " << so_path << ": " << dlerror();
             return;
         }
 
         original_Initialize = (void (*)())dlsym(handle, "_ZN9mindspore11distributed10InitializeEv");
         if (!original_Initialize) {
-            fprintf(stderr, "[ERROR] dlsym failed: %s\n", dlerror());
+            LOG_MODULE(ERROR, "Hook") << "Failed to dlsym _ZN9mindspore11distributed10InitializeEv: " << dlerror();
+            dlclose(handle);
             return;
         }
         ::systrace::SysTrace::getInstance();
     });
 
     if (!original_Initialize) {
-        fprintf(stderr, "[ERROR] Original function not loaded\n");
+        LOG_MODULE(ERROR, "Hook") << "Original function not loaded";
         return;
     }
     original_Initialize();
@@ -64,8 +66,7 @@ extern "C"
             g_hal_lib = dlopen("libascendcl.so", RTLD_LAZY);
             if (!g_hal_lib)
             {
-                fprintf(stderr, "[Hook] Failed to dlopen libascendcl.so: %s\n",
-                        dlerror());
+                systrace_log_error("Hook", "Failed to dlopen libascendcl.so: %s", dlerror());
                 return nullptr;
             }
         }
@@ -73,13 +74,12 @@ extern "C"
         void *func = dlsym(g_hal_lib, func_name);
         if (!func)
         {
-            fprintf(stderr, "[Hook] Failed to dlsym %s: %s\n", func_name,
-                    dlerror());
+            systrace_log_error("Hook", "Failed to dlsym %s: %s", func_name, dlerror());
         }
         else
         {
-            std::cout << "[Hook] Successfully hooked " << func_name
-                      << std::endl;
+            systrace_log_info("Hook", "Successfully hooked %s.", func_name);
+
         }
         return func;
     }

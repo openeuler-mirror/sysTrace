@@ -2,6 +2,7 @@
 #if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
 #include <pyframe.h>
 #endif
+#include "../../../include/log/logging.h"
 
 Stagetype determine_stage_type(const char *function_name)
 {
@@ -55,11 +56,11 @@ static int register_tracing_function(const char *name, int index, char **errors)
 
     if (ret)
     {
-        printf("register function `%s` error\n", name);
+        systrace_log_error("PyTorchTrace", "register function `%s` error", name);
         return ret;
     }
 
-    printf("register function `%s` at address %ld\n", name, code_address);
+    systrace_log_info("PyTorchTrace", "register function `%s` at address %ld", name, code_address);
     addTracingData(index, name);
 
     TracingFunction *traced_function =
@@ -87,7 +88,7 @@ static void set_profiler_for_all_threads()
     while (tstate != NULL && thread_count < PY_TRACING_MAX_THREADS)
     {
         thread_array[thread_count++] = tstate;
-        printf("Set profiler for thread %ld\n", tstate->thread_id);
+        systrace_log_info("PyTorchTrace", "Set profiler for thread %ld", tstate->thread_id);
         tstate = PyThreadState_Next(tstate);
     }
 

@@ -132,8 +132,8 @@ class EnvVarRegistry
     static void RegisterEnv(const std::string &name, VarType default_value)
     {
         auto &registry = GetRegistryManager();
-        LOG(INFO) << "[ENV] Register ENV " << name << " with default "
-                  << VariantToString(default_value) << std::endl;
+        LOG_MODULE(INFO, "Utils") << "[ENV] Register ENV " << name << " with default "
+                  << VariantToString(default_value);
         registry[name] = std::move(default_value);
     }
 
@@ -150,8 +150,8 @@ class EnvVarRegistry
         T result = getEnvInner<T>(name, &set);
         if (set)
         {
-            LOG(INFO) << "[ENV] Get " << name << "=" << result
-                      << " from environment" << std::endl;
+            LOG_MODULE(INFO, "Utils") << "[ENV] Get " << name << "=" << result
+                      << " from environment";
             return result;
         }
 
@@ -160,17 +160,17 @@ class EnvVarRegistry
         {
             if (const T *val = std::get_if<T>(&it->second))
             {
-                LOG(INFO) << "[ENV] Get " << name << "=" << *val
-                          << " from register default" << std::endl;
+                LOG_MODULE(INFO, "Utils") << "[ENV] Get " << name << "=" << *val
+                          << " from register default";
                 return *val;
             }
-            LOG(FATAL) << "[ENV] Wrong data type in `GetEnvVar`" << std::endl;
+            LOG_MODULE(ERROR, "Utils") << "[ENV] Wrong data type in `GetEnvVar`";
         }
 
         // Fall back to static default
         result = getDefault<T>();
-        LOG(WARNING) << "[ENV] Get not register env " << name << "=" << result
-                     << " from default" << std::endl;
+        LOG_MODULE(WARNING, "Utils") << "[ENV] Get not register env " << name << "=" << result
+                     << " from default";
         return result;
     }
 
@@ -204,7 +204,6 @@ class EnvVarRegistry
         return lower;
     }
 
-    // 值解析器
     template <typename T> static T parseEnvValue(const char *env)
     {
         if constexpr (std::is_same_v<T, int>)

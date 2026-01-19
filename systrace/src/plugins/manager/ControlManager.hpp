@@ -4,6 +4,8 @@
 #include <thread>
 #include <atomic>
 #include "../../../include/common/ICollector.hpp" 
+#include "../../../include/log/logging.h"
+#include "../../../include/utils/util.h"
 
 class ControlManager {
 public:

@@ -4,6 +4,8 @@
 #include <functional>
 #include <string>
 #include <stdint.h> 
+#include <fcntl.h>
+#include <sys/stat.h>  
 
 #ifdef __cplusplus
 extern "C"
