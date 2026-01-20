@@ -10,11 +10,14 @@ set(BPFTOOL bpftool)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBBPF REQUIRED libbpf)
 pkg_check_modules(PROTOBUF_C REQUIRED libprotobuf-c)
+pkg_check_modules(LIBDW REQUIRED libdw)
+pkg_check_modules(LIBELF REQUIRED libelf)
 
 # BPF compilation
 set(BPF_SOURCES
     ${PROJECT_SOURCE_DIR}/os_cpu.bpf.c
     ${PROJECT_SOURCE_DIR}/os_mem.bpf.c
+    ${PROJECT_SOURCE_DIR}/python_gil.bpf.c
 )
 
 add_custom_target(ebpf_kern
@@ -60,6 +63,8 @@ target_link_libraries(os_probe
     pthread
     z
     stdc++
+    ${LIBDW_LIBRARIES}
+    ${LIBELF_LIBRARIES}
 )
 
 # Install

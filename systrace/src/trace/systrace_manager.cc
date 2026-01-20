@@ -224,6 +224,7 @@ void SysTrace::registerPlugins() {
     cm.register_plugin(std::make_shared<MemoryPlugin>());
     cm.register_plugin(std::make_shared<CpuPlugin>());
     cm.register_plugin(std::make_shared<CacheMissPlugin>());
+    cm.register_plugin(std::make_shared<GILPlugin>());
 }
 
 void SysTrace::stopEventPoller() {

@@ -30,7 +30,7 @@ function format_code() {
     
     cd "$project_root" || exit
 
-    find . -path "./thirdparty" -prune -o -type f \( -name "*.c" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.cc" -o -name "*.cxx" \) -print | xargs clang-format -i -style=file
+    find . -path "./thirdparty" -prune -o -type f -not -name "*bpf.c"  \( -name "*.c" -o -name "*.h" -o -name "*.cpp" -o -name "*.hpp" -o -name "*.cc" -o -name "*.cxx" \) -print | xargs clang-format -i -style=file
 }
 
 install_clang_format
