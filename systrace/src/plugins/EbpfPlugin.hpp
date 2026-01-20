@@ -12,9 +12,7 @@ void os_probe_disable_event(os_probe_type_e type);
 class MemoryPlugin : public ICollector {
 
   public:
-    MemoryPlugin() {
-        pluginName_ = PluginNameType::MEMORY_PLUGIN.data();
-    }
+    MemoryPlugin() { pluginName_ = PluginNameType::MEMORY_PLUGIN.data(); }
     bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {
@@ -55,9 +53,7 @@ class MemoryPlugin : public ICollector {
 class CpuPlugin : public ICollector {
 
   public:
-    CpuPlugin() {
-        pluginName_ = PluginNameType::CPU_PLUGIN.data();
-    }
+    CpuPlugin() { pluginName_ = PluginNameType::CPU_PLUGIN.data(); }
     bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {

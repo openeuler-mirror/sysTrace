@@ -1,7 +1,7 @@
 #pragma once
+#include <atomic>
 #include <nlohmann/json.hpp>
 #include <string>
-#include <atomic>
 
 using json = nlohmann::json;
 
@@ -12,11 +12,10 @@ class ICollector {
         return pluginName_ ? pluginName_ : "unknown";
     }
 
-virtual bool start(const json &params, int duration) = 0;
+    virtual bool start(const json &params, int duration) = 0;
     virtual void stop() = 0;
 
   protected:
     std::atomic<bool> active_{false};
     const char *pluginName_;
-
 };

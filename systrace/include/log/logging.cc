@@ -1,4 +1,5 @@
 #include "logging.h"
+#include <algorithm>
 #include <cstdarg>
 #include <cstdio>
 #include <filesystem>
@@ -7,6 +8,31 @@ namespace systrace {
 namespace log {
 
 LogStream *g_main_log_stream = nullptr;
+LogLevel g_min_log_level = INFO;
+
+static LogLevel getLogLevelFromEnv() {
+    const char *env_val = getenv("SYSTRACE_LOG_LEVEL");
+    if (!env_val)
+        return INFO;
+
+    std::string level_str = env_val;
+
+    for (auto &c : level_str)
+        c = toupper(c);
+
+    if (level_str == "DEBUG")
+        return DEBUG;
+    if (level_str == "WARN")
+        return WARNING;
+    if (level_str == "INFO")
+        return INFO;
+    if (level_str == "ERROR")
+        return ERROR;
+    if (level_str == "FATAL")
+        return FATAL;
+
+    return INFO;
+}
 
 LogStream::LogStream(std::ostream &console_stream)
     : console_(console_stream), file_enabled_(false) {
@@ -14,6 +40,12 @@ LogStream::LogStream(std::ostream &console_stream)
     if (!r_str)
         r_str = getenv("RANK_ID");
     rank_str_ = r_str ? r_str : "";
+
+    static bool level_initialized = false;
+    if (!level_initialized) {
+        g_min_log_level = getLogLevelFromEnv();
+        level_initialized = true;
+    }
 }
 
 LogStream &getLogStream() {
@@ -26,16 +58,18 @@ LogStream &getLogStream() {
 
 const char *getLogLevelTag(LogLevel level) {
     switch (level) {
-    case INFO:
-        return "[INFO] ";
+    case DEBUG:
+        return "DEBUG";
     case WARNING:
-        return "[WARNING] ";
+        return "WARN";
+    case INFO:
+        return "INFO";
     case ERROR:
-        return "[ERROR] ";
+        return "ERROR";
     case FATAL:
-        return "[FATAL] ";
+        return "FATAL";
     default:
-        return "[UNKNOWN] ";
+        return "UNKNOWN";
     }
 }
 
@@ -71,16 +105,24 @@ void setLoggingPath(const std::string &file_path) {
 }
 
 void closeLoggingFile() { log::getLogStream().closeLogFile(); }
+
+void setMinLogLevel(LogLevel level) { log::g_min_log_level = level; }
 } // namespace systrace
 
 extern "C" {
+void systrace_set_min_log_level(int level) {
+    systrace::setMinLogLevel(static_cast<LogLevel>(level));
+}
+
 static void systrace_log_impl(LogLevel level, const char *module,
                               const char *format, va_list args) {
-    char buffer[4096];
-    vsnprintf(buffer, sizeof(buffer), format, args);
+    systrace::log::LogLine line(systrace::log::getLogStream(), level, module);
+    if (line.isEnabled()) {
+        char buffer[4096];
+        vsnprintf(buffer, sizeof(buffer), format, args);
 
-    systrace::log::LogLine line(systrace::log::getLogStream(), module);
-    line << systrace::log::getLogLevelTag(level) << buffer;
+        line << "[" << systrace::log::getLogLevelTag(level) << "] " << buffer;
+    }
 }
 
 void systrace_log_info(const char *module, const char *format, ...) {
@@ -105,6 +147,12 @@ void systrace_log_fatal(const char *module, const char *format, ...) {
     va_list args;
     va_start(args, format);
     systrace_log_impl(FATAL, module, format, args);
+    va_end(args);
+}
+void systrace_log_debug(const char *module, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    systrace_log_impl(DEBUG, module, format, args);
     va_end(args);
 }
 }
