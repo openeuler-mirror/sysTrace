@@ -217,13 +217,6 @@ void SysTrace::initializeSystem()
 {
     if (!config::GlobalConfig::Instance().enable)
         return;
-
-    const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");
-    std::string log_path = (log_path_env && strlen(log_path_env) > 0) 
-                           ? std::string(log_path_env) 
-                           : "/var/log/systrace.log";
-    systrace::setLoggingPath(log_path);
-
     systrace::util::InitializeSystemUtilities();
     registerPlugins();
     ControlManager::getInstance().start();

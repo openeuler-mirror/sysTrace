@@ -8,6 +8,9 @@
 #include <cstring>
 #include <type_traits>
 #include <cstdlib>
+#include <chrono>
+#include <iomanip>
+#include <ctime>
 #endif
 
 enum LogLevel { INFO, WARNING, ERROR, FATAL };
@@ -81,9 +84,23 @@ public:
     template <typename T>
     LogLine &operator<<(const T &value) {
         if (first_output_) {
+            auto now = std::chrono::system_clock::now();
+            auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now.time_since_epoch()) % 1000;
+            
+            std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+            std::tm now_tm;
+            localtime_r(&now_c, &now_tm);
+
+            stream_ << "[" 
+                    << std::put_time(&now_tm, "%Y-%m-%d %H:%M:%S")
+                    << "." << std::setfill('0') << std::setw(3) << ms.count() 
+                    << "] ";
+
             if (module_) {
                 stream_ << "[" << module_ << "] ";
             }
+
             const std::string& rank = stream_.getRankStr();
             if (!rank.empty()) {
                 stream_ << "[RANK " << rank << "] ";
