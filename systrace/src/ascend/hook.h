@@ -3,9 +3,9 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <functional>
+#include <mutex>
 #include <stdint.h>
 #include <string>
-#include <mutex>
 #include <sys/stat.h>
 
 #ifdef __cplusplus

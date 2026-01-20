@@ -13,11 +13,13 @@
 #include <type_traits>
 #endif
 
-enum LogLevel { INFO, WARNING, ERROR, FATAL };
+enum LogLevel { DEBUG = 0, WARNING = 1, INFO = 2, ERROR = 3, FATAL = 4 };
 
 #ifdef __cplusplus
 namespace systrace {
 namespace log {
+
+extern LogLevel g_min_log_level;
 
 class LogStream {
   public:
@@ -77,15 +79,21 @@ const char *getLogLevelTag(LogLevel level);
 
 class LogLine {
   public:
-    LogLine(LogStream &stream, const char *module = nullptr)
-        : stream_(stream), module_(module), first_output_(true) {}
+    LogLine(LogStream &stream, LogLevel level, const char *module = nullptr)
+        : stream_(stream), level_(level), module_(module), first_output_(true) {
+        enabled_ = (level_ >= g_min_log_level);
+    }
 
     ~LogLine() {
-        stream_ << std::endl;
-        stream_.flush();
+        if (enabled_) {
+            stream_ << std::endl;
+            stream_.flush();
+        }
     }
 
     template <typename T> LogLine &operator<<(const T &value) {
+        if (!enabled_)
+            return *this;
         if (first_output_) {
             auto now = std::chrono::system_clock::now();
             auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -114,14 +122,19 @@ class LogLine {
     }
 
     LogLine &operator<<(std::ostream &(*manip)(std::ostream &)) {
-        stream_ << manip;
+        if (enabled_)
+            stream_ << manip;
         return *this;
     }
 
+    bool isEnabled() const { return enabled_; }
+
   private:
     LogStream &stream_;
+    LogLevel level_;
     const char *module_;
     bool first_output_;
+    bool enabled_;
 };
 } // namespace log
 
@@ -137,14 +150,15 @@ void systrace_log_info(const char *module, const char *format, ...);
 void systrace_log_warning(const char *module, const char *format, ...);
 void systrace_log_error(const char *module, const char *format, ...);
 void systrace_log_fatal(const char *module, const char *format, ...);
+void systrace_log_debug(const char *module, const char *format, ...);
 #ifdef __cplusplus
 }
 #endif
 
 #define LOG(level)                                                             \
-    ::systrace::log::LogLine(::systrace::log::getLogStream())                  \
-        << ::systrace::log::getLogLevelTag(level)
+    ::systrace::log::LogLine(::systrace::log::getLogStream(), level)           \
+        << "[" << ::systrace::log::getLogLevelTag(level) << "] "
 
 #define LOG_MODULE(level, module)                                              \
-    ::systrace::log::LogLine(::systrace::log::getLogStream(), module)          \
-        << ::systrace::log::getLogLevelTag(level)
+    ::systrace::log::LogLine(::systrace::log::getLogStream(), level, module)   \
+        << "[" << ::systrace::log::getLogLevelTag(level) << "] "

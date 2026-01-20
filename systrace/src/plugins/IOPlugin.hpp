@@ -10,9 +10,7 @@ void io_trace_set_enabled(bool enabled);
 class IOPlugin : public ICollector {
 
   public:
-    IOPlugin() {
-        pluginName_ = PluginNameType::IO_PLUGIN.data();
-    }
+    IOPlugin() { pluginName_ = PluginNameType::IO_PLUGIN.data(); }
     bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {

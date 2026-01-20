@@ -10,9 +10,7 @@ void hbm_trace_set_enabled(bool enabled);
 class HbmPlugin : public ICollector {
 
   public:
-    HbmPlugin() {
-        pluginName_ = PluginNameType::HBM_PLUGIN.data();
-    }
+    HbmPlugin() { pluginName_ = PluginNameType::HBM_PLUGIN.data(); }
     bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {

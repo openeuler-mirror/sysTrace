@@ -7,9 +7,7 @@
 
 class MsptiPlugin : public ICollector {
   public:
-    MsptiPlugin() {
-        pluginName_ = PluginNameType::MSPTI_PLUGIN.data();
-    }
+    MsptiPlugin() { pluginName_ = PluginNameType::MSPTI_PLUGIN.data(); }
     bool start(const json &params, int duration) override {
         if (active_.exchange(true))
             return true;
