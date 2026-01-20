@@ -55,6 +55,9 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
         \
         __map = GET_MAP_OBJ(probe_name, map_name); \
         ret = bpf_map__set_pin_path(__map, map_path); \
+        if (ret) { \
+            fprintf(stderr, "Failed to set pin path for map " #map_name " in " #probe_name "\n"); \
+        } \
     } while (0)
 
 #define INIT_BPF_APP(app_name, limit) \
