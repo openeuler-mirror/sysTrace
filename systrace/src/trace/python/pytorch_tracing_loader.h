@@ -7,13 +7,10 @@
 #include "../library_loader.h"
 #include "pytorch_tracing_data.h"
 
-namespace systrace
-{
-namespace pytorch_tracing
-{
+namespace systrace {
+namespace pytorch_tracing {
 
-class PyTorchTracingLibrary : public DynamicLibraryLoader
-{
+class PyTorchTracingLibrary : public DynamicLibraryLoader {
   public:
     explicit PyTorchTracingLibrary(const std::string &);
     using TracingRegistrationFunc = void (*)(const char **, int, char **);
@@ -32,8 +29,7 @@ class PyTorchTracingLibrary : public DynamicLibraryLoader
     GetPartialTracingDataArrayPartFunc get_partial_tracing_data_;
     DataArrayReleaseFunc return_tracing_data_;
     void InitializeSymbols();
-    struct SymbolConfig
-    {
+    struct SymbolConfig {
         const char *name;
         std::function<void *(void)> loader;
         const char *type_name;

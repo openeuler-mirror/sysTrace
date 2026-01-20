@@ -13,14 +13,12 @@
 #define MAX_STACK_DEPTH 32
 #define MAX_STACK_FRAME_LENGTH 256
 
-typedef enum
-{
+typedef enum {
     PAYLOAD_UNINITIALIZED = 0,
     PAYLOAD_GC = 1,
 } PayloadType;
 
-typedef enum
-{
+typedef enum {
     UNKNOWN = 0,
     DATALOADER,
     FORWARD,
@@ -29,13 +27,11 @@ typedef enum
     GC,
 } Stagetype;
 
-typedef union
-{
+typedef union {
     int gc_debug[2];
 } Payload;
 
-typedef struct
-{
+typedef struct {
     uint64_t start;
     uint64_t end;
     uint32_t count;
@@ -47,8 +43,7 @@ typedef struct
     int stack_depth;
 } PyTorchTracingData;
 
-typedef struct
-{
+typedef struct {
     PyTorchTracingData data[PY_TRACING_BUFFER_SIZE];
     uint64_t cur;
 } PyTorchTracingDataArray;

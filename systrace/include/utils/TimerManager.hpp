@@ -1,32 +1,33 @@
 #pragma once
-#include <thread>
-#include <chrono>
-#include <functional>
-#include <mutex>
-#include <condition_variable>
-#include <map>
-#include <atomic>
-#include <memory>
-#include <string>
 #include "../../include/log/logging.h"
+#include <atomic>
+#include <chrono>
+#include <condition_variable>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
 
 namespace systrace {
 namespace utils {
 
 class TimerManager {
-public:
+  public:
     struct TimerTask {
         std::atomic<bool> active{true};
         std::mutex task_mtx;
         std::condition_variable task_cv;
     };
 
-    static TimerManager& getInstance() {
+    static TimerManager &getInstance() {
         static TimerManager instance;
         return instance;
     }
 
-    void startTimer(const std::string& id, int duration, std::function<void()> callback) {
+    void startTimer(const std::string &id, int duration,
+                    std::function<void()> callback) {
         stopTimer(id);
 
         auto task = std::make_shared<TimerTask>();
@@ -38,9 +39,9 @@ public:
         std::thread([this, id, duration, callback, task]() {
             {
                 std::unique_lock<std::mutex> lk(task->task_mtx);
-                task->task_cv.wait_for(lk, std::chrono::seconds(duration), [&task] {
-                    return !task->active.load();
-                });
+                task->task_cv.wait_for(
+                    lk, std::chrono::seconds(duration),
+                    [&task] { return !task->active.load(); });
             }
 
             if (task->active.load()) {
@@ -55,7 +56,7 @@ public:
         }).detach();
     }
 
-    void stopTimer(const std::string& id) {
+    void stopTimer(const std::string &id) {
         std::shared_ptr<TimerTask> task_to_stop;
         {
             std::lock_guard<std::mutex> lock(map_mtx_);
@@ -74,23 +75,23 @@ public:
 
     void clearAll() {
         std::lock_guard<std::mutex> lock(map_mtx_);
-        for (auto& pair : active_tasks_) {
+        for (auto &pair : active_tasks_) {
             pair.second->active.store(false);
             pair.second->task_cv.notify_one();
         }
         active_tasks_.clear();
     }
 
-private:
+  private:
     TimerManager() = default;
     ~TimerManager() { clearAll(); }
-    
+
     std::mutex map_mtx_;
     std::map<std::string, std::shared_ptr<TimerTask>> active_tasks_;
 
-    TimerManager(const TimerManager&) = delete;
-    TimerManager& operator=(const TimerManager&) = delete;
+    TimerManager(const TimerManager &) = delete;
+    TimerManager &operator=(const TimerManager &) = delete;
 };
 
-} 
-}
+} // namespace utils
+} // namespace systrace

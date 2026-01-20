@@ -1,18 +1,21 @@
-#include <dlfcn.h>
-#include <stdio.h>
-#include <mutex>
+#include "hook.h"
+#include "../../include/log/logging.h"
+#include "../src/trace/systrace_manager.h"
 #include <cstdlib>
+#include <dlfcn.h>
 #include <iostream>
+#include <mutex>
+#include <stdio.h>
 #include <string>
 #include <unistd.h>
-#include "../src/trace/systrace_manager.h"
-#include "../../include/log/logging.h"
-#include "hook.h"
 
 static std::string get_mindspore_lib_path() {
-    const char* cmd = "python -c \"import mindspore as ms; import os; print(os.path.join(os.path.dirname(ms.__file__), 'lib/libmindspore_backend.so'))\"";
-    FILE* pipe = popen(cmd, "r");
-    if (!pipe) return "";
+    const char *cmd = "python -c \"import mindspore as ms; import os; "
+                      "print(os.path.join(os.path.dirname(ms.__file__), "
+                      "'lib/libmindspore_backend.so'))\"";
+    FILE *pipe = popen(cmd, "r");
+    if (!pipe)
+        return "";
 
     char buffer[1024];
     std::string result;
@@ -28,19 +31,24 @@ extern "C" void _ZN9mindspore11distributed10InitializeEv() {
     std::call_once(init_flag, []() {
         std::string so_path = get_mindspore_lib_path();
         if (so_path.empty()) {
-            LOG_MODULE(ERROR, "Hook") << "Failed to find libmindspore_backend.so\n";
+            LOG_MODULE(ERROR, "Hook")
+                << "Failed to find libmindspore_backend.so\n";
             return;
         }
 
-        void* handle = dlopen(so_path.c_str(), RTLD_LAZY);
+        void *handle = dlopen(so_path.c_str(), RTLD_LAZY);
         if (!handle) {
-            LOG_MODULE(ERROR, "Hook") << "Failed to dlopen " << so_path << ": " << dlerror();
+            LOG_MODULE(ERROR, "Hook")
+                << "Failed to dlopen " << so_path << ": " << dlerror();
             return;
         }
 
-        original_Initialize = (void (*)())dlsym(handle, "_ZN9mindspore11distributed10InitializeEv");
+        original_Initialize = (void (*)())dlsym(
+            handle, "_ZN9mindspore11distributed10InitializeEv");
         if (!original_Initialize) {
-            LOG_MODULE(ERROR, "Hook") << "Failed to dlsym _ZN9mindspore11distributed10InitializeEv: " << dlerror();
+            LOG_MODULE(ERROR, "Hook")
+                << "Failed to dlsym _ZN9mindspore11distributed10InitializeEv: "
+                << dlerror();
             dlclose(handle);
             return;
         }
@@ -55,73 +63,63 @@ extern "C" void _ZN9mindspore11distributed10InitializeEv() {
 }
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
-    static void *load_symbol(const char *func_name)
-    {
-        if (!g_hal_lib)
-        {
-            g_hal_lib = dlopen("libascendcl.so", RTLD_LAZY);
-            if (!g_hal_lib)
-            {
-                systrace_log_error("Hook", "Failed to dlopen libascendcl.so: %s", dlerror());
-                return nullptr;
-            }
+static void *load_symbol(const char *func_name) {
+    if (!g_hal_lib) {
+        g_hal_lib = dlopen("libascendcl.so", RTLD_LAZY);
+        if (!g_hal_lib) {
+            systrace_log_error("Hook", "Failed to dlopen libascendcl.so: %s",
+                               dlerror());
+            return nullptr;
         }
-
-        void *func = dlsym(g_hal_lib, func_name);
-        if (!func)
-        {
-            systrace_log_error("Hook", "Failed to dlsym %s: %s", func_name, dlerror());
-        }
-        else
-        {
-            systrace_log_info("Hook", "Successfully hooked %s.", func_name);
-
-        }
-        return func;
     }
 
-#define HOOKED_FUNCTION(func_ptr, func_name, ...)                       \
-    do {                                                                \
-        const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");    \
-        std::string log_path = (log_path_env && strlen(log_path_env) > 0) \
-                                   ? std::string(log_path_env)          \
-                                   : "/var/log/systrace.log";           \
-        ::systrace::setLoggingPath(log_path);                           \
-        if (!func_ptr) {                                                \
-            func_ptr = (decltype(func_ptr))load_symbol(func_name);      \
-            if (!func_ptr) return -1;                                   \
-        }                                                               \
-        ::systrace::SysTrace::getInstance();                            \
-        return func_ptr(__VA_ARGS__);                                   \
+    void *func = dlsym(g_hal_lib, func_name);
+    if (!func) {
+        systrace_log_error("Hook", "Failed to dlsym %s: %s", func_name,
+                           dlerror());
+    } else {
+        systrace_log_info("Hook", "Successfully hooked %s.", func_name);
+    }
+    return func;
+}
+
+#define HOOKED_FUNCTION(func_ptr, func_name, ...)                              \
+    do {                                                                       \
+        const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");           \
+        std::string log_path = (log_path_env && strlen(log_path_env) > 0)      \
+                                   ? std::string(log_path_env)                 \
+                                   : "/var/log/systrace.log";                  \
+        ::systrace::setLoggingPath(log_path);                                  \
+        if (!func_ptr) {                                                       \
+            func_ptr = (decltype(func_ptr))load_symbol(func_name);             \
+            if (!func_ptr)                                                     \
+                return -1;                                                     \
+        }                                                                      \
+        ::systrace::SysTrace::getInstance();                                   \
+        return func_ptr(__VA_ARGS__);                                          \
     } while (0)
 
-    EXPOSE_API aclError aclInit(const char *configPath)
-    {
-        g_hooked_pid = getpid();
-        HOOKED_FUNCTION(orig_aclInit, "aclInit", configPath);
-    }
+EXPOSE_API aclError aclInit(const char *configPath) {
+    g_hooked_pid = getpid();
+    HOOKED_FUNCTION(orig_aclInit, "aclInit", configPath);
+}
 
-    EXPOSE_API aclError aclrtMapMem(void *virPtr, size_t size, size_t offset,
-                                    aclrtDrvMemHandle handle, uint64_t flags)
-    {
-        HOOKED_FUNCTION(orig_aclrtMapMem, "aclrtMapMem", virPtr, size, offset,
-                        handle, flags);
-    }
+EXPOSE_API aclError aclrtMapMem(void *virPtr, size_t size, size_t offset,
+                                aclrtDrvMemHandle handle, uint64_t flags) {
+    HOOKED_FUNCTION(orig_aclrtMapMem, "aclrtMapMem", virPtr, size, offset,
+                    handle, flags);
+}
 
-    EXPOSE_API aclError aclrtLaunchKernel(aclrtFuncHandle func, int workDim,
-                                          void **workGroup,
-                                          size_t *localWorkSize,
-                                          aclrtStream stream, void *event,
-                                          void *config)
-    {
-        HOOKED_FUNCTION(orig_aclrtLaunchKernel, "aclrtLaunchKernel", func,
-                        workDim, workGroup, localWorkSize, stream, event,
-                        config);
-    }
+EXPOSE_API aclError aclrtLaunchKernel(aclrtFuncHandle func, int workDim,
+                                      void **workGroup, size_t *localWorkSize,
+                                      aclrtStream stream, void *event,
+                                      void *config) {
+    HOOKED_FUNCTION(orig_aclrtLaunchKernel, "aclrtLaunchKernel", func, workDim,
+                    workGroup, localWorkSize, stream, event, config);
+}
 
 #ifdef __cplusplus
 }

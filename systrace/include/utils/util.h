@@ -1,34 +1,29 @@
 #pragma once
 
 #include "../log/logging.h"
+#include <arpa/inet.h>
 #include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <filesystem>
 #include <functional>
+#include <ifaddrs.h>
 #include <iostream>
 #include <mutex>
+#include <netinet/in.h>
 #include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <ifaddrs.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <cstring>
-#include <iostream>
 
-namespace systrace
-{
-namespace util
-{
+namespace systrace {
+namespace util {
 std::string GetPrimaryIP();
-namespace config
-{
+namespace config {
 
-struct GlobalConfig
-{
+struct GlobalConfig {
     uint32_t rank{0};
     uint32_t local_rank{0};
     uint32_t world_size{0};
@@ -39,8 +34,7 @@ struct GlobalConfig
     std::vector<uint64_t> devices;
     std::string rank_str;
 
-    static GlobalConfig &Instance()
-    {
+    static GlobalConfig &Instance() {
         static GlobalConfig instance;
         return instance;
     }
@@ -53,40 +47,33 @@ void InitializeGlobalConfiguration();
 
 } // namespace config
 
-namespace fs_utils
-{
+namespace fs_utils {
 
 std::string GenerateClusterUniqueFilename(const std::string &suffix);
 int CreateDirectoryIfNotExists(const std::string &path);
 
 } // namespace fs_utils
 
-namespace resource
-{
-template <typename T> class TimerPool
-{
+namespace resource {
+template <typename T> class TimerPool {
   public:
     TimerPool() = default;
     TimerPool(const TimerPool &) = delete;
     TimerPool &operator=(const TimerPool &) = delete;
 
-    template <bool Init = true> T *getObject()
-    {
+    template <bool Init = true> T *getObject() {
         std::lock_guard<std::mutex> lock(mutex_);
 
         T *obj = pool_.empty() ? nullptr : pool_.front();
-        if (obj)
-        {
+        if (obj) {
             pool_.pop_front();
         }
 
         return obj ? obj : (Init ? new T() : nullptr);
     }
 
-    void returnObject(T *obj, int *size)
-    {
-        if (!obj)
-        {
+    void returnObject(T *obj, int *size) {
+        if (!obj) {
             if (size)
                 *size = 0;
             return;
@@ -98,11 +85,9 @@ template <typename T> class TimerPool
             *size = static_cast<int>(pool_.size());
     }
 
-    void clear()
-    {
+    void clear() {
         std::lock_guard<std::mutex> lock(mutex_);
-        for (auto obj : pool_)
-        {
+        for (auto obj : pool_) {
             delete obj;
         }
         pool_.clear();
@@ -117,11 +102,9 @@ template <typename T> class TimerPool
 
 } // namespace resource
 
-namespace env
-{
+namespace env {
 
-class EnvVarRegistry
-{
+class EnvVarRegistry {
   public:
     using VarType = std::variant<int, bool, std::string>;
 
@@ -129,17 +112,16 @@ class EnvVarRegistry
     static int DEFAULT_VALUE_INT;
     static bool DEFAULT_VALUE_BOOL;
 
-    static void RegisterEnv(const std::string &name, VarType default_value)
-    {
+    static void RegisterEnv(const std::string &name, VarType default_value) {
         auto &registry = GetRegistryManager();
-        LOG_MODULE(INFO, "Utils") << "[ENV] Register ENV " << name << " with default "
-                  << VariantToString(default_value);
+        LOG_MODULE(INFO, "Utils")
+            << "[ENV] Register ENV " << name << " with default "
+            << VariantToString(default_value);
         registry[name] = std::move(default_value);
     }
 
     // Get an env var value, with optional printing
-    template <typename T> static T GetEnvVar(const std::string &name)
-    {
+    template <typename T> static T GetEnvVar(const std::string &name) {
         static_assert(is_supported_type<T>(),
                       "Unsupported type for environment variable");
 
@@ -148,55 +130,49 @@ class EnvVarRegistry
 
         // Try to get from environment first
         T result = getEnvInner<T>(name, &set);
-        if (set)
-        {
-            LOG_MODULE(INFO, "Utils") << "[ENV] Get " << name << "=" << result
-                      << " from environment";
+        if (set) {
+            LOG_MODULE(INFO, "Utils")
+                << "[ENV] Get " << name << "=" << result << " from environment";
             return result;
         }
 
         // Try to get from registered defaults
-        if (auto it = registry.find(name); it != registry.end())
-        {
-            if (const T *val = std::get_if<T>(&it->second))
-            {
+        if (auto it = registry.find(name); it != registry.end()) {
+            if (const T *val = std::get_if<T>(&it->second)) {
                 LOG_MODULE(INFO, "Utils") << "[ENV] Get " << name << "=" << *val
-                          << " from register default";
+                                          << " from register default";
                 return *val;
             }
-            LOG_MODULE(ERROR, "Utils") << "[ENV] Wrong data type in `GetEnvVar`";
+            LOG_MODULE(ERROR, "Utils")
+                << "[ENV] Wrong data type in `GetEnvVar`";
         }
 
         // Fall back to static default
         result = getDefault<T>();
-        LOG_MODULE(WARNING, "Utils") << "[ENV] Get not register env " << name << "=" << result
-                     << " from default";
+        LOG_MODULE(WARNING, "Utils") << "[ENV] Get not register env " << name
+                                     << "=" << result << " from default";
         return result;
     }
 
     template <typename T>
     static inline auto convert_to_variant(const T &s)
-        -> std::enable_if_t<std::is_constructible_v<std::string, T>, VarType>
-    {
+        -> std::enable_if_t<std::is_constructible_v<std::string, T>, VarType> {
         return std::string(s);
     }
 
     template <typename T>
     static inline auto convert_to_variant(const T &val)
-        -> std::enable_if_t<!std::is_constructible_v<std::string, T>, VarType>
-    {
+        -> std::enable_if_t<!std::is_constructible_v<std::string, T>, VarType> {
         return val;
     }
 
   private:
-    template <typename T> static constexpr bool is_supported_type()
-    {
+    template <typename T> static constexpr bool is_supported_type() {
         return std::is_same_v<T, bool> || std::is_same_v<T, int> ||
                std::is_same_v<T, std::string>;
     }
 
-    static std::string toLower(const std::string &str)
-    {
+    static std::string toLower(const std::string &str) {
         std::string lower;
         lower.reserve(str.size());
         std::transform(str.begin(), str.end(), std::back_inserter(lower),
@@ -204,41 +180,28 @@ class EnvVarRegistry
         return lower;
     }
 
-    template <typename T> static T parseEnvValue(const char *env)
-    {
-        if constexpr (std::is_same_v<T, int>)
-        {
-            try
-            {
+    template <typename T> static T parseEnvValue(const char *env) {
+        if constexpr (std::is_same_v<T, int>) {
+            try {
                 return std::stoi(env);
-            }
-            catch (...)
-            {
-                return DEFAULT_VALUE_INT;
-            }
-        }
-        else if constexpr (std::is_same_v<T, bool>)
-        {
+            } catch (...) { return DEFAULT_VALUE_INT; }
+        } else if constexpr (std::is_same_v<T, bool>) {
             std::string lower = toLower(env);
             if (lower == "true" || lower == "1")
                 return true;
             if (lower == "false" || lower == "0")
                 return false;
             return std::stoi(env) != 0;
-        }
-        else if constexpr (std::is_same_v<T, std::string>)
-        {
+        } else if constexpr (std::is_same_v<T, std::string>) {
             return env;
         }
     }
 
     // Get value from real environment
     template <typename T>
-    static T getEnvInner(const std::string &env_name, bool *set)
-    {
+    static T getEnvInner(const std::string &env_name, bool *set) {
         const char *env = std::getenv(env_name.c_str());
-        if (!env)
-        {
+        if (!env) {
             *set = false;
             return {};
         }
@@ -248,33 +211,25 @@ class EnvVarRegistry
     }
 
     // Default values for fallback
-    template <typename T> static T getDefault()
-    {
-        if constexpr (std::is_same_v<T, int>)
-        {
+    template <typename T> static T getDefault() {
+        if constexpr (std::is_same_v<T, int>) {
             return DEFAULT_VALUE_INT;
-        }
-        else if constexpr (std::is_same_v<T, bool>)
-        {
+        } else if constexpr (std::is_same_v<T, bool>) {
             return DEFAULT_VALUE_BOOL;
-        }
-        else if constexpr (std::is_same_v<T, std::string>)
-        {
+        } else if constexpr (std::is_same_v<T, std::string>) {
             return std::string(DEFAULT_VALUE_STRING);
         }
     }
 
-    static inline std::unordered_map<std::string, VarType> &GetRegistryManager()
-    {
+    static inline std::unordered_map<std::string, VarType> &
+    GetRegistryManager() {
         static std::unordered_map<std::string, VarType> registry_manager;
         return registry_manager;
     }
 
-    static std::string VariantToString(const VarType &var)
-    {
+    static std::string VariantToString(const VarType &var) {
         return std::visit(
-            [](const auto &value)
-            {
+            [](const auto &value) {
                 std::stringstream ss;
                 ss << value;
                 return ss.str();

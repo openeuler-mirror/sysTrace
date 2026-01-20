@@ -2,10 +2,13 @@
 #include "../../include/common/constant.h"
 #include "../../protos/systrace.pb-c.h"
 #include "common_hook.h"
+#include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <google/protobuf-c/protobuf-c.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,19 +16,18 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <stdarg.h>
-#include <dirent.h>
-#include <fcntl.h>
 typedef struct {
     IO *io;
     time_t last_log_time;
 } ThreadData;
 
-typedef size_t (*halFReadFunc_t)(void *ptr, size_t size, size_t nmemb, FILE *stream);
-typedef size_t (*halFWriteFunc_t)(const void *ptr, size_t size, size_t nmemb, FILE *stream);
-typedef ssize_t(*halReadFunc_t)(int fd, void *buf, size_t count);
-typedef ssize_t(*halWriteFunc_t)(int fd, const void *buf, size_t count);
-typedef FILE* (*halFOpenFunc_t)(const char *path, const char *mode);
+typedef size_t (*halFReadFunc_t)(void *ptr, size_t size, size_t nmemb,
+                                 FILE *stream);
+typedef size_t (*halFWriteFunc_t)(const void *ptr, size_t size, size_t nmemb,
+                                  FILE *stream);
+typedef ssize_t (*halReadFunc_t)(int fd, void *buf, size_t count);
+typedef ssize_t (*halWriteFunc_t)(int fd, const void *buf, size_t count);
+typedef FILE *(*halFOpenFunc_t)(const char *path, const char *mode);
 typedef int (*halFCloseFunc_t)(FILE *stream);
 typedef int (*halFFlushFunc_t)(FILE *stream);
 typedef int (*halRemoveFunc_t)(const char *filename);
@@ -35,7 +37,7 @@ typedef int (*halFsyncFunc_t)(int fd);
 typedef int (*halMkdirFunc_t)(const char *path, mode_t mode);
 typedef int (*halRmdirFunc_t)(const char *path);
 typedef int (*halUnlinkFunc_t)(const char *path);
-typedef DIR* (*halOpendirFunc_t)(const char *name);
+typedef DIR *(*halOpendirFunc_t)(const char *name);
 typedef int (*halClosedirFunc_t)(DIR *dir);
 
 static halFReadFunc_t orig_fread = NULL;
@@ -62,13 +64,9 @@ extern int global_stage_id;
 extern int global_stage_type;
 static bool g_io_trace_enabled = false;
 
-void io_trace_set_enabled(bool enabled) {
-    g_io_trace_enabled = enabled;
-}
+void io_trace_set_enabled(bool enabled) { g_io_trace_enabled = enabled; }
 
-static void make_key() {
-    pthread_key_create(&thread_data_key, NULL);
-}
+static void make_key() { pthread_key_create(&thread_data_key, NULL); }
 
 static ThreadData *get_thread_data() {
     ThreadData *td;
@@ -160,14 +158,14 @@ static void write_protobuf_to_file() {
 
 static void exit_handler(void) { write_protobuf_to_file(); }
 
-static void add_io_entry(int fd, uint64_t start_us, uint64_t duration, IOType operation) {
-    if (!g_io_trace_enabled)
-    {
-        return; 
+static void add_io_entry(int fd, uint64_t start_us, uint64_t duration,
+                         IOType operation) {
+    if (!g_io_trace_enabled) {
+        return;
     }
     ThreadData *td = get_thread_data();
-    if (!td || !td->io) return;
-
+    if (!td || !td->io)
+        return;
 
     size_t frame_count = 0;
 
@@ -189,7 +187,8 @@ static void add_io_entry(int fd, uint64_t start_us, uint64_t duration, IOType op
     entry->rank = rank_str ? atoi(rank_str) : 0;
 
     td->io->n_io_entries++;
-    td->io->io_entries = realloc(td->io->io_entries, td->io->n_io_entries * sizeof(IOEntry*));
+    td->io->io_entries =
+        realloc(td->io->io_entries, td->io->n_io_entries * sizeof(IOEntry *));
     td->io->io_entries[td->io->n_io_entries - 1] = entry;
 }
 
@@ -219,13 +218,11 @@ int init_io_trace() {
 
     if (!orig_fread || !orig_fwrite || !orig_read || !orig_write ||
         !orig_fopen || !orig_fclose || !orig_fflush || !orig_remove ||
-        !orig_rename || !orig_close || !orig_fsync ||
-        !orig_mkdir || !orig_rmdir || !orig_unlink || !orig_opendir || 
-        !orig_closedir) {
+        !orig_rename || !orig_close || !orig_fsync || !orig_mkdir ||
+        !orig_rmdir || !orig_unlink || !orig_opendir || !orig_closedir) {
         fprintf(stderr, "dlsym failed: %s\n", dlerror());
         return -1;
     }
-
 
     atexit(exit_handler);
     return 0;
@@ -247,7 +244,6 @@ ssize_t read(int fd, void *buf, size_t count) {
     write_protobuf_to_file();
     return ret;
 }
-
 
 ssize_t write(int fd, const void *buf, size_t count) {
     if (!orig_write) {

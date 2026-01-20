@@ -4,10 +4,10 @@
 
 #include "os_probe.h"
 
-#define MAX_SIZE_OF_PROC    128
-#define MAX_SIZE_OF_THREAD  (128 * MAX_SIZE_OF_PROC)
-#define PF_IDLE			0x00000002	/* IDLE thread */
-#define PF_KTHREAD		0x00200000	/* kernel thread */
+#define MAX_SIZE_OF_PROC 128
+#define MAX_SIZE_OF_THREAD (128 * MAX_SIZE_OF_PROC)
+#define PF_IDLE 0x00000002    /* IDLE thread */
+#define PF_KTHREAD 0x00200000 /* kernel thread */
 
 typedef struct {
     u32 pid;
@@ -138,20 +138,18 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(key_size, sizeof(u32)); // trace_cfg_key_e
+    __uint(key_size, sizeof(u32));   // trace_cfg_key_e
     __uint(value_size, sizeof(u32)); // 0: disable, 1: enable
     __uint(max_entries, 128);
 } trace_cfg_map SEC(".maps");
 
-
 enum trace_cfg_key_e {
     TRACE_CFG_SCHED_SWITCH = 0,
-    TRACE_CFG_MEM       = 1,
+    TRACE_CFG_MEM = 1,
 };
 
 #define MAX_COMM_LEN 16
-static __always_inline void emit_event(trace_event_data_t *event, void *ctx)
-{
+static __always_inline void emit_event(trace_event_data_t *event, void *ctx) {
     if (!event) {
         return;
     }
@@ -209,9 +207,10 @@ static __always_inline void emit_event(trace_event_data_t *event, void *ctx)
     }
 }
 
-static __always_inline void create_cur_event(trace_event_data_t *cur_event, int key,
-    u64 start_time, u64 end_time, int rank, event_type_e type)
-{
+static __always_inline void create_cur_event(trace_event_data_t *cur_event,
+                                             int key, u64 start_time,
+                                             u64 end_time, int rank,
+                                             event_type_e type) {
     if (cur_event == NULL) {
         return;
     }
@@ -224,8 +223,7 @@ static __always_inline void create_cur_event(trace_event_data_t *cur_event, int 
     cur_event->rank = rank;
 }
 
-static int strcase_match(const char *s1, const char *s2, int n)
-{
+static int strcase_match(const char *s1, const char *s2, int n) {
     unsigned char c1, c2;
 #pragma unroll
     while (n--) {
@@ -238,10 +236,12 @@ static int strcase_match(const char *s1, const char *s2, int n)
         if (c1 == c2)
             continue;
 
-        if ((c1 >= 'A' && c1 <= 'Z') && (c2 >= 'a' && c2 <= 'z') && (c1 + 32 == c2))
+        if ((c1 >= 'A' && c1 <= 'Z') && (c2 >= 'a' && c2 <= 'z') &&
+            (c1 + 32 == c2))
             continue;
 
-        if ((c2 >= 'A' && c2 <= 'Z') && (c1 >= 'a' && c1 <= 'z') && (c2 + 32 == c1))
+        if ((c2 >= 'A' && c2 <= 'Z') && (c1 >= 'a' && c1 <= 'z') &&
+            (c2 + 32 == c1))
             continue;
 
         return (int)c1 - (int)c2;
@@ -255,8 +255,7 @@ static int strcase_match(const char *s1, const char *s2, int n)
     return (int)c1 - (int)c2;
 }
 
-static __always_inline int get_npu_id(struct task_struct *task)
-{
+static __always_inline int get_npu_id(struct task_struct *task) {
     u32 pid = BPF_CORE_READ(task, pid);
 
     // 匹配python主线程
@@ -286,11 +285,9 @@ static __always_inline int get_npu_id(struct task_struct *task)
 
     // 全都不匹配返回-1
     return -1;
-
 }
 
-static __always_inline int trace_cfg_enabled(u32 key)
-{
+static __always_inline int trace_cfg_enabled(u32 key) {
     u32 *enable = bpf_map_lookup_elem(&trace_cfg_map, &key);
     if (!enable || *enable == 0) {
         return 0;
