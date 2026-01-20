@@ -8,26 +8,19 @@ void hbm_trace_set_enabled(bool enabled);
 }
 
 class HbmPlugin : public ICollector {
-  public:
-    std::string get_id() const override { return "HBM"; }
 
-    bool start(const json &params) override {
+  public:
+    HbmPlugin() {
+        pluginName_ = PluginNameType::HBM_PLUGIN.data();
+    }
+    bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {
             return true;
         }
 
-        int duration = 0;
-        if (params.contains("duration")) {
-            auto &v = params["duration"];
-            if (v.is_number())
-                duration = v.get<int>();
-            else if (v.is_string())
-                duration = std::stoi(v.get<std::string>());
-        }
-
         hbm_trace_set_enabled(true);
-        LOG_MODULE(INFO, "HbmPlugin") << "HBM trace started.";
+        LOG_MODULE(INFO, pluginName_) << "HBM trace started.";
 
         if (duration > 0) {
             systrace::utils::TimerManager::getInstance().startTimer(
@@ -47,13 +40,12 @@ class HbmPlugin : public ICollector {
 
             systrace::utils::TimerManager::getInstance().stopTimer(get_id());
 
-            LOG_MODULE(INFO, "HbmPlugin") << "HBM trace stopped.";
+            LOG_MODULE(INFO, pluginName_) << "HBM trace stopped.";
         }
 
         stop_latched_.clear(std::memory_order_release);
     }
 
   private:
-    std::atomic<bool> active_{false};
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
 };

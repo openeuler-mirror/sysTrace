@@ -144,6 +144,7 @@ void systrace_log_fatal(const char *module, const char *format, ...);
 #define LOG(level)                                                             \
     ::systrace::log::LogLine(::systrace::log::getLogStream())                  \
         << ::systrace::log::getLogLevelTag(level)
+
 #define LOG_MODULE(level, module)                                              \
     ::systrace::log::LogLine(::systrace::log::getLogStream(), module)          \
         << ::systrace::log::getLogLevelTag(level)

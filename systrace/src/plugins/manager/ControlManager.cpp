@@ -145,10 +145,18 @@ std::string ControlManager::handle_msg(const std::string &raw) {
         if (registry_.count(path)) {
             bool success = false;
             if (act == CliConst::ACT_ENABLE) {
+                int duration = 0;
+                if (params.contains(CliConst::DURATION)) {
+                    auto &v = params[CliConst::DURATION];
+                    if (v.is_number())
+                        duration = v.get<int>();
+                    else if (v.is_string())
+                        duration = std::stoi(v.get<std::string>());
+                }
                 LOG_MODULE(INFO, "Control")
                     << "Enabling plugin: " << path
                     << " with params: " << params.dump();
-                success = registry_[path]->start(params);
+                success = registry_[path]->start(params, duration);
             } else if (act == CliConst::ACT_DISABLE) {
                 LOG_MODULE(INFO, "Control") << "Disabling plugin: " << path;
                 registry_[path]->stop();

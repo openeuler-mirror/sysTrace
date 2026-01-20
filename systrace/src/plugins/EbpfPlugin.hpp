@@ -10,26 +10,19 @@ void os_probe_disable_event(os_probe_type_e type);
 }
 
 class MemoryPlugin : public ICollector {
-  public:
-    std::string get_id() const override { return "Memory"; }
 
-    bool start(const json &params) override {
+  public:
+    MemoryPlugin() {
+        pluginName_ = PluginNameType::MEMORY_PLUGIN.data();
+    }
+    bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {
             return true;
         }
 
-        int duration = 0;
-        if (params.contains("duration")) {
-            auto &v = params["duration"];
-            if (v.is_number())
-                duration = v.get<int>();
-            else if (v.is_string())
-                duration = std::stoi(v.get<std::string>());
-        }
-
         os_probe_enable_event(OS_PROBE_MEM);
-        LOG_MODULE(INFO, "MemoryPlugin") << "Memory trace started.";
+        LOG_MODULE(INFO, pluginName_) << "Memory trace started.";
 
         if (duration > 0) {
             systrace::utils::TimerManager::getInstance().startTimer(
@@ -49,38 +42,30 @@ class MemoryPlugin : public ICollector {
 
             systrace::utils::TimerManager::getInstance().stopTimer(get_id());
 
-            LOG_MODULE(INFO, "MemoryPlugin") << "Memory trace stopped.";
+            LOG_MODULE(INFO, pluginName_) << "Memory trace stopped.";
         }
 
         stop_latched_.clear(std::memory_order_release);
     }
 
   private:
-    std::atomic<bool> active_{false};
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
 };
 
 class CpuPlugin : public ICollector {
-  public:
-    std::string get_id() const override { return "CPU"; }
 
-    bool start(const json &params) override {
+  public:
+    CpuPlugin() {
+        pluginName_ = PluginNameType::CPU_PLUGIN.data();
+    }
+    bool start(const json &params, int duration) override {
         bool expected = false;
         if (!active_.compare_exchange_strong(expected, true)) {
             return true;
         }
 
-        int duration = 0;
-        if (params.contains("duration")) {
-            auto &v = params["duration"];
-            if (v.is_number())
-                duration = v.get<int>();
-            else if (v.is_string())
-                duration = std::stoi(v.get<std::string>());
-        }
-
         os_probe_enable_event(OS_PROBE_CPU);
-        LOG_MODULE(INFO, "CPUPlugin") << "CPU trace started.";
+        LOG_MODULE(INFO, pluginName_) << "CPU trace started.";
 
         if (duration > 0) {
             systrace::utils::TimerManager::getInstance().startTimer(
@@ -100,13 +85,12 @@ class CpuPlugin : public ICollector {
 
             systrace::utils::TimerManager::getInstance().stopTimer(get_id());
 
-            LOG_MODULE(INFO, "CPUPlugin") << "CPU trace stopped.";
+            LOG_MODULE(INFO, pluginName_) << "CPU trace stopped.";
         }
 
         stop_latched_.clear(std::memory_order_release);
     }
 
   private:
-    std::atomic<bool> active_{false};
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
 };

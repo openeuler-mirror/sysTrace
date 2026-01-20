@@ -7,20 +7,14 @@
 
 class MsptiPlugin : public ICollector {
   public:
-    std::string get_id() const override { return "MSPTI"; }
-
-    bool start(const json &params) override {
+    MsptiPlugin() {
+        pluginName_ = PluginNameType::MSPTI_PLUGIN.data();
+    }
+    bool start(const json &params, int duration) override {
         if (active_.exchange(true))
             return true;
 
         MSPTITracker::getInstance().setExternalEnable(true);
-
-        int duration = 0;
-        if (params.contains("duration")) {
-            auto &v = params["duration"];
-            duration =
-                v.is_number() ? v.get<int>() : std::stoi(v.get<std::string>());
-        }
 
         if (duration > 0) {
             systrace::utils::TimerManager::getInstance().startTimer(
@@ -45,6 +39,5 @@ class MsptiPlugin : public ICollector {
     }
 
   private:
-    std::atomic<bool> active_{false};
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
 };

@@ -10,6 +10,7 @@
 #include "../../include/utils/util.h"
 #include "../../protos/systrace.pb.h"
 #include "../mspti/mspti_tracker.hpp"
+#include "../plugins/CacheMissPlugin.hpp"
 #include "../plugins/EbpfPlugin.hpp"
 #include "../plugins/HbmPlugin.hpp"
 #include "../plugins/IOPlugin.hpp"

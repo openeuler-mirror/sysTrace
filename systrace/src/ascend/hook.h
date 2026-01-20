@@ -5,6 +5,7 @@
 #include <functional>
 #include <stdint.h>
 #include <string>
+#include <mutex>
 #include <sys/stat.h>
 
 #ifdef __cplusplus
