@@ -5,26 +5,25 @@
 #include <thread>
 #include <vector>
 
+#include "../../include/common/constant.h"
 #include "../../include/log/logging.h"
 #include "../../include/utils/util.h"
-#include "../../include/common/constant.h"
 #include "../../protos/systrace.pb.h"
 #include "../mspti/mspti_tracker.hpp"
+#include "../plugins/CacheMissPlugin.hpp"
+#include "../plugins/EbpfPlugin.hpp"
+#include "../plugins/HbmPlugin.hpp"
+#include "../plugins/IOPlugin.hpp"
+#include "../plugins/MsptiTrackerPlugin.hpp"
+#include "../plugins/manager/ControlManager.hpp"
 #include "library_loader.h"
 #include "python/pytorch_tracing_loader.h"
-#include "../plugins/manager/ControlManager.hpp"
-#include "../plugins/HbmPlugin.hpp"
-#include "../plugins/MsptiTrackerPlugin.hpp"
-#include "../plugins/IOPlugin.hpp"
-#include "../plugins/EbpfPlugin.hpp"
 
 class ControlManager;
-namespace systrace
-{
+namespace systrace {
 using namespace util;
 
-class PyTorchTrace
-{
+class PyTorchTrace {
   public:
     static PyTorchTrace &getInstance();
 
@@ -56,8 +55,7 @@ class PyTorchTrace
     pytorch_tracing::PyTorchTracingLibrary *pytorch_tracing_library_;
 };
 
-class SysTrace
-{
+class SysTrace {
   public:
     static SysTrace &getInstance();
 
@@ -76,9 +74,9 @@ class SysTrace
     void stopEventPoller();
     void eventPollerMain();
     static void cleanup() {
-      #ifdef HAS_BTF_SUPPORT
+#ifdef HAS_BTF_SUPPORT
         instance_->stopOsProbePoller();
-      #endif
+#endif
         instance_->stopEventPoller();
     }
 

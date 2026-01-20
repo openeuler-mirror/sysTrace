@@ -16,8 +16,7 @@
 
 typedef int drvError_t;
 
-typedef enum aclrtMemMallocPolicy
-{
+typedef enum aclrtMemMallocPolicy {
     ACL_MEM_MALLOC_HUGE_FIRST,
     ACL_MEM_MALLOC_HUGE_ONLY,
     ACL_MEM_MALLOC_NORMAL_ONLY,
@@ -58,27 +57,21 @@ extern int global_stage_id;
 extern int global_stage_type;
 static bool g_hbm_trace_enabled = false;
 
-typedef struct
-{
+typedef struct {
     ProcMem *proc_mem;
     time_t last_log_time;
 } ThreadData;
 
-void hbm_trace_set_enabled(bool enabled) {
-    g_hbm_trace_enabled = enabled;
-}
+void hbm_trace_set_enabled(bool enabled) { g_hbm_trace_enabled = enabled; }
 
-static void free_proc_mem(ProcMem *proc_mem)
-{
+static void free_proc_mem(ProcMem *proc_mem) {
     if (!proc_mem)
         return;
 
     // 释放分配记录
-    for (size_t i = 0; i < proc_mem->n_mem_alloc_stacks; i++)
-    {
+    for (size_t i = 0; i < proc_mem->n_mem_alloc_stacks; i++) {
         MemAllocEntry *entry = proc_mem->mem_alloc_stacks[i];
-        for (size_t j = 0; j < entry->n_stack_frames; j++)
-        {
+        for (size_t j = 0; j < entry->n_stack_frames; j++) {
             free((void *)entry->stack_frames[j]->so_name);
             free(entry->stack_frames[j]);
         }
@@ -88,8 +81,7 @@ static void free_proc_mem(ProcMem *proc_mem)
     free(proc_mem->mem_alloc_stacks);
 
     // 释放释放记录
-    for (size_t i = 0; i < proc_mem->n_mem_free_stacks; i++)
-    {
+    for (size_t i = 0; i < proc_mem->n_mem_free_stacks; i++) {
         free(proc_mem->mem_free_stacks[i]);
     }
     free(proc_mem->mem_free_stacks);
@@ -101,11 +93,9 @@ static void free_proc_mem(ProcMem *proc_mem)
     proc_mem->mem_free_stacks = NULL;
 }
 
-static void free_thread_data(void *data)
-{
+static void free_thread_data(void *data) {
     ThreadData *td = (ThreadData *)data;
-    if (td && td->proc_mem)
-    {
+    if (td && td->proc_mem) {
         free_proc_mem(td->proc_mem);
         free(td->proc_mem);
     }
@@ -114,24 +104,22 @@ static void free_thread_data(void *data)
 
 static inline uint32_t get_current_pid() { return (uint32_t)getpid(); }
 
-static void make_key()
-{
+static void make_key() {
     pthread_key_create(&thread_data_key, free_thread_data);
 }
 
-static ThreadData *get_thread_data()
-{
+static ThreadData *get_thread_data() {
     ThreadData *td;
 
     pthread_once(&key_once, make_key);
     td = pthread_getspecific(thread_data_key);
 
-    if (!td)
-    {
+    if (!td) {
         td = calloc(1, sizeof(ThreadData));
         td->proc_mem = calloc(1, sizeof(ProcMem));
         proc_mem__init(td->proc_mem);
-        const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
+        const char *rank_str =
+            getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
         int rank = rank_str ? atoi(rank_str) : 0;
         td->proc_mem->pid = rank;
         td->last_log_time = time(NULL);
@@ -141,21 +129,17 @@ static ThreadData *get_thread_data()
     return td;
 }
 
-static char is_ready_to_write(ThreadData *td, time_t *current)
-{
+static char is_ready_to_write(ThreadData *td, time_t *current) {
     ProcMem *proc_mem = td->proc_mem;
     if (!proc_mem ||
-        (proc_mem->n_mem_alloc_stacks + proc_mem->n_mem_free_stacks == 0))
-    {
+        (proc_mem->n_mem_alloc_stacks + proc_mem->n_mem_free_stacks == 0)) {
         return 0;
     }
 
     *current = time(NULL);
     if (proc_mem->n_mem_alloc_stacks + proc_mem->n_mem_free_stacks <
-        LOG_ITEMS_MIN)
-    {
-        if (*current - td->last_log_time < LOG_INTERVAL_SEC)
-        {
+        LOG_ITEMS_MIN) {
+        if (*current - td->last_log_time < LOG_INTERVAL_SEC) {
             return 0;
         }
     }
@@ -163,27 +147,23 @@ static char is_ready_to_write(ThreadData *td, time_t *current)
     return 1;
 }
 
-static void write_protobuf_to_file()
-{
-    if (!g_hbm_trace_enabled)
-    {
-        return; 
+static void write_protobuf_to_file() {
+    if (!g_hbm_trace_enabled) {
+        return;
     }
     time_t current;
     uint8_t *buf;
     ThreadData *td = get_thread_data();
-    if (!td)
-    {
+    if (!td) {
         return;
     }
 
-    if (!is_ready_to_write(td, &current))
-    {
+    if (!is_ready_to_write(td, &current)) {
         return;
     }
 
-    if (pthread_mutex_trylock(&file_mutex) == 0)
-    { // pthread_mutex_trylock or pthread_mutex_lock
+    if (pthread_mutex_trylock(&file_mutex) ==
+        0) { // pthread_mutex_trylock or pthread_mutex_lock
         char filename[256];
         get_log_filename(filename, sizeof(filename), "hbm_trace");
 
@@ -192,21 +172,17 @@ static void write_protobuf_to_file()
         proc_mem__pack(td->proc_mem, buf);
 
         FILE *fp = fopen(filename, "ab");
-        if (fp)
-        {
+        if (fp) {
             fwrite(buf, len, 1, fp);
             fclose(fp);
         }
 
         pthread_mutex_unlock(&file_mutex);
-    }
-    else
-    {
+    } else {
         return;
     }
 
-    if (buf)
-    {
+    if (buf) {
         free(buf);
     }
 
@@ -216,13 +192,11 @@ static void write_protobuf_to_file()
 
 static void exit_handler(void) { write_protobuf_to_file(); }
 
-int init_mem_trace()
-{
+int init_mem_trace() {
     void *lib =
         dlopen("/usr/local/Ascend/ascend-toolkit/latest/lib64/libascendcl.so",
                RTLD_LAZY);
-    if (!lib)
-    {
+    if (!lib) {
         fprintf(stderr, "dlopen failed: %s\n", dlerror());
         return -1;
     }
@@ -240,8 +214,7 @@ int init_mem_trace()
 
     if (!orig_halMemAlloc || !orig_halMemFree || !orig_aclrtMalloc ||
         !orig_aclrtFree || !orig_halMemCreate || !orig_halMemRelease ||
-        !orig_aclrtMallocCached || orig_aclrtMallocAlign32)
-    {
+        !orig_aclrtMallocCached || orig_aclrtMallocAlign32) {
         return -1;
     }
 
@@ -250,8 +223,7 @@ int init_mem_trace()
     return 0;
 }
 
-static void collect_stack_frames(MemAllocEntry *entry)
-{
+static void collect_stack_frames(MemAllocEntry *entry) {
     unw_cursor_t cursor;
     unw_context_t context;
     unw_word_t ip;
@@ -262,8 +234,7 @@ static void collect_stack_frames(MemAllocEntry *entry)
     unw_init_local(&cursor, &context);
 
     entry->stack_frames = calloc(max_frames, sizeof(StackFrame *));
-    while (unw_step(&cursor) > 0 && frame_count < max_frames)
-    {
+    while (unw_step(&cursor) > 0 && frame_count < max_frames) {
         unw_get_reg(&cursor, UNW_REG_IP, &ip);
 
         // Get the SO name and base address for this IP
@@ -283,11 +254,9 @@ static void collect_stack_frames(MemAllocEntry *entry)
     }
 }
 
-static void add_mem_alloc_entry(void *pp, size_t size)
-{
-    if (!g_hbm_trace_enabled)
-    {
-        return; 
+static void add_mem_alloc_entry(void *pp, size_t size) {
+    if (!g_hbm_trace_enabled) {
+        return;
     }
     ThreadData *td = get_thread_data();
 
@@ -310,11 +279,9 @@ static void add_mem_alloc_entry(void *pp, size_t size)
         entry;
 }
 
-static void add_mem_free_entry(void *pp)
-{
-    if (!g_hbm_trace_enabled)
-    {
-        return; 
+static void add_mem_free_entry(void *pp) {
+    if (!g_hbm_trace_enabled) {
+        return;
     }
     ThreadData *td = get_thread_data();
 
@@ -332,15 +299,12 @@ static void add_mem_free_entry(void *pp)
 }
 
 drvError_t halMemAlloc(void **pp, unsigned long long size,
-                       unsigned long long flag)
-{
-    if (!orig_halMemAlloc)
-    {
+                       unsigned long long flag) {
+    if (!orig_halMemAlloc) {
         init_mem_trace();
     }
     int ret = orig_halMemAlloc(pp, size, flag);
-    if (ret == 0 && pp && *pp)
-    {
+    if (ret == 0 && pp && *pp) {
         add_mem_alloc_entry(*pp, size);
     }
 
@@ -349,15 +313,12 @@ drvError_t halMemAlloc(void **pp, unsigned long long size,
     return ret;
 }
 
-drvError_t halMemFree(void *pp)
-{
-    if (!orig_halMemFree)
-    {
+drvError_t halMemFree(void *pp) {
+    if (!orig_halMemFree) {
         init_mem_trace();
     }
     int ret = orig_halMemFree(pp);
-    if (ret == 0 && pp)
-    {
+    if (ret == 0 && pp) {
         add_mem_free_entry(pp);
     }
 

@@ -6,11 +6,9 @@
 #include <string_view>
 #include <vector>
 
-namespace systrace
-{
+namespace systrace {
 
-class DynamicLibraryLoader
-{
+class DynamicLibraryLoader {
   protected:
     void *library_handle_;
     bool is_usable_;
@@ -22,8 +20,7 @@ class DynamicLibraryLoader
     explicit DynamicLibraryLoader(const std::string &library_path);
     virtual ~DynamicLibraryLoader();
 
-    bool IsLibraryLoaded() const
-    {
+    bool IsLibraryLoaded() const {
         return library_handle_ != nullptr && is_usable_;
     }
     void *GetLibraryHandle() const { return library_handle_; }
