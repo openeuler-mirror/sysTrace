@@ -1,16 +1,14 @@
 /******************************************************************************
  * Copyright (c) Huawei Technologies Co., Ltd. 2023. All rights reserved.
  * gala-gopher licensed under the Mulan PSL v2.
- * You can use this software according to the terms and conditions of the Mulan PSL v2.
- * You may obtain a copy of Mulan PSL v2 at:
+ * You can use this software according to the terms and conditions of the Mulan
+ *PSL v2. You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
- * PURPOSE.
- * See the Mulan PSL v2 for more details.
- * Author: curry
- * Create: 2025-06-20
- * Description: Compatibility APIs for eBPF probes
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ *KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ *NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
+ *Mulan PSL v2 for more details. Author: curry Create: 2025-06-20 Description:
+ *Compatibility APIs for eBPF probes
  ******************************************************************************/
 
 #ifndef __GOPHER_COMPAT_H__
@@ -38,8 +36,8 @@ struct {
 
 #if !defined(BPF_PROG_KERN) && !defined(BPF_PROG_USER)
 #include <bpf/libbpf.h>
-#include <malloc.h>
 #include <errno.h>
+#include <malloc.h>
 
 #include "__feat_probe.h"
 
@@ -48,8 +46,7 @@ struct {
 typedef int (*bpf_buffer_sample_fn)(void *ctx, void *data, u32 size);
 typedef void (*bpf_buffer_lost_fn)(void *ctx, int cpu, u64 cnt);
 
-struct bpf_buffer
-{
+struct bpf_buffer {
     struct bpf_map *map;
     void *inner;
     bpf_buffer_sample_fn fn;
@@ -57,8 +54,7 @@ struct bpf_buffer
     int type;
 };
 
-static void __perfbuf_sample_fn(void *ctx, int cpu, void *data, __u32 size)
-{
+static void __perfbuf_sample_fn(void *ctx, int cpu, void *data, __u32 size) {
     struct bpf_buffer *buffer = (struct bpf_buffer *)ctx;
     bpf_buffer_sample_fn fn;
 
@@ -70,8 +66,7 @@ static void __perfbuf_sample_fn(void *ctx, int cpu, void *data, __u32 size)
     (void)fn(buffer->ctx, data, size);
 }
 
-static inline int bpf_buffer__reset(struct bpf_map *map, struct bpf_map *heap)
-{
+static inline int bpf_buffer__reset(struct bpf_map *map, struct bpf_map *heap) {
     bool use_ringbuf;
     int type;
 
@@ -91,9 +86,10 @@ static inline int bpf_buffer__reset(struct bpf_map *map, struct bpf_map *heap)
     return type;
 }
 
-#define MAX_RB_MAP_SZ       32
-static inline int bpf_buffer__set_max_entries(struct bpf_map *map, struct bpf_buffer *buffer, unsigned char map_size_mb)
-{
+#define MAX_RB_MAP_SZ 32
+static inline int bpf_buffer__set_max_entries(struct bpf_map *map,
+                                              struct bpf_buffer *buffer,
+                                              unsigned char map_size_mb) {
 
     if (buffer == NULL || buffer->type != BPF_MAP_TYPE_RINGBUF) {
         return 0;
@@ -107,8 +103,8 @@ static inline int bpf_buffer__set_max_entries(struct bpf_map *map, struct bpf_bu
     return bpf_map__set_max_entries(map, max_entries);
 }
 
-static inline struct bpf_buffer *bpf_buffer__new(struct bpf_map *map, struct bpf_map *heap)
-{
+static inline struct bpf_buffer *bpf_buffer__new(struct bpf_map *map,
+                                                 struct bpf_map *heap) {
     struct bpf_buffer *buffer;
     int type;
 
@@ -124,8 +120,9 @@ static inline struct bpf_buffer *bpf_buffer__new(struct bpf_map *map, struct bpf
     return buffer;
 }
 
-static inline struct bpf_buffer *bpf_buffer__new_shared(struct bpf_map *map, struct bpf_map *heap, struct bpf_buffer **buffer_ptr)
-{
+static inline struct bpf_buffer *
+bpf_buffer__new_shared(struct bpf_map *map, struct bpf_map *heap,
+                       struct bpf_buffer **buffer_ptr) {
     struct bpf_buffer *buffer;
 
     if (*buffer_ptr != NULL) {
@@ -138,8 +135,9 @@ static inline struct bpf_buffer *bpf_buffer__new_shared(struct bpf_map *map, str
     return buffer;
 }
 
-static inline int bpf_buffer__open(struct bpf_buffer *buffer, bpf_buffer_sample_fn sample_cb, bpf_buffer_lost_fn lost_cb, void *ctx)
-{
+static inline int bpf_buffer__open(struct bpf_buffer *buffer,
+                                   bpf_buffer_sample_fn sample_cb,
+                                   bpf_buffer_lost_fn lost_cb, void *ctx) {
     int fd, type;
     void *inner;
 
@@ -154,10 +152,12 @@ static inline int bpf_buffer__open(struct bpf_buffer *buffer, bpf_buffer_sample_
     case BPF_MAP_TYPE_PERF_EVENT_ARRAY:
         buffer->fn = sample_cb;
         buffer->ctx = ctx;
-        inner = perf_buffer__new(fd, PERF_BUFFER_PAGES, __perfbuf_sample_fn, lost_cb, buffer, NULL);
+        inner = perf_buffer__new(fd, PERF_BUFFER_PAGES, __perfbuf_sample_fn,
+                                 lost_cb, buffer, NULL);
         break;
     case BPF_MAP_TYPE_RINGBUF:
-        inner = ring_buffer__new(fd, (ring_buffer_sample_fn) sample_cb, ctx, NULL);
+        inner =
+            ring_buffer__new(fd, (ring_buffer_sample_fn)sample_cb, ctx, NULL);
         break;
     default:
         return 0;
@@ -172,21 +172,20 @@ static inline int bpf_buffer__open(struct bpf_buffer *buffer, bpf_buffer_sample_
     return 0;
 }
 
-static inline int bpf_buffer__poll(struct bpf_buffer *buffer, int timeout_ms)
-{
-    switch (buffer->type)
-    {
+static inline int bpf_buffer__poll(struct bpf_buffer *buffer, int timeout_ms) {
+    switch (buffer->type) {
     case BPF_MAP_TYPE_PERF_EVENT_ARRAY:
-        return perf_buffer__poll((struct perf_buffer *)buffer->inner, timeout_ms);
+        return perf_buffer__poll((struct perf_buffer *)buffer->inner,
+                                 timeout_ms);
     case BPF_MAP_TYPE_RINGBUF:
-        return ring_buffer__poll((struct ring_buffer *)buffer->inner, timeout_ms);
+        return ring_buffer__poll((struct ring_buffer *)buffer->inner,
+                                 timeout_ms);
     default:
         return -EINVAL;
     }
 }
 
-static inline void bpf_buffer__free(struct bpf_buffer *buffer)
-{
+static inline void bpf_buffer__free(struct bpf_buffer *buffer) {
     if (!buffer) {
         return;
     }

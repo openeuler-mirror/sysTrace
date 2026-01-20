@@ -1,8 +1,8 @@
 #include "mspti_tracker.hpp"
+#include "../../include/utils/util.h"
 #include <dlfcn.h>
 #include <iostream>
 #include <stdlib.h>
-#include "../../include/utils/util.h"
 
 constexpr size_t KB = 1 * 1024;
 constexpr size_t MB = 1 * 1024 * KB;
@@ -15,25 +15,22 @@ void MSPTITracker::setExternalEnable(bool enable) {
     external_enabled_.store(enable);
 }
 
-inline uint8_t *align_buffer(uint8_t *buffer, size_t align)
-{
+inline uint8_t *align_buffer(uint8_t *buffer, size_t align) {
     return reinterpret_cast<uint8_t *>(
         (reinterpret_cast<uintptr_t>(buffer) + (align - 1)) & ~(align - 1));
 }
 
-MSPTITracker::MSPTITracker()
-{
+MSPTITracker::MSPTITracker() {
     LOG_MODULE(INFO, "MSPTI") << "Logging initialized from preloaded library.";
-    std::string file_name = "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.csv"; 
-    hcclFileWriter =
-        std::make_unique<MSPTIHcclFileWriter>(file_name);
+    std::string file_name =
+        "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.csv";
+    hcclFileWriter = std::make_unique<MSPTIHcclFileWriter>(file_name);
     msptiSubscribe(&subscriber, nullptr, nullptr);
     msptiActivityRegisterCallbacks(UserBufferRequest, UserBufferComplete);
     mspti_monitor_thread = std::thread(&MSPTITracker::collect, this);
 }
 
-void MSPTITracker::collect()
-{
+void MSPTITracker::collect() {
     while (should_run_) {
         bool should_collect = external_enabled_.load();
 
@@ -41,8 +38,7 @@ void MSPTITracker::collect()
             msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
             is_collecting_.store(true);
             LOG_MODULE(INFO, "MSPTI") << "Start collecting...";
-        } 
-        else if (!should_collect && is_collecting_.load()) {
+        } else if (!should_collect && is_collecting_.load()) {
             msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
             is_collecting_.store(false);
             LOG_MODULE(INFO, "MSPTI") << "Stop collecting...";
@@ -52,8 +48,7 @@ void MSPTITracker::collect()
     }
 }
 
-MSPTITracker::~MSPTITracker()
-{
+MSPTITracker::~MSPTITracker() {
     msptiActivityFlushAll(1);
     msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
     finish();
@@ -63,32 +58,26 @@ MSPTITracker::~MSPTITracker()
     }
 }
 
-MSPTITracker &MSPTITracker::getInstance()
-{
+MSPTITracker &MSPTITracker::getInstance() {
     static MSPTITracker instance;
     return instance;
 }
 
-void MSPTITracker::finish()
-{
+void MSPTITracker::finish() {
     LOG_MODULE(INFO, "MSPTI") << "Finishing MSPTI Tracker";
-    if (hcclFileWriter)
-    {
+    if (hcclFileWriter) {
         hcclFileWriter->stopWriter();
     }
 }
 
-void MSPTITracker::readActivityMarker(msptiActivityMarker *activity)
-{
-    if (hcclFileWriter)
-    {
+void MSPTITracker::readActivityMarker(msptiActivityMarker *activity) {
+    if (hcclFileWriter) {
         hcclFileWriter->bufferMarkerActivity(activity);
     }
 }
 
 void MSPTITracker::UserBufferRequest(uint8_t **buffer, size_t *size,
-                                     size_t *maxNumRecords)
-{
+                                     size_t *maxNumRecords) {
     auto &instance = getInstance();
     std::lock_guard<std::mutex> lock(mtx);
     constexpr uint32_t SIZE = (uint32_t)MB * 1;
@@ -100,25 +89,19 @@ void MSPTITracker::UserBufferRequest(uint8_t **buffer, size_t *size,
 }
 
 void MSPTITracker::UserBufferComplete(uint8_t *buffer, size_t size,
-                                      size_t validSize)
-{
+                                      size_t validSize) {
     auto &instance = getInstance();
-    if (validSize > 0)
-    {
+    if (validSize > 0) {
         msptiActivity *pRecord = nullptr;
         msptiResult status = MSPTI_SUCCESS;
-        do
-        {
+        do {
             std::lock_guard<std::mutex> lock(mtx);
             status = msptiActivityGetNextRecord(buffer, validSize, &pRecord);
             if (status == MSPTI_SUCCESS &&
-                pRecord->kind == MSPTI_ACTIVITY_KIND_MARKER)
-            {
+                pRecord->kind == MSPTI_ACTIVITY_KIND_MARKER) {
                 instance.readActivityMarker(
                     reinterpret_cast<msptiActivityMarker *>(pRecord));
-            }
-            else if (status == MSPTI_ERROR_MAX_LIMIT_REACHED)
-            {
+            } else if (status == MSPTI_ERROR_MAX_LIMIT_REACHED) {
                 break;
             }
         } while (status == MSPTI_SUCCESS);

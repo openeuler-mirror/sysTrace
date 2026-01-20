@@ -5,8 +5,7 @@
 #include <memory>
 #include <mutex>
 
-class MSPTITracker
-{
+class MSPTITracker {
   private:
     static std::mutex mtx;
 
@@ -14,7 +13,7 @@ class MSPTITracker
     std::unique_ptr<MSPTIHcclFileWriter> hcclFileWriter;
     std::atomic<int> requestedCount{0};
     std::thread mspti_monitor_thread;
-    std::atomic<bool> is_collecting_{false}; 
+    std::atomic<bool> is_collecting_{false};
     std::atomic<bool> should_run_{true};
     std::atomic<bool> external_enabled_{false};
 

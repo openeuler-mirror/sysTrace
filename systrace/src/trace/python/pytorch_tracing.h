@@ -10,27 +10,25 @@
 #include "pytorch_tracing_data.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
-    __attribute__((visibility("default"))) PyTorchTracingDataArray *
-    systrace_get_empty_pytorch_tracing_data_array(int);
-    __attribute__((visibility("default"))) PyTorchTracingDataArray *
-    systrace_get_full_pytorch_tracing_data_array(int);
+__attribute__((visibility("default"))) PyTorchTracingDataArray *
+systrace_get_empty_pytorch_tracing_data_array(int);
+__attribute__((visibility("default"))) PyTorchTracingDataArray *
+systrace_get_full_pytorch_tracing_data_array(int);
 
-    __attribute__((visibility("default"))) PyTorchTracingDataArray *
-    systrace_get_partial_pytorch_tracing_data_array(int);
+__attribute__((visibility("default"))) PyTorchTracingDataArray *
+systrace_get_partial_pytorch_tracing_data_array(int);
 
-    __attribute__((visibility("default"))) void
-    systrace_return_pytorch_tracing_data_array(PyTorchTracingDataArray *,
-                                               int type, int name);
-    __attribute__((visibility("default"))) void
-    systrace_register_tracing(const char **, int, char **);
+__attribute__((visibility("default"))) void
+systrace_return_pytorch_tracing_data_array(PyTorchTracingDataArray *, int type,
+                                           int name);
+__attribute__((visibility("default"))) void
+systrace_register_tracing(const char **, int, char **);
 #ifdef __cplusplus
 }
 #endif
-typedef struct
-{
+typedef struct {
     int64_t py_code_address;
     const char *function_name;
     int tag_name;
@@ -38,8 +36,7 @@ typedef struct
     UT_hash_handle hh;
 } TracingFunction;
 
-typedef struct
-{
+typedef struct {
     int tag_name;
     PyTorchTracingDataArray *curr_data;
     int64_t count;

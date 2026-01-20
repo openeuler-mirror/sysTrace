@@ -1,42 +1,39 @@
 /******************************************************************************
  * Copyright (c) Huawei Technologies Co., Ltd. 2021. All rights reserved.
  * sysTrace licensed under the Mulan PSL v2.
- * You can use this software according to the terms and conditions of the Mulan PSL v2.
- * You may obtain a copy of Mulan PSL v2 at:
+ * You can use this software according to the terms and conditions of the Mulan
+ *PSL v2. You may obtain a copy of Mulan PSL v2 at:
  *     http://license.coscl.org.cn/MulanPSL2
- * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR
- * PURPOSE.
- * See the Mulan PSL v2 for more details.
- * Author: curry
- * Create: 2025-06-20
- * Description: bpf header
+ * THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY
+ *KIND, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ *NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
+ *Mulan PSL v2 for more details. Author: curry Create: 2025-06-20 Description:
+ *bpf header
  ******************************************************************************/
 #ifndef __GOPHER_LIB_BPF_H__
 #define __GOPHER_LIB_BPF_H__
 
 #pragma once
 
-#if !defined( BPF_PROG_KERN ) && !defined( BPF_PROG_USER )
+#if !defined(BPF_PROG_KERN) && !defined(BPF_PROG_USER)
 
-#include <stdlib.h>
-#include <bpf/libbpf.h>
-#include <bpf/bpf.h>
-#include <sys/resource.h>
-#include "common.h"
 #include "__compat.h"
+#include "common.h"
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
+#include <stdlib.h>
+#include <sys/resource.h>
 
-#define EBPF_RLIM_LIMITED  RLIM_INFINITY
+#define EBPF_RLIM_LIMITED RLIM_INFINITY
 #define EBPF_RLIM_INFINITY (~0UL)
 #ifndef EINTR
 #define EINTR 4
 #endif
 
-static __always_inline int set_memlock_rlimit(unsigned long limit)
-{
+static __always_inline int set_memlock_rlimit(unsigned long limit) {
     struct rlimit rlim_new = {
-        .rlim_cur   = limit,
-        .rlim_max   = limit,
+        .rlim_cur = limit,
+        .rlim_max = limit,
     };
 
     if (setrlimit(RLIMIT_MEMLOCK, (const struct rlimit *)&rlim_new) != 0) {
@@ -48,108 +45,108 @@ static __always_inline int set_memlock_rlimit(unsigned long limit)
 
 #define GET_MAP_OBJ(probe_name, map_name) (probe_name##_skel->maps.map_name)
 
-#define __MAP_SET_PIN_PATH(probe_name, map_name, map_path) \
-    do { \
-        int ret; \
-        struct bpf_map *__map; \
-        \
-        __map = GET_MAP_OBJ(probe_name, map_name); \
-        ret = bpf_map__set_pin_path(__map, map_path); \
-        if (ret) { \
-            fprintf(stderr, "Failed to set pin path for map " #map_name " in " #probe_name "\n"); \
-        } \
+#define __MAP_SET_PIN_PATH(probe_name, map_name, map_path)                     \
+    do {                                                                       \
+        int ret;                                                               \
+        struct bpf_map *__map;                                                 \
+                                                                               \
+        __map = GET_MAP_OBJ(probe_name, map_name);                             \
+        ret = bpf_map__set_pin_path(__map, map_path);                          \
+        if (ret) {                                                             \
+            fprintf(stderr, "Failed to set pin path for map " #map_name        \
+                            " in " #probe_name "\n");                          \
+        }                                                                      \
     } while (0)
 
-#define INIT_BPF_APP(app_name, limit) \
-    static char __init = 0; \
-    do { \
-        if (!__init) { \
-            /* Bump RLIMIT_MEMLOCK  allow BPF sub-system to do anything */ \
-            if (set_memlock_rlimit(limit) == 0) { \
-                printf("BPF app(" #app_name ") failed to set mem limit.\n"); \
-                return -1; \
-            } \
-            __init = 1; \
-        } \
+#define INIT_BPF_APP(app_name, limit)                                          \
+    static char __init = 0;                                                    \
+    do {                                                                       \
+        if (!__init) {                                                         \
+            /* Bump RLIMIT_MEMLOCK  allow BPF sub-system to do anything */     \
+            if (set_memlock_rlimit(limit) == 0) {                              \
+                printf("BPF app(" #app_name ") failed to set mem limit.\n");   \
+                return -1;                                                     \
+            }                                                                  \
+            __init = 1;                                                        \
+        }                                                                      \
     } while (0)
 
-
-#define __OPEN_OPTS(probe_name, end, load, opts) \
-    struct probe_name##_bpf *probe_name##_skel = NULL;           \
-    struct bpf_link *probe_name##_link[PATH_NUM] __maybe_unused = {NULL}; \
-    int probe_name##_link_current = 0;    \
-    do { \
-        if (load) \
-        {\
-            /* Open load and verify BPF application */ \
-            probe_name##_skel = probe_name##_bpf__open_opts(opts); \
-            if (!probe_name##_skel) { \
-                printf("Failed to open BPF " #probe_name " skeleton\n"); \
-                goto end; \
-            } \
-        }\
+#define __OPEN_OPTS(probe_name, end, load, opts)                               \
+    struct probe_name##_bpf *probe_name##_skel = NULL;                         \
+    struct bpf_link *probe_name##_link[PATH_NUM] __maybe_unused = {NULL};      \
+    int probe_name##_link_current = 0;                                         \
+    do {                                                                       \
+        if (load) {                                                            \
+            /* Open load and verify BPF application */                         \
+            probe_name##_skel = probe_name##_bpf__open_opts(opts);             \
+            if (!probe_name##_skel) {                                          \
+                printf("Failed to open BPF " #probe_name " skeleton\n");       \
+                goto end;                                                      \
+            }                                                                  \
+        }                                                                      \
     } while (0)
 
+#define OPEN_OPTS(probe_name, end, load)                                       \
+    __OPEN_OPTS(probe_name, end, load, &probe_name##_open_opts)
 
-#define OPEN_OPTS(probe_name, end, load) __OPEN_OPTS(probe_name, end, load, &probe_name##_open_opts)
-
-#define MAP_SET_PIN_PATH(probe_name, map_name, map_path, load) \
-    do { \
-        if (load) \
-        { \
-            __MAP_SET_PIN_PATH(probe_name, map_name, map_path); \
-        } \
+#define MAP_SET_PIN_PATH(probe_name, map_name, map_path, load)                 \
+    do {                                                                       \
+        if (load) {                                                            \
+            __MAP_SET_PIN_PATH(probe_name, map_name, map_path);                \
+        }                                                                      \
     } while (0)
 
-#define MAP_INIT_BPF_BUFFER_SHARED(probe_name, map_name, buffer_ptr, load) \
-    do { \
-        if (load) { \
-            (void)bpf_buffer__new_shared(probe_name##_skel->maps.map_name, probe_name##_skel->maps.heap, (buffer_ptr)); \
-            if (*(buffer_ptr) == NULL) { \
-                printf("Failed to initialize bpf_buffer for " #map_name " in " #probe_name "\n"); \
-            } \
-        } \
+#define MAP_INIT_BPF_BUFFER_SHARED(probe_name, map_name, buffer_ptr, load)     \
+    do {                                                                       \
+        if (load) {                                                            \
+            (void)bpf_buffer__new_shared(probe_name##_skel->maps.map_name,     \
+                                         probe_name##_skel->maps.heap,         \
+                                         (buffer_ptr));                        \
+            if (*(buffer_ptr) == NULL) {                                       \
+                printf("Failed to initialize bpf_buffer for " #map_name        \
+                       " in " #probe_name "\n");                               \
+            }                                                                  \
+        }                                                                      \
     } while (0)
 
-#define LOAD_ATTACH(app_name, probe_name, end, load) \
-    do { \
-        if (load) \
-        { \
-            int err; \
-            if (probe_name##_bpf__load(probe_name##_skel)) { \
-                printf("Failed to load BPF " #probe_name " skeleton\n"); \
-                goto end; \
-            } \
-            /* Attach tracepoint handler */ \
-            err = probe_name##_bpf__attach(probe_name##_skel); \
-            if (err) { \
-                printf("Failed to attach BPF " #probe_name " skeleton\n"); \
-                probe_name##_bpf__destroy(probe_name##_skel); \
-                probe_name##_skel = NULL; \
-                goto end; \
-            } \
-        } \
+#define LOAD_ATTACH(app_name, probe_name, end, load)                           \
+    do {                                                                       \
+        if (load) {                                                            \
+            int err;                                                           \
+            if (probe_name##_bpf__load(probe_name##_skel)) {                   \
+                printf("Failed to load BPF " #probe_name " skeleton\n");       \
+                goto end;                                                      \
+            }                                                                  \
+            /* Attach tracepoint handler */                                    \
+            err = probe_name##_bpf__attach(probe_name##_skel);                 \
+            if (err) {                                                         \
+                printf("Failed to attach BPF " #probe_name " skeleton\n");     \
+                probe_name##_bpf__destroy(probe_name##_skel);                  \
+                probe_name##_skel = NULL;                                      \
+                goto end;                                                      \
+            }                                                                  \
+        }                                                                      \
     } while (0)
 
-#define UNLOAD(probe_name) \
-    do { \
-        int err; \
-        if (probe_name##_skel != NULL) { \
-            probe_name##_bpf__destroy(probe_name##_skel); \
-        } \
-        for (int i = 0; i < probe_name##_link_current; i++) { \
-            err = bpf_link__destroy(probe_name##_link[i]); \
-            if (err < 0) { \
-                printf("Failed to detach BPF " #probe_name " %d\n", err); \
-                break; \
-            } \
-        } \
+#define UNLOAD(probe_name)                                                     \
+    do {                                                                       \
+        int err;                                                               \
+        if (probe_name##_skel != NULL) {                                       \
+            probe_name##_bpf__destroy(probe_name##_skel);                      \
+        }                                                                      \
+        for (int i = 0; i < probe_name##_link_current; i++) {                  \
+            err = bpf_link__destroy(probe_name##_link[i]);                     \
+            if (err < 0) {                                                     \
+                printf("Failed to detach BPF " #probe_name " %d\n", err);      \
+                break;                                                         \
+            }                                                                  \
+        }                                                                      \
     } while (0)
 
-#define INIT_OPEN_OPTS(probe_name) \
+#define INIT_OPEN_OPTS(probe_name)                                             \
     LIBBPF_OPTS(bpf_object_open_opts, probe_name##_open_opts)
 
-#define SKEL_MAX_NUM  20
+#define SKEL_MAX_NUM 20
 typedef void (*skel_destroy_fn)(void *);
 
 struct __bpf_skel_s {
@@ -159,24 +156,23 @@ struct __bpf_skel_s {
     size_t _link_num;
 };
 struct bpf_prog_s {
-    struct perf_buffer* pb;
-    struct ring_buffer* rb;
+    struct perf_buffer *pb;
+    struct ring_buffer *rb;
     struct bpf_buffer *buffer;
-    struct perf_buffer* pbs[SKEL_MAX_NUM];
-    struct ring_buffer* rbs[SKEL_MAX_NUM];
+    struct perf_buffer *pbs[SKEL_MAX_NUM];
+    struct ring_buffer *rbs[SKEL_MAX_NUM];
     struct bpf_buffer *buffers[SKEL_MAX_NUM];
     struct __bpf_skel_s skels[SKEL_MAX_NUM];
     const char *custom_btf_paths[SKEL_MAX_NUM];
     size_t num;
 };
 
-static __always_inline __maybe_unused void free_bpf_prog(struct bpf_prog_s *prog)
-{
+static __always_inline __maybe_unused void
+free_bpf_prog(struct bpf_prog_s *prog) {
     (void)free(prog);
 }
 
-static __always_inline __maybe_unused struct bpf_prog_s *alloc_bpf_prog(void)
-{
+static __always_inline __maybe_unused struct bpf_prog_s *alloc_bpf_prog(void) {
     struct bpf_prog_s *prog = malloc(sizeof(struct bpf_prog_s));
     if (prog == NULL) {
         return NULL;
@@ -186,8 +182,8 @@ static __always_inline __maybe_unused struct bpf_prog_s *alloc_bpf_prog(void)
     return prog;
 }
 
-static __always_inline __maybe_unused void unload_bpf_prog(struct bpf_prog_s **unload_prog)
-{
+static __always_inline __maybe_unused void
+unload_bpf_prog(struct bpf_prog_s **unload_prog) {
     struct bpf_prog_s *prog = *unload_prog;
 
     *unload_prog = NULL;
@@ -210,7 +206,7 @@ static __always_inline __maybe_unused void unload_bpf_prog(struct bpf_prog_s **u
             perf_buffer__free(prog->pbs[i]);
         }
 
-#if (CURRENT_LIBBPF_VERSION  >= LIBBPF_VERSION(0, 8))
+#if (CURRENT_LIBBPF_VERSION >= LIBBPF_VERSION(0, 8))
         if (prog->rbs[i]) {
             ring_buffer__free(prog->rbs[i]);
         }
@@ -227,7 +223,7 @@ static __always_inline __maybe_unused void unload_bpf_prog(struct bpf_prog_s **u
         perf_buffer__free(prog->pb);
     }
 
-#if (CURRENT_LIBBPF_VERSION  >= LIBBPF_VERSION(0, 8))
+#if (CURRENT_LIBBPF_VERSION >= LIBBPF_VERSION(0, 8))
     if (prog->rb) {
         ring_buffer__free(prog->rb);
     }
@@ -240,7 +236,6 @@ static __always_inline __maybe_unused void unload_bpf_prog(struct bpf_prog_s **u
     free_bpf_prog(prog);
     return;
 }
-
 
 #endif
 #endif
