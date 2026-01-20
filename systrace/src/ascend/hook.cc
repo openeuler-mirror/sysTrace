@@ -84,15 +84,20 @@ extern "C"
         return func;
     }
 
-#define HOOKED_FUNCTION(func_ptr, func_name, ...)                              \
-    if (!func_ptr)                                                             \
-    {                                                                          \
-        func_ptr = (decltype(func_ptr))load_symbol(func_name);                 \
-        if (!func_ptr)                                                         \
-            return -1;                                                         \
-    }                                                                          \
-    ::systrace::SysTrace::getInstance();                                       \
-    return func_ptr(__VA_ARGS__);
+#define HOOKED_FUNCTION(func_ptr, func_name, ...)                       \
+    do {                                                                \
+        const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");    \
+        std::string log_path = (log_path_env && strlen(log_path_env) > 0) \
+                                   ? std::string(log_path_env)          \
+                                   : "/var/log/systrace.log";           \
+        ::systrace::setLoggingPath(log_path);                           \
+        if (!func_ptr) {                                                \
+            func_ptr = (decltype(func_ptr))load_symbol(func_name);      \
+            if (!func_ptr) return -1;                                   \
+        }                                                               \
+        ::systrace::SysTrace::getInstance();                            \
+        return func_ptr(__VA_ARGS__);                                   \
+    } while (0)
 
     EXPOSE_API aclError aclInit(const char *configPath)
     {
