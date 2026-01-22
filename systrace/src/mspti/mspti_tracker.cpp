@@ -1,19 +1,15 @@
 #include "mspti_tracker.hpp"
 #include "../../include/utils/util.h"
+#include <chrono>
 #include <dlfcn.h>
 #include <iostream>
 #include <stdlib.h>
 
-constexpr size_t KB = 1 * 1024;
-constexpr size_t MB = 1 * 1024 * KB;
+constexpr size_t MB = 1024 * 1024;
 constexpr size_t ALIGN_SIZE = 8;
 
 std::mutex MSPTITracker::mtx;
 using namespace systrace::util;
-
-void MSPTITracker::setExternalEnable(bool enable) {
-    external_enabled_.store(enable);
-}
 
 inline uint8_t *align_buffer(uint8_t *buffer, size_t align) {
     return reinterpret_cast<uint8_t *>(
@@ -22,40 +18,18 @@ inline uint8_t *align_buffer(uint8_t *buffer, size_t align) {
 
 MSPTITracker::MSPTITracker() {
     LOG_MODULE(INFO, "MSPTI") << "Logging initialized from preloaded library.";
-    std::string file_name =
-        "hccl_activity-" + systrace::util::GetPrimaryIP() + "-.csv";
-    hcclFileWriter = std::make_unique<MSPTIHcclFileWriter>(file_name);
+    hcclFileWriter = std::make_unique<MSPTIHcclFileWriter>("mspti_activity");
     msptiSubscribe(&subscriber, nullptr, nullptr);
     msptiActivityRegisterCallbacks(UserBufferRequest, UserBufferComplete);
     mspti_monitor_thread = std::thread(&MSPTITracker::collect, this);
 }
 
-void MSPTITracker::collect() {
-    while (should_run_) {
-        bool should_collect = external_enabled_.load();
-
-        if (should_collect && !is_collecting_.load()) {
-            msptiActivityEnable(MSPTI_ACTIVITY_KIND_MARKER);
-            is_collecting_.store(true);
-            LOG_MODULE(INFO, "MSPTI") << "Start collecting...";
-        } else if (!should_collect && is_collecting_.load()) {
-            msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
-            is_collecting_.store(false);
-            LOG_MODULE(INFO, "MSPTI") << "Stop collecting...";
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-}
-
 MSPTITracker::~MSPTITracker() {
-    msptiActivityFlushAll(1);
-    msptiActivityDisable(MSPTI_ACTIVITY_KIND_MARKER);
-    finish();
     should_run_ = false;
-    if (mspti_monitor_thread.joinable()) {
+    if (mspti_monitor_thread.joinable())
         mspti_monitor_thread.join();
-    }
+    msptiActivityFlushAll(1);
+    finish();
 }
 
 MSPTITracker &MSPTITracker::getInstance() {
@@ -63,28 +37,75 @@ MSPTITracker &MSPTITracker::getInstance() {
     return instance;
 }
 
-void MSPTITracker::finish() {
-    LOG_MODULE(INFO, "MSPTI") << "Finishing MSPTI Tracker";
-    if (hcclFileWriter) {
-        hcclFileWriter->stopWriter();
+void MSPTITracker::setEventMask(uint32_t mask) {
+    target_mask_.store(mask);
+    if (mask == MSPTI_EVENT_NONE) {
+        msptiActivityFlushAll(1);
+
+        if (hcclFileWriter) {
+            hcclFileWriter->flush();
+        }
     }
 }
 
-void MSPTITracker::readActivityMarker(msptiActivityMarker *activity) {
-    if (hcclFileWriter) {
-        hcclFileWriter->bufferMarkerActivity(activity);
+void MSPTITracker::updateActivityState(uint32_t target, uint32_t bit,
+                                       msptiActivityKind kind) {
+    bool is_on = (current_mask_ & bit);
+    bool should_on = (target & bit);
+    if (should_on && !is_on) {
+        msptiActivityEnable(kind);
+        current_mask_ |= bit;
+        LOG_MODULE(INFO, "MSPTI") << "Enabled Activity Kind: " << kind;
+    } else if (!should_on && is_on) {
+        msptiActivityDisable(kind);
+        current_mask_ &= ~bit;
+        LOG_MODULE(INFO, "MSPTI") << "Disabled Activity Kind: " << kind;
     }
+}
+
+void MSPTITracker::collect() {
+    while (should_run_) {
+        uint32_t target = target_mask_.load();
+        if (target != current_mask_) {
+            std::lock_guard<std::mutex> lock(mtx);
+            updateActivityState(target, MSPTI_EVENT_MARKER,
+                                MSPTI_ACTIVITY_KIND_MARKER);
+            updateActivityState(target, MSPTI_EVENT_KERNEL,
+                                MSPTI_ACTIVITY_KIND_KERNEL);
+            updateActivityState(target, MSPTI_EVENT_API,
+                                MSPTI_ACTIVITY_KIND_API);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+}
+
+void MSPTITracker::finish() {
+    if (hcclFileWriter)
+        hcclFileWriter->stopWriter();
+}
+
+void MSPTITracker::readActivityMarker(msptiActivityMarker *activity) {
+    if (hcclFileWriter)
+        hcclFileWriter->bufferMarkerActivity(activity);
+}
+void MSPTITracker::readActivityKernel(msptiActivityKernel *activity) {
+    if (hcclFileWriter)
+        hcclFileWriter->bufferKernelActivity(activity);
+}
+void MSPTITracker::readActivityApi(msptiActivityApi *activity) {
+    if (hcclFileWriter)
+        hcclFileWriter->bufferApiActivity(activity);
 }
 
 void MSPTITracker::UserBufferRequest(uint8_t **buffer, size_t *size,
                                      size_t *maxNumRecords) {
     auto &instance = getInstance();
     std::lock_guard<std::mutex> lock(mtx);
-    constexpr uint32_t SIZE = (uint32_t)MB * 1;
+    size_t buffer_size = 2 * MB;
     instance.requestedCount.fetch_add(1);
-    uint8_t *pBuffer = (uint8_t *)malloc(SIZE + ALIGN_SIZE);
+    uint8_t *pBuffer = (uint8_t *)malloc(buffer_size + ALIGN_SIZE);
     *buffer = align_buffer(pBuffer, ALIGN_SIZE);
-    *size = MB * 1;
+    *size = buffer_size;
     *maxNumRecords = 0;
 }
 
@@ -95,14 +116,14 @@ void MSPTITracker::UserBufferComplete(uint8_t *buffer, size_t size,
         msptiActivity *pRecord = nullptr;
         msptiResult status = MSPTI_SUCCESS;
         do {
-            std::lock_guard<std::mutex> lock(mtx);
             status = msptiActivityGetNextRecord(buffer, validSize, &pRecord);
-            if (status == MSPTI_SUCCESS &&
-                pRecord->kind == MSPTI_ACTIVITY_KIND_MARKER) {
-                instance.readActivityMarker(
-                    reinterpret_cast<msptiActivityMarker *>(pRecord));
-            } else if (status == MSPTI_ERROR_MAX_LIMIT_REACHED) {
-                break;
+            if (status == MSPTI_SUCCESS) {
+                if (pRecord->kind == MSPTI_ACTIVITY_KIND_MARKER)
+                    instance.readActivityMarker((msptiActivityMarker *)pRecord);
+                else if (pRecord->kind == MSPTI_ACTIVITY_KIND_KERNEL)
+                    instance.readActivityKernel((msptiActivityKernel *)pRecord);
+                else if (pRecord->kind == MSPTI_ACTIVITY_KIND_API)
+                    instance.readActivityApi((msptiActivityApi *)pRecord);
             }
         } while (status == MSPTI_SUCCESS);
     }

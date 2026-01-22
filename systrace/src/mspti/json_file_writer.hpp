@@ -6,170 +6,143 @@
 #include <atomic>
 #include <condition_variable>
 #include <fstream>
-#include <iostream>
 #include <mutex>
-#include <string.h>
 #include <thread>
 #include <vector>
 
 class MSPTIHcclFileWriter {
   private:
-    std::ofstream file;
-    std::mutex buffermtx;
-    std::mutex bufferMarkerMtx;
-    std::mutex threadmtx;
-    std::atomic<bool> opened;
-    std::unique_ptr<std::vector<msptiActivityMarker>> markerActivityBuffer;
+    std::ofstream fM, fK, fA; // Marker, Kernel, Api
+    std::mutex bmtx, tmtx;
+    std::unique_ptr<std::vector<msptiActivityMarker>> bM;
+    std::unique_ptr<std::vector<msptiActivityKernel>> bK;
+    std::unique_ptr<std::vector<msptiActivityApi>> bA;
     std::thread writerThread;
     std::condition_variable cv;
     std::atomic<bool> stop;
 
-  public:
-    MSPTIHcclFileWriter(const std::string &filename) {
-        // obtain environment variable LOCAL_RANK
-        // to determine the rank of the process
-        // and append it to the filename
+    std::string getFn(const std::string &type, int rank) {
         const char *path = std::getenv("METRIC_PATH");
-        std::string savePath = path ? path : SYS_TRACE_ROOT_DIR "mspti/";
-        if (systrace::util::fs_utils::CreateDirectoryIfNotExists(savePath)) {
-            LOG_MODULE(ERROR, "MSPTI") << "Failed to create dump directory";
+        std::string p = path ? path : SYS_TRACE_ROOT_DIR "mspti/";
+        systrace::util::fs_utils::CreateDirectoryIfNotExists(p);
+        if (!p.empty() && p.back() != '/')
+            p += "/";
+        return p + "mspti-" + type + "-" + systrace::util::GetPrimaryIP() +
+               "-" + std::to_string(rank) + ".csv";
+    }
+
+    void writeRecord(std::ofstream &f, const msptiActivityMarker &a) {
+        f << a.flag << "," << a.id << "," << a.kind << "," << s(a.name) << ","
+          << a.sourceKind << "," << a.timestamp << ",";
+        if (a.sourceKind == MSPTI_ACTIVITY_SOURCE_KIND_DEVICE) {
+            f << a.objectId.ds.deviceId << "," << a.objectId.ds.streamId
+              << ",,";
+        } else {
+            f << ",," << a.objectId.pt.processId << ","
+              << a.objectId.pt.threadId;
+        }
+        f << "\n";
+    }
+
+    void writeRecord(std::ofstream &f, const msptiActivityKernel &a) {
+        f << a.kind << "," << a.start << "," << a.end << "," << a.ds.deviceId
+          << "," << a.ds.streamId << "," << a.correlationId << "," << s(a.type)
+          << "," << s(a.name) << "\n";
+    }
+
+    void writeRecord(std::ofstream &f, const msptiActivityApi &a) {
+        f << a.kind << "," << a.start << "," << a.end << "," << a.pt.processId
+          << "," << a.pt.threadId << "," << a.correlationId << "," << s(a.name)
+          << "\n";
+    }
+
+    template <typename T>
+    void flushBuffer(std::ofstream &f, std::vector<T> &buffer) {
+        if (!f.is_open() || buffer.empty())
             return;
+        for (const auto &record : buffer) {
+            writeRecord(f, record);
         }
-        std::string savePathStr = savePath;
-        if (!savePathStr.empty() && savePathStr.back() != '/') {
-            savePathStr += "/";
-        }
-        std::string saveFilename = savePathStr + filename;
-        std::string filenameWithRank = saveFilename;
-        this->markerActivityBuffer =
-            std::make_unique<std::vector<msptiActivityMarker>>();
+        buffer.clear();
+        f.flush();
+    }
 
-        const char *localRankCStr =
-            std::getenv("RANK") ? std::getenv("RANK") : std::getenv("RANK_ID");
-        if (localRankCStr == nullptr) {
-            localRankCStr = "-1";
-        }
-        std::string localRank = localRankCStr;
-        auto rank = std::stoi(localRank);
-        if (saveFilename.length() >= 4 &&
-            saveFilename.substr(saveFilename.length() - 4) == ".csv") {
-            std::string baseName =
-                saveFilename.substr(0, saveFilename.length() - 4);
-            filenameWithRank = baseName + "." + std::to_string(rank) + ".csv";
-        } else {
-            filenameWithRank = saveFilename + "." + std::to_string(rank);
-        }
-        LOG_MODULE(INFO, "MSPTI") << "Filename: " << filenameWithRank;
+  public:
+    MSPTIHcclFileWriter(const std::string &fn) {
+        const char *rS =
+            std::getenv("RANK")
+                ? std::getenv("RANK")
+                : (std::getenv("RANK_ID") ? std::getenv("RANK_ID") : "-1");
+        int rank = std::stoi(rS);
+        bM = std::make_unique<std::vector<msptiActivityMarker>>();
+        bK = std::make_unique<std::vector<msptiActivityKernel>>();
+        bA = std::make_unique<std::vector<msptiActivityApi>>();
 
-        // if file does not exists
-        // create it and write header
-        if (this->fileExists(filenameWithRank)) {
-            this->file.open(filenameWithRank, std::ios::out | std::ios::app);
-            this->opened.store(true);
-        } else {
-            this->file.open(filenameWithRank, std::ios::out | std::ios::app);
-            this->opened.store(true);
-            this->file << "Flag,Id,Kind,Name,SourceKind,Timestamp,"
-                          "msptiObjectId_Ds_DeviceId,msptiObjectId_Ds_StreamId,"
-                          "msptiObjectId_Pt_ProcessId,msptiObjectId_Pt_ThreadId"
-                       << std::endl;
-        }
+        fM.open(getFn("marker", rank), std::ios::out | std::ios::app);
+        fM << "Flag,Id,Kind,Name,SourceKind,Timestamp,msptiObjectId_Ds_"
+              "DeviceId,msptiObjectId_Ds_StreamId,msptiObjectId_Pt_ProcessId,"
+              "msptiObjectId_Pt_ThreadId"
+           << std::endl;
+        fK.open(getFn("kernel", rank), std::ios::out | std::ios::app);
+        fK << "Kind,Start,End,DevId,StrmId,CorrId,Type,Name" << std::endl;
+        fA.open(getFn("api", rank), std::ios::out | std::ios::app);
+        fA << "Kind,Start,End,Pid,Tid,CorrId,Name" << std::endl;
 
-        this->stop.store(false);
-        this->run();
+        stop.store(false);
+        run();
+    }
+
+    void bufferMarkerActivity(msptiActivityMarker *a) {
+        std::lock_guard<std::mutex> l(bmtx);
+        bM->push_back(*a);
+    }
+    void bufferKernelActivity(msptiActivityKernel *a) {
+        std::lock_guard<std::mutex> l(bmtx);
+        bK->push_back(*a);
+    }
+    void bufferApiActivity(msptiActivityApi *a) {
+        std::lock_guard<std::mutex> l(bmtx);
+        bA->push_back(*a);
     }
 
     void stopWriter() {
-        if (this->file.is_open()) {
-            {
-                std::unique_lock<std::mutex> lock(this->threadmtx);
-                // clean up the thread
-                this->stop.store(true);
-            }
-            this->cv.notify_all();
-            this->hcclActivityFormatToCSV();
-            if (this->writerThread.joinable()) {
-                this->writerThread.join();
-            }
-            // write the remaining buffer
-            LOG_MODULE(INFO, "MSPTI") << "Closing file";
-            this->file.close();
-            this->opened.store(false);
+        {
+            std::unique_lock<std::mutex> l(tmtx);
+            stop.store(true);
         }
+        cv.notify_all();
+        if (writerThread.joinable())
+            writerThread.join();
+        flush();
+        if (fM.is_open())
+            fM.close();
+        if (fK.is_open())
+            fK.close();
+        if (fA.is_open())
+            fA.close();
     }
 
-    ~MSPTIHcclFileWriter() { this->stopWriter(); }
-
-    bool fileExists(const std::string &fp) {
-        std::ifstream file(fp.c_str());
-        return file.good() && file.is_open();
-    }
-
-    void bufferMarkerActivity(msptiActivityMarker *activity) {
-        std::lock_guard<std::mutex> lock(this->bufferMarkerMtx);
-        this->markerActivityBuffer->push_back(*activity);
-    }
+    ~MSPTIHcclFileWriter() { stopWriter(); }
 
     void run() {
-        // a thread to periodically flush
-        // the buffer to the file
-        // watch the conditional variable for signal
-        this->writerThread = std::thread([this]() {
-            while (!this->stop.load()) {
-                std::unique_lock<std::mutex> lock(this->threadmtx);
-                if (this->cv.wait_for(lock, std::chrono::seconds(5)) ==
-                    std::cv_status::timeout) {
-                    this->hcclActivityFormatToCSV();
-                } else if (this->stop.load()) {
+        writerThread = std::thread([this]() {
+            while (!stop.load()) {
+                std::unique_lock<std::mutex> l(tmtx);
+                if (cv.wait_for(l, std::chrono::seconds(5)) ==
+                    std::cv_status::timeout)
+                    flush();
+                else if (stop.load())
                     break;
-                };
             }
         });
     }
 
-    void replaceCommasWithExclamation(const char *input, char *output) {
-        for (int i = 0; input[i] != '\0'; i++) {
-            if (input[i] == ',') {
-                output[i] = '!';
-            } else {
-                output[i] = input[i];
-            }
-        }
-        output[strlen(input)] = '\0';
-    }
+    const char *s(const char *i) { return i ? i : "NULL"; }
 
-    void hcclActivityFormatToCSV() {
-        std::lock_guard<std::mutex> lock(this->buffermtx);
-        if (this->file.is_open()) {
-            // enumerate the buffer and write to file
-            for (auto activity : *this->markerActivityBuffer) {
-                char result[strlen(activity.name) + 1];
-                this->replaceCommasWithExclamation(activity.name, result);
-                // "Flag,Id,Kind,Name,SourceKind,Timestamp,msptiObjectId_Ds_DeviceId,msptiObjectId_Ds_StreamId,msptiObjectId_Pt_ProcessId,msptiObjectId_Pt_ThreadId";
-                if (activity.sourceKind == MSPTI_ACTIVITY_SOURCE_KIND_HOST) {
-                    this->file << activity.flag << "," << activity.id << ","
-                               << activity.kind << "," << result << ","
-                               << activity.sourceKind << ","
-                               << activity.timestamp << ","
-                               << activity.objectId.pt.processId << ","
-                               << activity.objectId.pt.threadId << ","
-                               << activity.objectId.pt.processId << ","
-                               << activity.objectId.pt.threadId << std::endl;
-                } else if (activity.sourceKind ==
-                           MSPTI_ACTIVITY_SOURCE_KIND_DEVICE) {
-                    this->file << activity.flag << "," << activity.id << ","
-                               << activity.kind << "," << result << ","
-                               << activity.sourceKind << ","
-                               << activity.timestamp << ","
-                               << activity.objectId.ds.deviceId << ","
-                               << activity.objectId.ds.streamId << ","
-                               << activity.objectId.ds.deviceId << ","
-                               << activity.objectId.ds.streamId << std::endl;
-                }
-            }
-            this->markerActivityBuffer->clear();
-        } else {
-            LOG_MODULE(ERROR, "MSPTI") << "File is not open";
-        }
+    void flush() {
+        std::lock_guard<std::mutex> l(bmtx);
+        flushBuffer(fM, *bM);
+        flushBuffer(fK, *bK);
+        flushBuffer(fA, *bA);
     }
 };
