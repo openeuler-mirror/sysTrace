@@ -91,7 +91,7 @@ static void *load_symbol(const char *func_name) {
         const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");           \
         std::string log_path = (log_path_env && strlen(log_path_env) > 0)      \
                                    ? std::string(log_path_env)                 \
-                                   : "/var/log/systrace.log";                  \
+                                   : "/var/log/sysTrace";                      \
         ::systrace::setLoggingPath(log_path);                                  \
         if (!func_ptr) {                                                       \
             func_ptr = (decltype(func_ptr))load_symbol(func_name);             \

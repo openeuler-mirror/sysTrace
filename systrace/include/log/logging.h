@@ -24,7 +24,7 @@ extern LogLevel g_min_log_level;
 class LogStream {
   public:
     LogStream(std::ostream &console_stream);
-    bool setLogFile(const std::string &file_path);
+    bool setLogFile(const std::string &base_dir);
     void closeLogFile();
     bool isFileEnabled() const { return file_enabled_; }
 
