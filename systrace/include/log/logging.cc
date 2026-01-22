@@ -1,8 +1,11 @@
 #include "logging.h"
 #include <algorithm>
+#include <chrono>
 #include <cstdarg>
 #include <cstdio>
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 namespace systrace {
 namespace log {
@@ -73,22 +76,51 @@ const char *getLogLevelTag(LogLevel level) {
     }
 }
 
-bool LogStream::setLogFile(const std::string &file_path) {
+bool LogStream::setLogFile(const std::string &base_dir) {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (file_path.empty())
+    if (base_dir.empty())
         return false;
+
     if (log_file_.is_open())
         log_file_.close();
 
-    std::filesystem::path path(file_path);
-    std::filesystem::path dir = path.parent_path();
-    if (!dir.empty() && !std::filesystem::exists(dir)) {
-        try {
+    std::filesystem::path dir(base_dir);
+    try {
+        if (!std::filesystem::exists(dir)) {
             std::filesystem::create_directories(dir);
-        } catch (...) { return false; }
-    }
-    log_file_.open(file_path, std::ios::app);
+        }
+    } catch (...) { return false; }
+
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << "sysTrace_"
+       << std::put_time(std::localtime(&in_time_t), "%Y%m%d_%H%M%S") << ".log";
+
+    std::filesystem::path actual_file_path = dir / ss.str();
+
+    log_file_.open(actual_file_path, std::ios::app);
     file_enabled_ = log_file_.is_open();
+
+    if (file_enabled_) {
+        try {
+            std::filesystem::path symlink_path = dir / "sysTrace_latest.log";
+
+            if (std::filesystem::exists(symlink_path) ||
+                std::filesystem::is_symlink(symlink_path)) {
+                std::filesystem::remove(symlink_path);
+            }
+
+            std::filesystem::create_symlink(
+                std::filesystem::absolute(actual_file_path), symlink_path);
+            std::cout << "[LOG] Symlink created: " << symlink_path << " -> "
+                      << actual_file_path << std::endl;
+
+        } catch (const std::exception &e) {
+            std::cerr << "[LOG] Symlink error: " << e.what() << std::endl;
+        }
+    }
+
     return file_enabled_;
 }
 

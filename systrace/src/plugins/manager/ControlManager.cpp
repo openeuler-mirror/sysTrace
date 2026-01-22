@@ -165,7 +165,7 @@ std::string ControlManager::handle_msg(const std::string &raw) {
                 LOG_MODULE(ERROR, "Control") << "Unknown action: " << act;
                 return "ACK_UNKNOWN_ACTION";
             }
-            return success ? "ACK_OK" : "ACK_FAIL";
+            return success ? "SUCCESS" : "FAILED";
         }
 
         LOG_MODULE(ERROR, "Control") << "Plugin not found: " << path;
