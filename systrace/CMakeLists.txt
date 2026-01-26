@@ -57,7 +57,7 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/cann/io_hook.c
     ${PROJECT_SOURCE_DIR}/src/plugins/manager/ControlManager.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/HbmPlugin.hpp
-    
+    ${PROJECT_SOURCE_DIR}/src/plugins/gil/GilPlugin.cpp
 )
 
 add_executable(sysTrace_cli

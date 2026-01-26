@@ -27,6 +27,35 @@ static std::string get_mindspore_lib_path() {
     return result;
 }
 
+static void find_python_path_cmd() {
+    const char *cmd = "python3 -c \"import sys, os, sysconfig; "
+                      "l=sysconfig.get_config_var('LIBDIR'); "
+                      "s=sysconfig.get_config_var('INSTSONAME'); "
+                      "p=os.path.join(l, s) if l and s else ''; "
+                      "print(p if p and os.path.exists(p) and ('.so' in s or "
+                      "'.dylib' in s) else sys.executable)\" 2>&1";
+    std::array<char, 512> buffer;
+    std::string result;
+    FILE *pipe_ptr = popen(cmd, "r");
+    if (!pipe_ptr) {
+        return;
+    }
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(pipe_ptr, pclose);
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+    result.erase(result.find_last_not_of("\r\n ") + 1);
+
+    if (!result.empty()) {
+        std::strncpy(g_python_lib_path, result.c_str(),
+                     sizeof(g_python_lib_path) - 1);
+        g_python_lib_path[sizeof(g_python_lib_path) - 1] = '\0';
+    } else {
+        systrace_log_error("Hook", "Failed to auto-detect python path!",
+                           dlerror());
+    }
+}
+
 extern "C" void _ZN9mindspore11distributed10InitializeEv() {
     std::call_once(init_flag, []() {
         std::string so_path = get_mindspore_lib_path();
@@ -66,6 +95,7 @@ extern "C" void _ZN9mindspore11distributed10InitializeEv() {
 extern "C" {
 #endif
 
+char g_python_lib_path[512] = {0};
 static void *load_symbol(const char *func_name) {
     if (!g_hal_lib) {
         g_hal_lib = dlopen("libascendcl.so", RTLD_LAZY);
@@ -104,6 +134,8 @@ static void *load_symbol(const char *func_name) {
 
 EXPOSE_API aclError aclInit(const char *configPath) {
     g_hooked_pid = getpid();
+    find_python_path_cmd();
+
     HOOKED_FUNCTION(orig_aclInit, "aclInit", configPath);
 }
 

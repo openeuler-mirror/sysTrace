@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 pid_t g_hooked_pid = 0;
+extern char g_python_lib_path[512];
 typedef int aclError;
 typedef void *aclrtStream;
 typedef void *aclrtFuncHandle;
