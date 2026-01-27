@@ -1,21 +1,4 @@
 #include "GilPlugin.h"
-#include "../../../include/log/logging.h"
-#include "../../../include/utils/ElfUtils.hpp"
-#include "../../../include/utils/PluginUtils.hpp"
-#include "../../../include/utils/TimeUtil.hpp"
-#include "../../../include/utils/TimerManager.hpp"
-#include "../../../include/utils/util.h"
-#include "../../os/python_gil.skel.h"
-#include <algorithm>
-#include <bpf/bpf.h>
-#include <bpf/libbpf.h>
-#include <fcntl.h>
-#include <gelf.h>
-#include <iomanip>
-#include <iostream>
-#include <sstream>
-#include <sys/stat.h>
-#include <unistd.h>
 
 #define MAP_HOOK_PID_PATH "/sys/fs/bpf/sysTrace/__osprobe_rank_pid"
 #define PROC_FILTER_RANK_MAP_PATH "/sys/fs/bpf/sysTrace/__osprobe_proc_filter"
@@ -26,7 +9,7 @@ const int MAP_INIT_TIMEOUT_S = 5;
 
 extern "C" char g_python_lib_path[512];
 extern "C" pid_t g_hooked_pid;
-const size_t BUF_CHUNK_SIZE = 64 * 1024;
+
 struct event {
     unsigned long long ts;
     unsigned int pid;
@@ -99,7 +82,7 @@ bool GILPlugin::start(const json &params, int duration) {
     // If the pid-to-rank map is empty, initialize it by setting rank-pid
     // mapping.
     if (host_pid_to_rank_mapping_.empty()) {
-        initPidToRankMap();
+        host_pid_to_rank_mapping_ = init_pid_to_rank_map();
     }
 
     if (!bpf_skeleton_) {
@@ -143,7 +126,6 @@ bool GILPlugin::start(const json &params, int duration) {
     }
 
     fprintf(trace_output_stream_, "[\n");
-    LOG_MODULE(INFO, pluginName_) << "Output file: " << output_;
 
     attach_all_probes(pids, libpython_path);
 
@@ -153,7 +135,7 @@ bool GILPlugin::start(const json &params, int duration) {
         systrace::utils::TimerManager::getInstance().startTimer(
             get_id(), duration, [this]() { this->stop(); });
     }
-
+    LOG_MODULE(INFO, pluginName_) << "Output file: " << output_;
     return true;
 }
 
@@ -212,6 +194,7 @@ void GILPlugin::stop() {
 
     stop_latched_.clear(std::memory_order_release);
 }
+
 void GILPlugin::register_target_process_to_bpf() {
     int hook_pid_fd = -1;
     int count = GET_HOOK_PID_COUNT;
@@ -240,63 +223,6 @@ void GILPlugin::register_target_process_to_bpf() {
         << "Write pid " << g_hooked_pid << " to map success";
 
     close(hook_pid_fd);
-}
-
-int GILPlugin::get_local_rank() {
-    return systrace::util::config::GlobalConfig::Instance().local_rank;
-}
-
-bool GILPlugin::is_main_process() { return get_local_rank() == 0; }
-
-void GILPlugin::initPidToRankMap() {
-    std::unordered_map<int, int> pid_to_rank;
-    int map_fd = bpf_obj_get(PROC_FILTER_RANK_MAP_PATH);
-    if (map_fd < 0) {
-        LOG_MODULE(ERROR, pluginName_)
-            << "Failed to get eBPF map FD: " << strerror(errno)
-            << " (path: " << PROC_FILTER_RANK_MAP_PATH << ")";
-        host_pid_to_rank_mapping_ = pid_to_rank;
-        return;
-    }
-
-    __u32 iter_key = 0;
-    __u32 next_key = 0;
-    int rank_value = 0;
-
-    while (true) {
-        int next_ret = bpf_map_get_next_key(map_fd, &iter_key, &next_key);
-        if (next_ret != 0) {
-            if (errno == ENOENT) {
-                LOG_MODULE(INFO, pluginName_)
-                    << "eBPF map traverse done, total entries: "
-                    << pid_to_rank.size();
-                break;
-            } else {
-                LOG_MODULE(ERROR, pluginName_)
-                    << "Failed to get next key: " << strerror(errno);
-                break;
-            }
-        }
-
-        int read_ret = bpf_map_lookup_elem(map_fd, &next_key, &rank_value);
-        if (read_ret != 0) {
-            LOG_MODULE(WARNING, pluginName_)
-                << "Failed to read rank for PID " << next_key << ": "
-                << strerror(errno);
-            iter_key = next_key;
-            continue;
-        }
-
-        pid_to_rank[next_key] = rank_value;
-
-        LOG_MODULE(INFO, pluginName_)
-            << "Insert to map: PID=" << next_key << ", Rank=" << rank_value;
-
-        iter_key = next_key;
-    }
-
-    close(map_fd);
-    host_pid_to_rank_mapping_ = pid_to_rank;
 }
 
 void GILPlugin::cleanup_all_uprobe_links() {
@@ -382,7 +308,9 @@ void GILPlugin::process_raw_event(void *data) {
     if (!trace_output_stream_ || !json_buf_.buf) {
         return;
     }
-
+    if (json_buf_.total_size - json_buf_.used_size < 512) {
+        systrace::fileWriterUtil::strbuf_flush(&json_buf_);
+    }
     size_t remaining = json_buf_.total_size - json_buf_.used_size;
     if (remaining < 256) {
         systrace::fileWriterUtil::strbuf_flush(&json_buf_);
@@ -498,71 +426,4 @@ void GILPlugin::attach_all_probes(std::vector<int> pids,
                 << ") Failed to attach Drop GIL Exit probes";
         }
     }
-}
-std::vector<int> GILPlugin::get_trace_pids(const json &params) {
-    std::vector<int> result_pids;
-
-    if (params.contains("pid")) {
-        auto &v = params["pid"];
-        if (v.is_string()) {
-            std::string pid_str = v.get<std::string>();
-            std::vector<int> parsed_pids =
-                systrace::pluginutils::PluginUtils::split_pid_string(pid_str);
-            if (!parsed_pids.empty()) {
-                result_pids.insert(result_pids.end(), parsed_pids.begin(),
-                                   parsed_pids.end());
-            }
-        }
-    }
-    std::vector<int> trace_pids = read_all_pids_from_map();
-    result_pids.insert(result_pids.end(), trace_pids.begin(), trace_pids.end());
-
-    std::sort(result_pids.begin(), result_pids.end());
-    auto last = std::unique(result_pids.begin(), result_pids.end());
-    result_pids.erase(last, result_pids.end());
-    return result_pids;
-}
-std::vector<int> GILPlugin::read_all_pids_from_map() {
-    std::vector<int> trace_pids;
-    int hook_pid_fd = bpf_obj_get(MAP_HOOK_PID_PATH);
-
-    if (hook_pid_fd < 0) {
-        LOG_MODULE(ERROR, pluginName_)
-            << " Failed to get bpf prog rank_pid map: " << strerror(errno);
-        return trace_pids;
-    }
-
-    __u32 current_key = 0;
-    __u32 next_key;
-    __u32 pid;
-
-    while (true) {
-        int next_ret =
-            bpf_map_get_next_key(hook_pid_fd, &current_key, &next_key);
-        if (next_ret != 0) {
-            if (errno == ENOENT) {
-                LOG_MODULE(INFO, pluginName_)
-                    << " Read " << trace_pids.size() << " PIDs from map";
-                break;
-            } else {
-                LOG_MODULE(ERROR, pluginName_)
-                    << " Failed to get next key from map: " << strerror(errno);
-                break;
-            }
-        }
-
-        int read_ret = bpf_map_lookup_elem(hook_pid_fd, &next_key, &pid);
-        if (read_ret == 0 && pid > 0) {
-            trace_pids.push_back(static_cast<int>(pid));
-        } else if (read_ret != 0) {
-            LOG_MODULE(WARNING, pluginName_)
-                << " Failed to read PID for key " << next_key << ": "
-                << strerror(errno);
-        }
-
-        current_key = next_key;
-    }
-
-    close(hook_pid_fd);
-    return trace_pids;
 }

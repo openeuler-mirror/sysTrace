@@ -58,6 +58,8 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/plugins/manager/ControlManager.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/HbmPlugin.hpp
     ${PROJECT_SOURCE_DIR}/src/plugins/gil/GilPlugin.cpp
+    ${PROJECT_SOURCE_DIR}/src/plugins/pthread/PthreadPlugin.cpp
+    ${PROJECT_SOURCE_DIR}/src/plugins/ebpfPluginBase/EbpfCollectorBase.cpp
 )
 
 add_executable(sysTrace_cli

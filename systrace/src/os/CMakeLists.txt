@@ -18,6 +18,8 @@ set(BPF_SOURCES
     ${PROJECT_SOURCE_DIR}/os_cpu.bpf.c
     ${PROJECT_SOURCE_DIR}/os_mem.bpf.c
     ${PROJECT_SOURCE_DIR}/python_gil.bpf.c
+    ${PROJECT_SOURCE_DIR}/pthrd_sync.bpf.c
+
 )
 
 add_custom_target(ebpf_kern
