@@ -233,9 +233,9 @@ ssize_t read(int fd, void *buf, size_t count) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     ssize_t ret = orig_read(fd, buf, count);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret > 0) {
         add_io_entry(fd, start_us, end_us - start_us, IOTYPE__IO_READ);
@@ -250,9 +250,9 @@ ssize_t write(int fd, const void *buf, size_t count) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     ssize_t ret = orig_write(fd, buf, count);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret > 0) {
         add_io_entry(fd, start_us, end_us - start_us, IOTYPE__IO_WRITE);
@@ -267,9 +267,9 @@ size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     ssize_t ret = orig_fwrite(ptr, size, nmemb, stream);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret > 0) {
         int fd = fileno(stream);
@@ -285,9 +285,9 @@ size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     ssize_t ret = orig_fread(ptr, size, nmemb, stream);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret > 0) {
         int fd = fileno(stream);
@@ -303,9 +303,9 @@ FILE *fopen(const char *path, const char *mode) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     FILE *ret = orig_fopen(path, mode);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret) {
         int fd = fileno(ret);
@@ -321,9 +321,9 @@ int fclose(FILE *stream) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_fclose(stream);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         int fd = fileno(stream);
@@ -339,9 +339,9 @@ int fflush(FILE *stream) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_fflush(stream);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0 && stream) {
         int fd = fileno(stream);
@@ -357,9 +357,9 @@ int remove(const char *filename) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_remove(filename);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_REMOVE);
@@ -374,9 +374,9 @@ int rename(const char *oldname, const char *newname) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_rename(oldname, newname);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_RENAME);
@@ -391,9 +391,9 @@ int close(int fd) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_close(fd);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(fd, start_us, end_us - start_us, IOTYPE__IO_CLOSE);
@@ -408,9 +408,9 @@ int fsync(int fd) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_fsync(fd);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(fd, start_us, end_us - start_us, IOTYPE__IO_FSYNC);
@@ -425,9 +425,9 @@ int mkdir(const char *path, mode_t mode) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_mkdir(path, mode);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_MKDIR);
@@ -442,9 +442,9 @@ int rmdir(const char *path) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_rmdir(path);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_RMDIR);
@@ -459,9 +459,9 @@ int unlink(const char *path) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_unlink(path);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_UNLINK);
@@ -476,9 +476,9 @@ DIR *opendir(const char *name) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     DIR *ret = orig_opendir(name);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_OPENDIR);
@@ -493,9 +493,9 @@ int closedir(DIR *dir) {
         init_io_trace();
     }
 
-    uint64_t start_us = get_current_us();
+    uint64_t start_us = get_current_utc_us();
     int ret = orig_closedir(dir);
-    uint64_t end_us = get_current_us();
+    uint64_t end_us = get_current_utc_us();
 
     if (ret == 0) {
         add_io_entry(-1, start_us, end_us - start_us, IOTYPE__IO_CLOSEDIR);

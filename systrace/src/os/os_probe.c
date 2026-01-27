@@ -31,6 +31,7 @@
 #define SYS_TRACE_ROOT_DIR "/home/sysTrace/"
 #endif
 
+#include "../../include/utils/TimeUtil.hpp"
 #include "../../protos/systrace.pb-c.h"
 #include "bpf.h"
 #include "os_cpu.skel.h"
@@ -103,7 +104,6 @@ static pthread_key_t thread_data_key;
 static pthread_once_t key_once = PTHREAD_ONCE_INIT;
 static int rank;
 static int local_rank;
-static u64 sysBootTime;
 static struct bpf_prog_s *prog = NULL;
 
 typedef struct {
@@ -116,41 +116,12 @@ void sig_int() { g_stop = 1; };
 char *event_name[] = {"mem_fault", "swap_page", "compaction", "vmscan",
                       "offcpu"};
 
-// system boot time = current time - uptime since system boot.
-static int get_sys_boot_time() {
-    struct timespec ts_cur_time = {0};
-    struct timespec ts_uptime = {0};
-    __u64 cur_time = 0;
-    __u64 uptime = 0;
-
-    if (clock_gettime(CLOCK_REALTIME, &ts_cur_time)) {
-        return -1;
-    }
-    cur_time = (__u64)ts_cur_time.tv_sec * NSEC_PER_SEC + ts_cur_time.tv_nsec;
-
-    if (clock_gettime(CLOCK_BOOTTIME, &ts_uptime)) {
-        return -1;
-    }
-    uptime = (__u64)ts_uptime.tv_sec * NSEC_PER_SEC + ts_uptime.tv_nsec;
-
-    if (uptime >= cur_time) {
-        return -1;
-    }
-    sysBootTime = cur_time - uptime;
-    return 0;
-}
-
-static __u64 get_unix_time_from_uptime(__u64 uptime) {
-    return sysBootTime + uptime;
-}
-
 void initialize_osprobe() {
     const char *rank_str = getenv("RANK") ? getenv("RANK") : getenv("RANK_ID");
     const char *local_rank_str =
         getenv("LOCAL_RANK") ? getenv("LOCAL_RANK") : getenv("DEVICE_ID");
     rank = rank_str ? atoi(rank_str) : 0;
     local_rank = local_rank_str ? atoi(local_rank_str) : 0;
-    get_sys_boot_time();
 }
 
 static void free_osprobe(OSprobe *osprobe) {
@@ -207,8 +178,7 @@ static void add_osprobe_entry(trace_event_data_t *evt_data) {
     }
     osprobe_entry__init(entry);
     entry->key = evt_data->key;
-    entry->start_us =
-        get_unix_time_from_uptime(evt_data->start_time) / NSEC_PER_USEC;
+    entry->start_us = monotonic_ns_to_utc_us(evt_data->start_time);
     entry->dur = evt_data->duration / NSEC_PER_USEC;
     entry->rundelay = evt_data->delay;
     entry->os_event_type = (u32)evt_data->type;

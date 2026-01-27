@@ -40,9 +40,8 @@ class GILPlugin : public ICollector {
     void process_raw_event(void *data);
     void attach_all_probes(std::vector<int> pids, const std::string &path);
     bool try_bind_uprobe(struct bpf_program *prog, int pid,
-                             const std::string &path,
-                             const std::vector<std::string> &funcs,
-                             bool is_ret);
+                         const std::string &path,
+                         const std::vector<std::string> &funcs, bool is_ret);
     void cleanup_all_uprobe_links();
     std::vector<int> get_trace_pids(const json &params);
 
@@ -65,8 +64,8 @@ class GILPlugin : public ICollector {
     std::vector<std::unique_ptr<UprobeLink>> uprobe_links_;
     std::mutex link_mutex_;
     std::string output_;
-    const std::vector<std::string> gil_acquire_symbols = {"take_gil",
-                                                 "PyEval_RestoreThread"};
+    const std::vector<std::string> gil_acquire_symbols = {
+        "take_gil", "PyEval_RestoreThread"};
     const std::vector<std::string> gil_release_symbols = {"drop_gil",
-                                                 "PyEval_SaveThread"};
+                                                          "PyEval_SaveThread"};
 };

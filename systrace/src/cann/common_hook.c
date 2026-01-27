@@ -4,12 +4,6 @@
 #include <errno.h>
 #include <stdio.h>
 
-uint64_t get_current_us() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (uint64_t)tv.tv_sec * 1000000 + tv.tv_usec;
-}
-
 const char *get_so_name(uint64_t ip) {
     Dl_info info;
     const char *so_name;

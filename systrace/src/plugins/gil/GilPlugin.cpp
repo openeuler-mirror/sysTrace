@@ -2,6 +2,7 @@
 #include "../../../include/log/logging.h"
 #include "../../../include/utils/ElfUtils.hpp"
 #include "../../../include/utils/PluginUtils.hpp"
+#include "../../../include/utils/TimeUtil.hpp"
 #include "../../../include/utils/TimerManager.hpp"
 #include "../../../include/utils/util.h"
 #include "../../os/python_gil.skel.h"
@@ -61,7 +62,8 @@ GILPlugin::GILPlugin() {
         output_ = dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
                   "_rank_" + std::to_string(get_local_rank()) + ".json";
 
-        int ret = bpf_map__pin(bpf_skeleton_->maps.rank_pid_map, MAP_HOOK_PID_PATH);
+        int ret =
+            bpf_map__pin(bpf_skeleton_->maps.rank_pid_map, MAP_HOOK_PID_PATH);
         if (ret) {
             LOG_MODULE(ERROR, pluginName_) << "init hook map error";
         }
@@ -94,7 +96,8 @@ bool GILPlugin::start(const json &params, int duration) {
         return true;
 
     // Get the mapping relationship between AI process IDs (host pid) and ranks.
-    // If the pid-to-rank map is empty, initialize it by setting rank-pid mapping.
+    // If the pid-to-rank map is empty, initialize it by setting rank-pid
+    // mapping.
     if (host_pid_to_rank_mapping_.empty()) {
         initPidToRankMap();
     }
@@ -129,7 +132,8 @@ bool GILPlugin::start(const json &params, int duration) {
         return false;
     }
 
-    systrace::fileWriterUtil::strbuf_init(&json_buf_, BUF_CHUNK_SIZE, trace_output_stream_);
+    systrace::fileWriterUtil::strbuf_init(&json_buf_, BUF_CHUNK_SIZE,
+                                          trace_output_stream_);
     if (!json_buf_.buf) {
         LOG_MODULE(ERROR, pluginName_) << "Init buffer failed";
         fclose(trace_output_stream_);
@@ -399,17 +403,19 @@ void GILPlugin::process_raw_event(void *data) {
         remaining -= ret;
     }
     std::string rank_str = "";
-    if (host_pid_to_rank_mapping_.find(e->pid) != host_pid_to_rank_mapping_.end()) {
+    if (host_pid_to_rank_mapping_.find(e->pid) !=
+        host_pid_to_rank_mapping_.end()) {
         rank_str = std::to_string(host_pid_to_rank_mapping_[e->pid]);
     } else {
         rank_str = std::to_string(e->pid);
     }
     std::string tid_str =
         std::string(pluginName_) + "_" + std::to_string(e->tid);
+    uint64_t current_time = systrace::util::time::MonotonicNsToUtcUs(e->ts);
     ret = snprintf(write_ptr, remaining,
-                   "  {\"name\": \"%s\", \"ph\": \"%c\", \"ts\": %llu, "
+                   "  {\"name\": \"%s\", \"ph\": \"%c\", \"ts\": %lu, "
                    "\"pid\": \"%s\", \"tid\": \"%s\"}",
-                   e->name, e->ph, e->ts / 1000, rank_str.c_str(),
+                   e->name, e->ph, current_time, rank_str.c_str(),
                    tid_str.c_str());
 
     if (ret < 0 || ret >= static_cast<int>(remaining)) {
@@ -428,9 +434,9 @@ void GILPlugin::process_raw_event(void *data) {
 std::string GILPlugin::auto_find_libpython() { return g_python_lib_path; }
 
 bool GILPlugin::try_bind_uprobe(struct bpf_program *prog, int pid,
-                                    const std::string &path,
-                                    const std::vector<std::string> &funcs,
-                                    bool is_ret) {
+                                const std::string &path,
+                                const std::vector<std::string> &funcs,
+                                bool is_ret) {
 
     for (const auto &func : funcs) {
         unsigned long off = systrace::elfutils::ElfUtils::find_function_offset(
@@ -467,26 +473,26 @@ void GILPlugin::attach_all_probes(std::vector<int> pids,
     }
 
     for (int i = 0; i < pids.size(); i++) {
-        if (!try_bind_uprobe(bpf_skeleton_->progs.handle_take_gil_enter, pids[i],
-                                 path, gil_acquire_symbols, false)) {
+        if (!try_bind_uprobe(bpf_skeleton_->progs.handle_take_gil_enter,
+                             pids[i], path, gil_acquire_symbols, false)) {
             LOG_MODULE(ERROR, pluginName_)
                 << "Process(pid=" << pids[i]
                 << ") Failed to attach Take GIL Enter probes";
         }
         if (!try_bind_uprobe(bpf_skeleton_->progs.handle_take_gil_exit, pids[i],
-                                 path, gil_acquire_symbols, true)) {
+                             path, gil_acquire_symbols, true)) {
             LOG_MODULE(ERROR, pluginName_)
                 << "Process(pid=" << pids[i]
                 << ") Failed to attach Take GIL Exit probes";
         }
-        if (!try_bind_uprobe(bpf_skeleton_->progs.handle_drop_gil_enter, pids[i],
-                                 path, gil_release_symbols, false)) {
+        if (!try_bind_uprobe(bpf_skeleton_->progs.handle_drop_gil_enter,
+                             pids[i], path, gil_release_symbols, false)) {
             LOG_MODULE(ERROR, pluginName_)
                 << "Process(pid=" << pids[i]
                 << ") Failed to attach Drop GIL Enter probes";
         }
         if (!try_bind_uprobe(bpf_skeleton_->progs.handle_drop_gil_exit, pids[i],
-                                 path, gil_release_symbols, true)) {
+                             path, gil_release_symbols, true)) {
             LOG_MODULE(ERROR, pluginName_)
                 << "Process(pid=" << pids[i]
                 << ") Failed to attach Drop GIL Exit probes";

@@ -40,7 +40,10 @@ static void find_python_path_cmd() {
     if (!pipe_ptr) {
         return;
     }
-    std::unique_ptr<FILE, decltype(&pclose)> pipe(pipe_ptr, pclose);
+    std::unique_ptr<FILE, void (*)(FILE *)> pipe(pipe_ptr, [](FILE *f) {
+        if (f)
+            pclose(f);
+    });
     while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
         result += buffer.data();
     }
