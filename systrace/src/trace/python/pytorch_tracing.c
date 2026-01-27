@@ -1,8 +1,4 @@
 #include "pytorch_tracing.h"
-#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
-#include <pyframe.h>
-#endif
-#include "../../../include/log/logging.h"
 
 Stagetype determine_stage_type(const char *function_name) {
     if (function_name == NULL) {
@@ -148,12 +144,6 @@ uint64_t getCodeOfFrame(PyFrameObject *frame) {
 
 #endif
 
-uint64_t getMsTime() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (uint64_t)tv.tv_sec * 1000000 + (uint64_t)tv.tv_usec;
-}
-
 static void ensure_python_initialized() {
     if (!Py_IsInitialized()) {
         Py_Initialize();
@@ -186,7 +176,7 @@ static int profiler(PyObject *obj, PyFrameObject *frame, int what,
                 systrace_get_empty_pytorch_tracing_data_array(tag_name);
             curr_data = tracing_data->curr_data;
         }
-        curr_data->data[curr_data->cur].start = getMsTime();
+        curr_data->data[curr_data->cur].start = get_current_utc_us();
         if (stage_type == DATALOADER) {
             global_stage_id++;
         }
@@ -202,7 +192,7 @@ static int profiler(PyObject *obj, PyFrameObject *frame, int what,
         if (start_tracing) {
             PyTorchTracingDataArray *curr_data = tracing_data->curr_data;
             curr_data->data[curr_data->cur].count = tracing_data->count;
-            curr_data->data[curr_data->cur++].end = getMsTime();
+            curr_data->data[curr_data->cur++].end = get_current_utc_us();
         }
         tracing_data->count++;
         pthread_mutex_unlock(&mutex);
@@ -437,7 +427,7 @@ static void gcCallback(PyObject *phase, PyObject *info) {
                 systrace_get_empty_pytorch_tracing_data_array(PY_TRACING_GC);
             curr_data = tracing_data->curr_data;
         }
-        curr_data->data[curr_data->cur].start = getMsTime();
+        curr_data->data[curr_data->cur].start = get_current_utc_us();
         pthread_mutex_unlock(&mutex);
     } else if (PyUnicode_CompareWithASCIIString(phase, "stop") == 0) {
         TracingData *tracing_data = receiveTracingData(PY_TRACING_GC);
@@ -447,11 +437,11 @@ static void gcCallback(PyObject *phase, PyObject *info) {
                 curr_data->data[curr_data->cur].count = tracing_data->count;
                 curr_data->data[curr_data->cur].type = PAYLOAD_GC;
                 getGcInfo(curr_data->data + curr_data->cur, info);
-                curr_data->data[curr_data->cur++].end = getMsTime();
+                curr_data->data[curr_data->cur++].end = get_current_utc_us();
             }
             curr_data->data[curr_data->cur].count = tracing_data->count;
             curr_data->data[curr_data->cur].stage_id = global_stage_id;
-            curr_data->data[curr_data->cur++].end = getMsTime();
+            curr_data->data[curr_data->cur++].end = get_current_utc_us();
         }
         tracing_data->count++;
     }

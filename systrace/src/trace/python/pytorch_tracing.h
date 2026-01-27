@@ -1,13 +1,17 @@
+#include "../../../include/common/constant.h"
+#include "../../../thirdparty/uthash.h"
+#include "pytorch_tracing_data.h"
 #include <Python.h>
 #include <frameobject.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/time.h>
-
-#include "../../../include/common/constant.h"
-#include "../../../thirdparty/uthash.h"
-#include "pytorch_tracing_data.h"
+#if PY_MAJOR_VERSION >= 3 && PY_MINOR_VERSION >= 11
+#include <pyframe.h>
+#endif
+#include "../../../include/log/logging.h"
+#include "../../../include/utils/TimeUtil.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +62,6 @@ static int tracing_data_count = 0;
 
 static int GetFuncAddressByPython(const char *input, char **error_message,
                                   int64_t *code_address, int *is_native);
-static uint64_t getMsTime();
 static TracingFunction *isTracedPyTorchFunction(PyFrameObject *frame);
 static TracingData *receiveTracingData(int name);
 static void addTracingData(int name, const char *func_name);

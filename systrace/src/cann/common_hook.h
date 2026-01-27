@@ -1,6 +1,7 @@
 #ifndef COMMON_HOOK_H
 #define COMMON_HOOK_H
 #define _GNU_SOURCE
+#include "../../include/utils/TimeUtil.hpp"
 #include <dlfcn.h>
 #include <errno.h>
 #include <pthread.h>
@@ -12,7 +13,6 @@
 #include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
-
 #if defined(__aarch64__)
 #include "../../thirdparty/aarch64/libunwind/libunwind.h"
 #elif defined(__x86_64__)
@@ -26,7 +26,6 @@
 #define PATH_LEN 256
 
 extern pid_t g_hooked_pid;
-uint64_t get_current_us();
 const char *get_so_name(uint64_t ip);
 unw_word_t get_so_base(unw_word_t addr);
 void get_log_filename(char *buf, size_t buf_size, const char *path_suffix);
