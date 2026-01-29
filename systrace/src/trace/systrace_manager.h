@@ -17,6 +17,7 @@
 #include "../plugins/MsptiTrackerPlugin.hpp"
 #include "../plugins/gil/GilPlugin.h"
 #include "../plugins/manager/ControlManager.hpp"
+#include "../plugins/pthread/PthreadPlugin.h"
 #include "library_loader.h"
 #include "python/pytorch_tracing_loader.h"
 

@@ -59,6 +59,31 @@ static void find_python_path_cmd() {
     }
 }
 
+static int set_libc_so_path(int pid, char *elf_path, int size,
+                            const char *so_keyword) {
+    char map_file[512];
+    char buf[512];
+    snprintf(map_file, sizeof(map_file), "/proc/%d/maps", pid);
+
+    FILE *fp = fopen(map_file, "r");
+    if (!fp)
+        return -1;
+
+    while (fgets(buf, sizeof(buf), fp)) {
+        char so_path[512] = {0};
+        if (sscanf(buf, "%*x-%*x %*s %*s %*s %*s %511s", so_path) != 1)
+            continue;
+
+        if (strstr(so_path, so_keyword)) {
+            snprintf(elf_path, size, "/proc/%d/root%s", pid, so_path);
+            fclose(fp);
+            return 0;
+        }
+    }
+    fclose(fp);
+    return -1;
+}
+
 extern "C" void _ZN9mindspore11distributed10InitializeEv() {
     std::call_once(init_flag, []() {
         std::string so_path = get_mindspore_lib_path();
@@ -99,6 +124,7 @@ extern "C" {
 #endif
 
 char g_python_lib_path[512] = {0};
+char g_libc_path[512] = {0};
 static void *load_symbol(const char *func_name) {
     if (!g_hal_lib) {
         g_hal_lib = dlopen("libascendcl.so", RTLD_LAZY);
@@ -138,6 +164,7 @@ static void *load_symbol(const char *func_name) {
 EXPOSE_API aclError aclInit(const char *configPath) {
     g_hooked_pid = getpid();
     find_python_path_cmd();
+    set_libc_so_path(g_hooked_pid, g_libc_path, sizeof(g_libc_path), "libc.so");
 
     HOOKED_FUNCTION(orig_aclInit, "aclInit", configPath);
 }

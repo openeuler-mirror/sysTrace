@@ -2,12 +2,30 @@
 
 #include "../../../include/common/ICollector.hpp"
 #include "../../../include/common/constant.h"
+#include "../../../include/log/logging.h"
+#include "../../../include/utils/ElfUtils.hpp"
 #include "../../../include/utils/FileWriterUtil.hpp"
+#include "../../../include/utils/PluginUtils.hpp"
+#include "../../../include/utils/TimeUtil.hpp"
+#include "../../../include/utils/TimerManager.hpp"
+#include "../../../include/utils/util.h"
+#include "../../os/python_gil.skel.h"
+#include "../ebpfPluginBase/EbpfCollectorBase.h"
+#include <algorithm>
 #include <atomic>
+#include <bpf/bpf.h>
+#include <bpf/libbpf.h>
+#include <fcntl.h>
+#include <gelf.h>
+#include <iomanip>
+#include <iostream>
 #include <memory>
 #include <mutex>
+#include <sstream>
 #include <string>
+#include <sys/stat.h>
 #include <thread>
+#include <unistd.h>
 #include <unordered_map>
 #include <vector>
 
@@ -27,7 +45,7 @@ struct UprobeLink {
     ~UprobeLink();
 };
 
-class GILPlugin : public ICollector {
+class GILPlugin : public EbpfCollectorBase, public ICollector {
   public:
     GILPlugin();
     ~GILPlugin();
@@ -43,15 +61,10 @@ class GILPlugin : public ICollector {
                          const std::string &path,
                          const std::vector<std::string> &funcs, bool is_ret);
     void cleanup_all_uprobe_links();
-    std::vector<int> get_trace_pids(const json &params);
 
-    std::vector<int> read_all_pids_from_map();
-    void initPidToRankMap();
-    int get_local_rank();
-    bool is_main_process();
     void register_target_process_to_bpf();
     std::string auto_find_libpython();
-
+    const size_t BUF_CHUNK_SIZE = 64 * 1024;
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
     struct python_gil_bpf *bpf_skeleton_ = nullptr;
     std::thread poll_thread_;
