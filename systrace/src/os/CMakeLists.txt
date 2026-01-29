@@ -10,6 +10,9 @@ set(BPFTOOL bpftool)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBBPF REQUIRED libbpf)
 pkg_check_modules(PROTOBUF_C REQUIRED libprotobuf-c)
+if(NOT USE_JSON_FORMAT)
+    pkg_check_modules(PROTOBUF_C REQUIRED libprotobuf-c)
+endif()
 
 # BPF compilation
 set(BPF_SOURCES

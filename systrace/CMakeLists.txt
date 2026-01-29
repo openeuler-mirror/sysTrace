@@ -8,6 +8,16 @@ set(CMAKE_SKIP_RPATH TRUE)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
 set(CMAKE_INSTALL_RPATH "")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+option(USE_JSON_FORMAT "Build with JSON output and NO protobuf link" OFF)
+option(HAS_BTF_SUPPORT "Enable BPF modules with BTF support" OFF)
+
+if(USE_JSON_FORMAT)
+    add_definitions(-DUSE_JSON)
+    message(STATUS ">>> Build Mode: JSON (Protobuf linking disabled) <<<")
+else()
+    message(STATUS ">>> Build Mode: Protobuf (Binary format) <<<")
+endif()
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
     set(UNWIND_LIB "unwind-aarch64")
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/include")
@@ -25,23 +35,34 @@ include_directories(
 )
 
 find_package(Python3 REQUIRED COMPONENTS Development)
-find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 
+if(NOT USE_JSON_FORMAT)
+    find_package(Protobuf REQUIRED)
+endif()
 add_library(common STATIC
     ${PROJECT_SOURCE_DIR}/include/log/logging.cc
     ${PROJECT_SOURCE_DIR}/include/utils/util.cc
     ${PROJECT_SOURCE_DIR}/include/utils/TimerManager.hpp
 )
-target_include_directories(common PUBLIC ${PROJECT_SOURCE_DIR}/include ${Python3_INCLUDE_DIRS})
+target_include_directories(common PUBLIC 
+    ${PROJECT_SOURCE_DIR}/include 
+    ${Python3_INCLUDE_DIRS}
+)
 
 
-add_subdirectory(protos)
+if(NOT USE_JSON_FORMAT)
+    add_subdirectory(protos)
+    set(PB_SOURCES "${PROJECT_SOURCE_DIR}/protos/systrace.pb-c.c")
+    set(PB_LIBS protobuf::libprotobuf protobuf-c general_pb2)
+else()
+    set(PB_SOURCES "")
+    set(PB_LIBS "")
+endif()
+
 if(HAS_BTF_SUPPORT)
     message(STATUS "Enabling BPF modules with BTF support")
     add_subdirectory(src/os)
-else()
-    message(WARNING "Disabling BPF modules (no BTF support)")
 endif()
 
 add_subdirectory(src/plugins/ebpf)
@@ -74,18 +95,20 @@ if(HAS_BTF_SUPPORT)
     target_compile_definitions(sysTrace_hook PRIVATE HAS_BTF_SUPPORT=1)
 endif()
 
-
 target_link_libraries(sysTrace_hook
     ebpf_module
     common
-    general_pb2
     ${Python3_LIBRARIES}
-    protobuf::libprotobuf
+    ${PB_LIBS}
     ${CMAKE_THREAD_LIBS}
     pthread
     -ldl
 )
+
 if(HAS_BTF_SUPPORT)
     target_link_libraries(sysTrace_hook os_probe)
-    message(STATUS "Linking osprobe library")
+endif()
+
+if(NOT USE_JSON_FORMAT)
+    target_link_libraries(sysTrace_cli general_pb2)
 endif()

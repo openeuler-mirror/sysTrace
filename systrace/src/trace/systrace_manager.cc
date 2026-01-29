@@ -1,13 +1,7 @@
-#include <cstdlib>
-#include <cstring>
+#include "systrace_manager.h"
+#include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <memory>
-#include <vector>
-
-#include "../../include/common/constant.h"
-#include "../../include/log/logging.h"
-#include "systrace_manager.h"
 
 int global_stage_id = 0;
 int global_stage_type = 0;
@@ -34,10 +28,39 @@ PyTorchTrace &PyTorchTrace::getInstance() {
     return *instance_;
 }
 
+PyTorchTrace::PyTorchTrace() {
+#ifdef USE_JSON
+    writer_thread_ = std::thread(&PyTorchTrace::writerLoop, this);
+#endif
+}
+
+PyTorchTrace::~PyTorchTrace() {
+#ifdef USE_JSON
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        stop_writer_ = true;
+    }
+    queue_cv_.notify_one();
+    if (writer_thread_.joinable())
+        writer_thread_.join();
+#else
+    std::lock_guard<std::mutex> lock(trace_mutex_);
+    writeTraceToFile();
+#endif
+    if (pytorch_tracing_library_) {
+        delete pytorch_tracing_library_;
+        pytorch_tracing_library_ = nullptr;
+    }
+}
+
 void PyTorchTrace::initialize() {
-    pytorch_trace_.set_rank(config::GlobalConfig::Instance().rank);
+#ifndef USE_JSON
+    pytorch_trace_.set_rank(
+        systrace::util::config::GlobalConfig::Instance().rank);
     LOG_MODULE(INFO, "PyTorchTrace")
-        << "Rank set to: " << config::GlobalConfig::Instance().rank;
+        << "Rank set to: "
+        << systrace::util::config::GlobalConfig::Instance().rank;
+#endif
 
     pytorch_tracing_library_ =
         new pytorch_tracing::PyTorchTracingLibrary("libsysTrace.so");
@@ -58,15 +81,16 @@ void PyTorchTrace::registerTracingFunctions() {
             pytorch_tracing_functions_.push_back(line);
         }
     }
-
     funcListFile.close();
 
-    auto errors =
-        pytorch_tracing_library_->Register(pytorch_tracing_functions_);
-    for (size_t i = 0; i < pytorch_tracing_functions_.size(); ++i) {
-        LOG_MODULE(INFO, "PyTorchTrace")
-            << "Registered function: " << pytorch_tracing_functions_[i]
-            << ", status: " << errors[i];
+    if (pytorch_tracing_library_) {
+        auto errors =
+            pytorch_tracing_library_->Register(pytorch_tracing_functions_);
+        for (size_t i = 0; i < pytorch_tracing_functions_.size(); ++i) {
+            LOG_MODULE(INFO, "PyTorchTrace")
+                << "Registered function: " << pytorch_tracing_functions_[i]
+                << ", status: " << errors[i];
+        }
     }
 }
 
@@ -84,17 +108,26 @@ void PyTorchTrace::dumpPyTorchTracing() {
 
     std::lock_guard<std::mutex> lock(trace_mutex_);
 
-    pytorch_trace_.set_rank(config::GlobalConfig::Instance().rank);
-    pytorch_trace_.set_comm(config::GlobalConfig::Instance().job_name);
+#ifndef USE_JSON
+    pytorch_trace_.set_rank(
+        systrace::util::config::GlobalConfig::Instance().rank);
+    pytorch_trace_.set_comm(
+        systrace::util::config::GlobalConfig::Instance().job_name);
+#endif
 
     for (size_t i = 0; i < pytorch_tracing_functions_.size(); ++i) {
         processFunctionTracingData(i);
     }
 
+#ifndef USE_JSON
     writeTraceToFile();
+#endif
 }
 
 void PyTorchTrace::processFunctionTracingData(size_t function_index) {
+    if (!pytorch_tracing_library_)
+        return;
+
     std::vector<PyTorchTracingDataArray *> data_holders;
 
     if (auto data = pytorch_tracing_library_->RetrievePartialTracingData(
@@ -112,11 +145,45 @@ void PyTorchTrace::processFunctionTracingData(size_t function_index) {
             if (data->data[i].start == 0)
                 continue;
 
+#ifdef USE_JSON
+            json item;
+            item["start_us"] = data->data[i].start;
+            item["end_us"] = data->data[i].end;
+            item["stage_id"] = data->data[i].count;
+            item["rank"] =
+                systrace::util::config::GlobalConfig::Instance().rank;
+
+            if (data->data[i].type == PAYLOAD_GC) {
+                item["stage_type"] = "GC";
+                item["gc_debug"] = {
+                    {"collected", data->data[i].payload.gc_debug[0]},
+                    {"uncollectable", data->data[i].payload.gc_debug[1]}};
+            } else {
+                item["stage_type"] = pytorch_tracing_functions_[function_index];
+            }
+
+            if (data->data[i].stack_depth > 0) {
+                item["stack_frames"] = json::array();
+                for (int j = 0; j < data->data[i].stack_depth; ++j) {
+                    if (data->data[i].stack_info[j][0] != '\0') {
+                        item["stack_frames"].push_back(
+                            data->data[i].stack_info[j]);
+                    }
+                }
+            }
+            enqueueTraceEntry(std::move(item));
+#else
             auto trace = pytorch_trace_.add_pytorch_stages();
             trace->set_start_us(data->data[i].start);
             trace->set_end_us(data->data[i].end);
             trace->set_stage_id(data->data[i].count);
-            trace->set_stage_type(pytorch_tracing_functions_[function_index]);
+
+            if (data->data[i].type == PAYLOAD_GC) {
+                trace->set_stage_type("GC");
+            } else {
+                trace->set_stage_type(
+                    pytorch_tracing_functions_[function_index]);
+            }
 
             if (data->data[i].stack_depth > 0) {
                 trace->mutable_stack_frames()->Reserve(
@@ -133,15 +200,54 @@ void PyTorchTrace::processFunctionTracingData(size_t function_index) {
                 gc_debug->set_collected(data->data[i].payload.gc_debug[0]);
                 gc_debug->set_uncollectable(data->data[i].payload.gc_debug[1]);
             }
+#endif
         }
     }
-
     for (auto data : data_holders) {
-        pytorch_tracing_library_->ReleaseTracingData(
+            pytorch_tracing_library_->ReleaseTracingData(
             data, PY_TRACING_EMPTY_POOL, function_index);
     }
 }
 
+#ifdef USE_JSON
+void PyTorchTrace::enqueueTraceEntry(json &&entry) {
+    {
+        std::lock_guard<std::mutex> lock(queue_mutex_);
+        trace_queue_.push(std::move(entry));
+    }
+    queue_cv_.notify_one();
+}
+
+void PyTorchTrace::writerLoop() {
+    while (true) {
+        std::vector<json> batch;
+        {
+            std::unique_lock<std::mutex> lock(queue_mutex_);
+            queue_cv_.wait(
+                lock, [this] { return !trace_queue_.empty() || stop_writer_; });
+            if (stop_writer_ && trace_queue_.empty())
+                break;
+            while (!trace_queue_.empty()) {
+                batch.push_back(std::move(trace_queue_.front()));
+                trace_queue_.pop();
+            }
+        }
+        if (!batch.empty()) {
+            const std::string &dump_path = std::string(
+                constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH);
+            std::string file_path =
+                dump_path + "/" +
+                util::fs_utils::GenerateClusterUniqueFilename(".json");
+            std::ofstream file(file_path, std::ios::app);
+            if (file.is_open()) {
+                for (const auto &entry : batch)
+                    file << entry.dump() << "\n";
+                file.flush();
+            }
+        }
+    }
+}
+#else
 void PyTorchTrace::writeTraceToFile() {
     const std::string &dump_path =
         std::string(constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH);
@@ -164,6 +270,7 @@ void PyTorchTrace::writeTraceToFile() {
 
     file << binary_data;
 }
+#endif
 
 SysTrace &SysTrace::getInstance() {
     std::call_once(init_flag_, []() {
@@ -175,46 +282,11 @@ SysTrace &SysTrace::getInstance() {
 }
 
 SysTrace::~SysTrace() {
-    ControlManager::getInstance().stop();
+    stopEventPoller();
 #ifdef HAS_BTF_SUPPORT
     stopOsProbePoller();
 #endif
-    stopEventPoller();
 }
-
-void SysTrace::initializeSystem() {
-    if (!config::GlobalConfig::Instance().enable)
-        return;
-    systrace::util::InitializeSystemUtilities();
-    registerPlugins();
-    ControlManager::getInstance().start();
-
-    MSPTITracker::getInstance();
-    PyTorchTrace::getInstance();
-#ifdef HAS_BTF_SUPPORT
-    os_probe_ = std::thread(&run_osprobe);
-#endif
-
-    startEventPoller();
-}
-
-void SysTrace::startEventPoller() {
-#ifdef _GNU_SOURCE
-    should_run_ = true;
-    event_poller_ = std::thread(&SysTrace::eventPollerMain, this);
-    pthread_setname_np(event_poller_.native_handle(), "systrace_poller");
-#endif
-    LOG_MODULE(INFO, "SysTrace") << "Event poller started";
-}
-
-#ifdef HAS_BTF_SUPPORT
-void SysTrace::stopOsProbePoller() {
-    cleanup_osprobe();
-    if (os_probe_.joinable()) {
-        os_probe_.join();
-    }
-}
-#endif
 
 void SysTrace::registerPlugins() {
     auto &cm = ControlManager::getInstance();
@@ -230,11 +302,32 @@ void SysTrace::registerPlugins() {
     cm.register_plugin(std::make_shared<TracePlugin>());
 }
 
+void SysTrace::initializeSystem() {
+    if (!systrace::util::config::GlobalConfig::Instance().enable)
+        return;
+    systrace::util::InitializeSystemUtilities();
+    registerPlugins();
+    ControlManager::getInstance().start();
+
+    MSPTITracker::getInstance();
+    PyTorchTrace::getInstance();
+#ifdef HAS_BTF_SUPPORT
+    os_probe_ = std::thread(&run_osprobe);
+#endif
+    startEventPoller();
+}
+
+void SysTrace::startEventPoller() {
+    should_run_ = true;
+    event_poller_ = std::thread(&SysTrace::eventPollerMain, this);
+    pthread_setname_np(event_poller_.native_handle(), "systrace_poller");
+}
+
 void SysTrace::stopEventPoller() {
     should_run_ = false;
-    if (event_poller_.joinable()) {
+    if (event_poller_.joinable())
         event_poller_.join();
-    }
+    ControlManager::getInstance().stop();
 }
 
 void SysTrace::eventPollerMain() {
@@ -246,10 +339,24 @@ void SysTrace::eventPollerMain() {
         }
         std::this_thread::sleep_for(POLL_INTERVAL);
     }
+    PyTorchTrace::getInstance().dumpPyTorchTracing();
+}
 
-    if (PyTorchTrace::getInstance().triggerTrace()) {
+#ifdef HAS_BTF_SUPPORT
+void SysTrace::stopOsProbePoller() {
+    cleanup_osprobe();
+    if (os_probe_.joinable())
+        os_probe_.join();
+}
+#endif
+
+void SysTrace::cleanup() {
+    if (instance_) {
         PyTorchTrace::getInstance().dumpPyTorchTracing();
     }
+#ifdef HAS_BTF_SUPPORT
+    instance_->stopOsProbePoller();
+#endif
 }
 
 } // namespace systrace

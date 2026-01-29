@@ -1,5 +1,6 @@
 #!/bin/bash
 
+MODE=${1:-"proto"}
 CONFIG_DIR="/etc/systrace/config"
 PY_FUNC_LIST="config/PyFuncList"
 BPF_MOUNT="/sys/fs/bpf"
@@ -8,6 +9,7 @@ BUILD_DIR="build"
 
 cleanup() {
     mkdir -p "$BUILD_DIR" "$CONFIG_DIR"
+    rm -rf "$BUILD_DIR"/*
     rm -rf "$BPF_MOUNT/sysTrace"
     mount -t bpf bpf "$BPF_MOUNT/" 2>/dev/null || true
     rm -f src/os/*.{o,skel.h}
@@ -18,15 +20,18 @@ setup_config() {
 }
 
 compile_proto() {
+    if [ "$MODE" == "json" ]; then
+        echo "JSON Mode detected. Skipping Protobuf compilation."
+        return
+    fi
+
+    echo "Compiling Protobuf definitions..."
     cd "$PROTOS_DIR"
     PROTOC_VERSION=$(protoc --version | awk '{print $2}' | cut -d. -f1)
-    PROTO_FILE=""
-    PROTO_EXTRA_OPT=""
-
     if [ "$PROTOC_VERSION" -ge 3 ]; then
-        mv systrace.v3.proto systrace.proto
+        cp systrace.v3.proto systrace.proto
     else
-        mv systrace.v2.proto systrace.proto
+        cp systrace.v2.proto systrace.proto
     fi
     protoc --{c,cpp,python}_out=. systrace.proto
     cd ..
@@ -41,7 +46,15 @@ check_btf() {
 build() {
     cd "$BUILD_DIR"
     cmake_flags=""
-    check_btf && cmake_flags="-DHAS_BTF_SUPPORT=ON" || cmake_flags="-DHAS_BTF_SUPPORT=OFF"
+
+    if [ "$MODE" == "json" ]; then
+        cmake_flags="-DUSE_JSON_FORMAT=ON"
+    else
+        cmake_flags="-DUSE_JSON_FORMAT=OFF"
+    fi
+
+    check_btf && cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=ON" || cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=OFF"
+    
     cmake .. $cmake_flags
     make -j $(nproc)
     cd ..
