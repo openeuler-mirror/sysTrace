@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <signal.h>
 #include <string>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
@@ -25,6 +26,14 @@ class CacheMissPlugin : public ICollector {
   public:
     CacheMissPlugin() {
         pluginName_ = PluginNameType::CACHE_MISS_PLUGIN.data();
+        std::string dir = std::string(SYS_TRACE_ROOT_DIR) + pluginName_;
+        mkdir(dir.c_str(), 0755);
+        output_ =
+            dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
+            "_rank_" +
+            std::to_string(
+                systrace::util::config::GlobalConfig::Instance().local_rank) +
+            ".txt";
     }
     bool start(const json &params, int duration) override {
         if (systrace::util::config::GlobalConfig::Instance().local_rank != 0) {
@@ -42,22 +51,15 @@ class CacheMissPlugin : public ICollector {
             return false;
         }
 
-        std::string output = "";
-        if (params.contains("output") && params["output"].is_string()) {
-            output = params["output"].get<std::string>();
-        } else {
-            output =
-                std::string(SYS_TRACE_ROOT_DIR) + get_id() + "_" +
-                std::to_string(g_hooked_pid) + "_rank_" +
-                std::to_string(systrace::util::config::GlobalConfig::Instance()
-                                   .local_rank) +
-                ".txt";
-        }
-        output_file_ = output;
-
         std::string args = params.value("args", "");
-        std::string full_cmd = "perf stat " + args + " -o " + output + " 2>&1";
-        LOG_MODULE(INFO, pluginName_) << " Output file: " << output;
+        if (args.empty()) {
+            LOG_MODULE(ERROR, pluginName_)
+                << "Failed to start: 'args' (target command) is empty.";
+            active_.store(false);
+            return false;
+        }
+        std::string full_cmd = "perf stat " + args + " -o " + output_ + " 2>&1";
+        LOG_MODULE(INFO, pluginName_) << " Output file: " << output_;
 
         perf_pid_ = fork();
         if (perf_pid_ == 0) {
@@ -125,5 +127,5 @@ class CacheMissPlugin : public ICollector {
 
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
     pid_t perf_pid_ = -1;
-    std::string output_file_;
+    std::string output_;
 };
