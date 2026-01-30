@@ -35,7 +35,18 @@ class UsageHelper {
              {{"event=<types>", "Comma-separated: marker, kernel, api"}}},
             {"IO", "Disk and Network I/O Latency/Throughput", {}},
             {"CPU", "CPU Utilization and Context Switch Trace", {}},
-            {"Memory", "Memory Allocation and Leak Detection", {}}};
+            {"Memory", "Memory Allocation and Leak Detection", {}},
+            {"CacheMiss",
+             "Hardware Cache Miss Rates and Memory Access Efficiency",
+             {{"args=-p <pid> -e <events> --timeout <ms>",
+               "Standard perf-stat arguments for hardware event monitoring"}}},
+            {"GIL",
+             "Python Global Interpreter Lock (GIL) Contention and Latency "
+             "Trace",
+             {{"pid=<pid>", "trace target python process"}}},
+            {"Mutex",
+             "Pthread Synchronization Latency (Mutex/RWLock/Spinlock/Sem)",
+             {{"pid=<pid>", "trace target process"}}}};
 
         std::cout << "\033[1;36m"
                   << "========================================================="
@@ -73,6 +84,13 @@ class UsageHelper {
                      "duration=10\n";
         std::cout << "  sysTrace_cli enable IO duration=10\n";
         std::cout << "  sysTrace_cli enable Memory duration=10\n";
+        std::cout << "  sysTrace_cli enable CacheMiss duration=10 args=\"-p "
+                     "12345 -e cache-miss\"\n";
+        std::cout << "  sysTrace_cli enable GIL duration=10\n";
+        std::cout << "  sysTrace_cli enable Mutex duration=10\n";
+        std::cout << "  sysTrace_cli enable CacheMiss args=\" -e "
+                     "branch-misses,cache-misses,cache-references "
+                     "--timeout 5000\" duration=10\n";
         std::cout << "  sysTrace_cli disable CPU\n";
         std::cout << "\033[1;36m"
                   << "========================================================="
