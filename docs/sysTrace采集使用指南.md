@@ -59,6 +59,7 @@ EXAMPLES:
 | GIL       | Python Global Interpreter Lock (GIL) Contention and Latency Trace |                       ./sysTrace_cli enable GIL  duration=10 |
 | CacheMiss |    Hardware Cache Miss Rates and Memory Access Efficiency    | ./sysTrace_cli enable CacheMiss args="-p 27638 -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads --timeout 20000" |
 | Mutex     | Pthread Synchronization Latency (Mutex/RWLock/Spinlock/Sem)  |                      ./sysTrace_cli enable Mutex duration=10 |
+| Ftrace    | Linux Kernel Ftrace (Events, Function Graph, and Sched Tracing) | ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit" |
 
 ## 4、使用示例
 ### 4.1 HBM
@@ -90,6 +91,7 @@ total 64
 -rw-r--r-- 1 root root 30900 Jan 30 09:40 hbm_trace_rank0_1868164.pb
 -rw-r--r-- 1 root root 30684 Jan 30 09:40 hbm_trace_rank1_1868165.pb
 ~~~
+
 
 
 ### 4.2 IO
@@ -124,7 +126,9 @@ total 60
 ~~~
 
 
+
 ### 4.3 MSPTI
+
 ~~~bash
 # 采集指令
 ./sysTrace_cli enable MSPTI duration=10
@@ -155,7 +159,9 @@ total 1288
 ~~~
 
 
+
 ### 4.4 CPU
+
 ~~~bash
 # 采集指令
 ./sysTrace_cli enable CPU duration=10
@@ -184,6 +190,7 @@ total 260
 -rw-r--r-- 1 root root 128010 Jan 30 09:51 os_trace_20260130_09_rank_0_1868164.pb
 -rw-r--r-- 1 root root 133567 Jan 30 09:51 os_trace_20260130_09_rank_1_1868165.pb
 ~~~
+
 
 
 ### 4.5 Memory
@@ -217,7 +224,7 @@ total 260
 -rw-r--r-- 1 root root 133567 Jan 30 09:51 os_trace_20260130_09_rank_1_1868165.pb
 ~~~
 
-### 
+
 
 ### 4.6 GIL
 
@@ -273,7 +280,7 @@ total 13172
 -rw-r--r-- 1 root root 13487979 Jan 30 10:37 GIL_1901644_rank_0.json
 ~~~
 
-### 
+
 
 ### 4.7 CacheMiss
 
@@ -341,7 +348,7 @@ cat  /home/sysTrace/CacheMiss/CacheMiss_1935088_rank_0.txt
        5.015744890 seconds time elapsed
 ~~~
 
-### 
+ 
 
 ### 4.7 Mutex
 
@@ -416,4 +423,76 @@ total 716
 -rw-r--r-- 1 root root 729376 Jan 30 10:53 Mutex_1901644_rank_0.json
 ~~~
 
+ 
+
+### 4.8 Ftrace
+
+~~~bash
+# 采集指令 
+ ./sysTrace_cli enable Ftrace duration=10  events="syscalls/sys_enter_futex,syscalls/sys_exit_futex" cpu_list=0-15
+
+# 指令发送成功
+[ACK] /tmp/sysTrace_3249973.sock: SUCCESS
+[ACK] /tmp/sysTrace_3249974.sock: SUCCESS
+
+# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
+[2026-01-31 16:56:31.848] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"},"path":"Ftrace"}
+[2026-01-31 16:56:31.848] [Control] [RANK 0] [INFO] Enabling plugin: Ftrace with params: {"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"}
+[2026-01-31 16:56:32.172] [Ftrace] [RANK 0] [INFO] Parallel Ftrace started. Output file: /home/sysTrace/Ftrace/Ftrace_3249973_rank_0.log
+[2026-01-31 16:56:32.172] [Control] [RANK 0] [INFO] Response sent: SUCCESS
+[2026-01-31 16:56:32.172] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"},"path":"Ftrace"}
+[2026-01-31 16:56:32.173] [Control] [RANK 1] [INFO] Enabling plugin: Ftrace with params: {"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"}
+[2026-01-31 16:56:32.173] [Control] [RANK 1] [INFO] Response sent: SUCCESS
+[2026-01-31 16:56:43.183] [Ftrace] [RANK 0] [INFO] Parallel ftrace stop.
+
+#采集结果 log是采集结果
+[root@localhost Ftrace]# pwd
+/home/sysTrace/Ftrace
+[root@localhost Ftrace]# ll
+total 4
+-rw-r--r-- 1 root root  870 Jan 31 16:56 Ftrace_3249973_rank_0.log
+drwxr-xr-x 2 root root 4096 Jan 31 16:56 tmp
+
+常用指令：
+1. 系统软中断跟踪（仅启用软中断事件）
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="irq/softirq_entry,irq/softirq_exit,irq/softirq_raise"
+
+2. 系统硬中断跟踪（仅启用硬中断事件）
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="irq/irq_handler_entry,irq/irq_handler_exit"
+
+3. 系统所有系统调用跟踪（raw_syscalls 全量）
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit"
+
+4. 特定系统调用 (Futex) 跟踪（仅 Futex 调用）
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex"
+
+5. 特定系统调用 (sys_write) 跟踪（仅 write 调用）
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="syscalls/sys_enter_write,syscalls/sys_exit_write"
+
+6. 任务调度跟踪（仅调度相关事件）
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="sched/sched_switch,sched/sched_wakeup,sched/sched_waking,sched/sched_migrate_task,sched/sched_wakeup_new"
+
+7. 内核函数跟踪 (hal_kernel_svm_dam_desc_create)（function_graph 追踪器） --数据量较大
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 tracer=function_graph func="hal_kernel_svm_dam_desc_create"
+
+8. 内核函数跟踪 (mmap/munmap/do_page_fault)（function 追踪器） --数据量较大
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 tracer=function func="*mmap,*munmap,do_page_fault" stack_trace=1
+
+9. 内存页表跟踪 (vmscan 全量事件)
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="vmscan/mm_vmscan_wakeup_kswapd,vmscan/mm_vmscan_direct_reclaim_begin,vmscan/mm_vmscan_direct_reclaim_end,vmscan/mm_vmscan_memcg_reclaim_begin,vmscan/mm_vmscan_memcg_reclaim_end,vmscan/mm_vmscan_node_reclaim_begin,vmscan/mm_vmscan_node_reclaim_end,vmscan/mm_vmscan_kswapd_wake,vmscan/mm_vmscan_kswapd_sleep"
+
+10. 内存页表跟踪 (compaction 事件)
+
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="compaction/mm_compaction_begin,compaction/mm_compaction_end"
+
+~~~
 
