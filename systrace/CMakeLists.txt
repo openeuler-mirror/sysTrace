@@ -44,6 +44,8 @@ else()
     message(WARNING "Disabling BPF modules (no BTF support)")
 endif()
 
+add_subdirectory(src/plugins/ebpf)
+
 add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/trace/systrace_manager.cc
     ${PROJECT_SOURCE_DIR}/src/trace/library_loader.cc
@@ -73,6 +75,7 @@ endif()
 
 
 target_link_libraries(sysTrace_hook
+    ebpf_module
     common
     general_pb2
     ${Python3_LIBRARIES}

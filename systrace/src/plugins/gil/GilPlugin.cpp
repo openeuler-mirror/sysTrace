@@ -382,7 +382,7 @@ bool GILPlugin::try_bind_uprobe(struct bpf_program *prog, int pid,
                     << std::dec;
                 return true;
             } else {
-                LOG_MODULE(WARNING, pluginName_)
+                LOG_MODULE(WARN, pluginName_)
                     << "Failed to attach uprobe: PID=" << pid
                     << ", func=" << func << ", is_ret=" << is_ret
                     << ", error=" << strerror(errno);

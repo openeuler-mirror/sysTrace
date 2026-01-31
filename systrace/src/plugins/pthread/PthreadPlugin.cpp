@@ -189,7 +189,7 @@ void PthreadPlugin::init_trace_setting_t(const json &params) {
             try {
                 final_min_dur = std::stoull(v.get<std::string>());
             } catch (...) {
-                LOG_MODULE(WARNING, pluginName_)
+                LOG_MODULE(WARN, pluginName_)
                     << "Invalid min_dur_ns string: " << v;
             }
         } else if (v.is_number()) {

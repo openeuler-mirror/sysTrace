@@ -26,7 +26,7 @@ static LogLevel getLogLevelFromEnv() {
     if (level_str == "DEBUG")
         return DEBUG;
     if (level_str == "WARN")
-        return WARNING;
+        return WARN;
     if (level_str == "INFO")
         return INFO;
     if (level_str == "ERROR")
@@ -63,7 +63,7 @@ const char *getLogLevelTag(LogLevel level) {
     switch (level) {
     case DEBUG:
         return "DEBUG";
-    case WARNING:
+    case WARN:
         return "WARN";
     case INFO:
         return "INFO";
@@ -163,10 +163,10 @@ void systrace_log_info(const char *module, const char *format, ...) {
     systrace_log_impl(INFO, module, format, args);
     va_end(args);
 }
-void systrace_log_warning(const char *module, const char *format, ...) {
+void systrace_log_warn(const char *module, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    systrace_log_impl(WARNING, module, format, args);
+    systrace_log_impl(WARN, module, format, args);
     va_end(args);
 }
 void systrace_log_error(const char *module, const char *format, ...) {

@@ -7,7 +7,7 @@
         func_ptr = (func_type)dlsym(handle, symbol);                           \
         const char *dlsym_error = dlerror();                                   \
         if (dlsym_error) {                                                     \
-            LOG(WARNING) << "Load fn `" << symbol << "` error in " << msg      \
+            LOG(WARN) << "Load fn `" << symbol << "` error in " << msg      \
                          << dlsym_error;                                       \
             is_usable_ = false;                                                \
             return;                                                            \
