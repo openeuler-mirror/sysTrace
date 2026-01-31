@@ -13,7 +13,7 @@
 #include <type_traits>
 #endif
 
-enum LogLevel { DEBUG = 0, WARNING = 1, INFO = 2, ERROR = 3, FATAL = 4 };
+enum LogLevel { DEBUG = 0, WARN = 1, INFO = 2, ERROR = 3, FATAL = 4 };
 
 #ifdef __cplusplus
 namespace systrace {
@@ -147,7 +147,7 @@ void closeLoggingFile();
 extern "C" {
 #endif
 void systrace_log_info(const char *module, const char *format, ...);
-void systrace_log_warning(const char *module, const char *format, ...);
+void systrace_log_warn(const char *module, const char *format, ...);
 void systrace_log_error(const char *module, const char *format, ...);
 void systrace_log_fatal(const char *module, const char *format, ...);
 void systrace_log_debug(const char *module, const char *format, ...);

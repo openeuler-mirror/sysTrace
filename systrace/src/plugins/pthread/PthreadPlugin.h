@@ -9,7 +9,7 @@
 #include "../../../include/utils/TimeUtil.hpp"
 #include "../../../include/utils/TimerManager.hpp"
 #include "../../../include/utils/util.h"
-#include "../../os/pthrd_sync.skel.h"
+#include "../ebpf//pthrd_sync.skel.h"
 #include "../ebpfPluginBase/EbpfCollectorBase.h"
 #include <atomic>
 #include <bpf/bpf.h>

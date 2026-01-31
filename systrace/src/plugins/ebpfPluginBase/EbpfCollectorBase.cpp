@@ -21,7 +21,7 @@ std::unordered_map<int, int> EbpfCollectorBase::init_pid_to_rank_map() {
     std::unordered_map<int, int> pid_to_rank;
     int map_fd = bpf_obj_get(PROC_FILTER_RANK_MAP_PATH);
     if (map_fd < 0) {
-        LOG_MODULE(ERROR, ebpfPluginName_)
+        LOG_MODULE(WARN, ebpfPluginName_)
             << "Failed to get eBPF map FD: " << strerror(errno)
             << " (path: " << PROC_FILTER_RANK_MAP_PATH << ")";
         return pid_to_rank;
@@ -48,7 +48,7 @@ std::unordered_map<int, int> EbpfCollectorBase::init_pid_to_rank_map() {
 
         int read_ret = bpf_map_lookup_elem(map_fd, &next_key, &rank_value);
         if (read_ret != 0) {
-            LOG_MODULE(WARNING, ebpfPluginName_)
+            LOG_MODULE(WARN, ebpfPluginName_)
                 << "Failed to read rank for PID " << next_key << ": "
                 << strerror(errno);
             iter_key = next_key;
@@ -100,7 +100,7 @@ std::vector<int> EbpfCollectorBase::read_all_pids_from_map() {
         if (read_ret == 0 && pid > 0) {
             trace_pids.push_back(static_cast<int>(pid));
         } else if (read_ret != 0) {
-            LOG_MODULE(WARNING, ebpfPluginName_)
+            LOG_MODULE(WARN, ebpfPluginName_)
                 << " Failed to read PID for key " << next_key << ": "
                 << strerror(errno);
         }

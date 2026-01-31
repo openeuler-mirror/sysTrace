@@ -149,7 +149,7 @@ class EnvVarRegistry {
 
         // Fall back to static default
         result = getDefault<T>();
-        LOG_MODULE(WARNING, "Utils") << "[ENV] Get not register env " << name
+        LOG_MODULE(WARN, "Utils") << "[ENV] Get not register env " << name
                                      << "=" << result << " from default";
         return result;
     }

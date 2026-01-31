@@ -122,12 +122,12 @@ void ValidateDeviceConfiguration() {
 
     if (config.devices.empty()) {
         config.enable = false;
-        LOG_MODULE(WARNING, "Utils") << "No devices found, disabling tracing";
+        LOG_MODULE(WARN, "Utils") << "No devices found, disabling tracing";
         return;
     }
 
     if (config.local_world_size != config.devices.size()) {
-        LOG_MODULE(WARNING, "Utils")
+        LOG_MODULE(WARN, "Utils")
             << "Local world size mismatch, disabling hook";
         config.enable = false;
     }

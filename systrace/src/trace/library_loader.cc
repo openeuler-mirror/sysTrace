@@ -18,7 +18,7 @@ DynamicLibraryLoader::~DynamicLibraryLoader() {
 
 void DynamicLibraryLoader::LoadDynamicLibrary() {
     if (library_handle_) {
-        LOG(WARNING) << "Library already loaded: " << library_path_;
+        LOG(WARN) << "Library already loaded: " << library_path_;
         return;
     }
 
@@ -27,7 +27,7 @@ void DynamicLibraryLoader::LoadDynamicLibrary() {
     library_handle_ = dlopen(library_path_.c_str(), RTLD_LAZY);
     if (!library_handle_) {
         const char *error_message = dlerror();
-        LOG(WARNING) << "Failed to load library: "
+        LOG(WARN) << "Failed to load library: "
                      << (error_message ? error_message : "Unknown error");
         is_usable_ = false;
         return;
