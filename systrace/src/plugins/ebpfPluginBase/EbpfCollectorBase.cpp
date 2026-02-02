@@ -135,3 +135,16 @@ std::vector<int> EbpfCollectorBase::get_trace_pids(const json &params) {
     result_pids.erase(last, result_pids.end());
     return result_pids;
 }
+
+int EbpfCollectorBase::set_memlock_rlimit(unsigned long limit) {
+    struct rlimit rlim_new = {
+        .rlim_cur = limit,
+        .rlim_max = limit,
+    };
+
+    if (setrlimit(RLIMIT_MEMLOCK, (const struct rlimit *)&rlim_new) != 0) {
+        (void)fprintf(stderr, "Failed to increase RLIMIT_MEMLOCK limit!\n");
+        return 0;
+    }
+    return 1;
+}
