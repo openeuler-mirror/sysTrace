@@ -44,8 +44,8 @@ bool PyTorchTracingLibrary::LoadSymbol(const SymbolConfig &config) {
     void *symbol = dlsym(library_handle_, config.name);
     if (!symbol) {
         LOG(WARN) << "Failed to load symbol: " << config.name
-                     << " (type: " << config.type_name
-                     << "), error: " << dlerror();
+                  << " (type: " << config.type_name
+                  << "), error: " << dlerror();
         return false;
     }
 

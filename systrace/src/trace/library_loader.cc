@@ -28,7 +28,7 @@ void DynamicLibraryLoader::LoadDynamicLibrary() {
     if (!library_handle_) {
         const char *error_message = dlerror();
         LOG(WARN) << "Failed to load library: "
-                     << (error_message ? error_message : "Unknown error");
+                  << (error_message ? error_message : "Unknown error");
         is_usable_ = false;
         return;
     }

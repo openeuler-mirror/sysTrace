@@ -46,7 +46,30 @@ class UsageHelper {
              {{"pid=<pid>", "trace target python process"}}},
             {"Mutex",
              "Pthread Synchronization Latency (Mutex/RWLock/Spinlock/Sem)",
-             {{"pid=<pid>", "trace target process"}}}};
+             {{"pid=<pid>", "trace target process"}}},
+            {
+                "Ftrace",
+                "Linux Kernel Ftrace (Events, Function Graph, and Sched "
+                "Tracing)",
+                {
+                    {"cpu_list=\"0-15\"",
+                     "Trace specific CPUs (e.g., \"0-3,5\")"},
+                    {"events=\"<group>/<event>,<group>/<event>\"",
+                     "Enable tracepoints: irq, sched, syscalls, raw_syscalls, "
+                     "vmscan, compaction"},
+                    {"function_tracer=\"function_graph|function\"",
+                     "Set ftrace tracer (default: nop)"},
+                    {"func=\"func1 func2\"",
+                     "Filter kernel functions to trace (wildcards supported: "
+                     "\"*mmap\")"},
+                    {"func_stack_trace=1",
+                     "Enable kernel stack trace for functions (use with "
+                     "function_tracer=function)"},
+                    {"event_stack_trace=1", "Enable kernel stack trace for "
+                                            "events (use with events!=null)"},
+                },
+
+            }};
 
         std::cout << "\033[1;36m"
                   << "========================================================="
@@ -92,6 +115,9 @@ class UsageHelper {
                      "branch-misses,cache-misses,cache-references "
                      "--timeout 5000\" duration=10\n";
         std::cout << "  sysTrace_cli disable CPU\n";
+        std::cout
+            << "  sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 "
+               "events=\"syscalls/sys_enter_futex,syscalls/sys_exit_futex\"\n";
         std::cout << "\033[1;36m"
                   << "========================================================="
                   << "\033[0m" << std::endl;
@@ -136,7 +162,7 @@ class TraceCLI {
         strncpy(addr.sun_path, s_path.c_str(), sizeof(addr.sun_path) - 1);
 
         struct timeval tv {
-            1, 0
+            5, 0
         };
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
 

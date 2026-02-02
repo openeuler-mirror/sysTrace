@@ -62,6 +62,7 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/plugins/gil/GilPlugin.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/pthread/PthreadPlugin.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/ebpfPluginBase/EbpfCollectorBase.cpp
+    ${PROJECT_SOURCE_DIR}/src/plugins/ftrace/FtracePlugin.cpp
 )
 
 add_executable(sysTrace_cli

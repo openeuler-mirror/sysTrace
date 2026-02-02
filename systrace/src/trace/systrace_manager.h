@@ -15,6 +15,7 @@
 #include "../plugins/HbmPlugin.hpp"
 #include "../plugins/IOPlugin.hpp"
 #include "../plugins/MsptiTrackerPlugin.hpp"
+#include "../plugins/ftrace/FtracePlugin.h"
 #include "../plugins/gil/GilPlugin.h"
 #include "../plugins/manager/ControlManager.hpp"
 #include "../plugins/pthread/PthreadPlugin.h"
