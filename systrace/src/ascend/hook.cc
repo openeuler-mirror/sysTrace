@@ -1,12 +1,15 @@
 #include "hook.h"
 #include "../../include/log/logging.h"
 #include "../src/trace/systrace_manager.h"
+#include <Python.h>
+#include <chrono>
 #include <cstdlib>
 #include <dlfcn.h>
 #include <iostream>
 #include <mutex>
 #include <stdio.h>
 #include <string>
+#include <thread>
 #include <unistd.h>
 
 static std::string get_mindspore_lib_path() {
@@ -137,27 +140,127 @@ static void *load_symbol(const char *func_name) {
 
     void *func = dlsym(g_hal_lib, func_name);
     if (!func) {
-        systrace_log_error("Hook", "Failed to dlsym %s: %s", func_name,
-                           dlerror());
+        std::cout << "[Hook]"
+                  << "Failed to dlsym: " << func_name << " " << dlerror()
+                  << std::endl;
     } else {
-        systrace_log_info("Hook", "Successfully hooked %s.", func_name);
+        std::cout << "[Hook]"
+                  << "Successfully hooked " << func_name << std::endl;
     }
     return func;
 }
 
+void set_rank() {
+    int local_rank = -1;
+    int global_rank = -1;
+    bool success = false;
+
+    const int max_retries = 600;
+    const int sleep_ms = 100;
+
+    for (int i = 0; i < max_retries; ++i) {
+        PyGILState_STATE gstate = PyGILState_Ensure();
+
+        PyObject *parallel_mod =
+            PyImport_ImportModule("vllm.distributed.parallel_state");
+        if (parallel_mod) {
+            PyObject *get_group_func =
+                PyObject_GetAttrString(parallel_mod, "get_world_group");
+
+            if (get_group_func && PyCallable_Check(get_group_func)) {
+                PyObject *world_group =
+                    PyObject_CallObject(get_group_func, nullptr);
+
+                if (world_group && world_group != Py_None) {
+                    PyObject *py_rank =
+                        PyObject_GetAttrString(world_group, "rank");
+                    PyObject *py_local_rank =
+                        PyObject_GetAttrString(world_group, "local_rank");
+
+                    if (py_rank && py_rank != Py_None && py_local_rank &&
+                        py_local_rank != Py_None) {
+                        global_rank = (int)PyLong_AsLong(py_rank);
+                        local_rank = (int)PyLong_AsLong(py_local_rank);
+                        success = true;
+                    }
+
+                    Py_XDECREF(py_rank);
+                    Py_XDECREF(py_local_rank);
+                    Py_DECREF(world_group);
+                }
+                Py_XDECREF(get_group_func);
+            }
+            Py_DECREF(parallel_mod);
+        } else {
+            PyErr_Clear();
+        }
+
+        PyGILState_Release(gstate);
+
+        if (success) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
+    }
+
+    if (success) {
+        std::string lr_str = std::to_string(local_rank);
+        std::string gr_str = std::to_string(global_rank);
+
+        setenv("LOCAL_RANK", lr_str.c_str(), 1);
+        setenv("RANK", gr_str.c_str(), 1);
+    }
+}
+
+static std::once_flag global_delayed_init_flag;
+
+bool check_rank_env() {
+    const char *r_str = getenv("RANK");
+    if (!r_str)
+        r_str = getenv("RANK_ID");
+    if (!r_str)
+        return false;
+    return true;
+}
+
+bool check_local_rank_env() {
+    const char *lr_str = getenv("LOCAL_RANK");
+    if (!lr_str)
+        lr_str = getenv("DEVICE_ID");
+    if (!lr_str)
+        return false;
+    return true;
+}
+
+void async_delayed_init() {
+    try {
+
+        if (!(check_rank_env() && check_local_rank_env())) {
+            set_rank();
+        }
+        const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");
+        std::string log_path = (log_path_env && strlen(log_path_env) > 0)
+                                   ? std::string(log_path_env)
+                                   : "/var/log/sysTrace";
+        ::systrace::setLoggingPath(log_path);
+
+        ::systrace::SysTrace::getInstance();
+    } catch (const std::exception &e) {
+        systrace_log_error("Hook", "Delayed init failed: %s", e.what());
+    }
+}
+
 #define HOOKED_FUNCTION(func_ptr, func_name, ...)                              \
     do {                                                                       \
-        const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");           \
-        std::string log_path = (log_path_env && strlen(log_path_env) > 0)      \
-                                   ? std::string(log_path_env)                 \
-                                   : "/var/log/sysTrace";                      \
-        ::systrace::setLoggingPath(log_path);                                  \
+        std::call_once(global_delayed_init_flag, []() {                        \
+            std::thread t(async_delayed_init);                                 \
+            t.detach();                                                        \
+        });                                                                    \
         if (!func_ptr) {                                                       \
             func_ptr = (decltype(func_ptr))load_symbol(func_name);             \
             if (!func_ptr)                                                     \
                 return -1;                                                     \
         }                                                                      \
-        ::systrace::SysTrace::getInstance();                                   \
         return func_ptr(__VA_ARGS__);                                          \
     } while (0)
 

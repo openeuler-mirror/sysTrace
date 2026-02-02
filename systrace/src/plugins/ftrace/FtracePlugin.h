@@ -2,28 +2,28 @@
 #define FTRACE_PLUGIN_HPP
 
 #include "../../../include/common/ICollector.hpp"
-#include "../../../include/utils/TimerManager.hpp"
 #include "../../../include/common/constant.h"
 #include "../../../include/log/logging.h"
-#include "../../../include/utils/util.h"
 #include "../../../include/utils/PluginUtils.hpp"
-#include <nlohmann/json.hpp>
-#include <vector>
-#include <string>
-#include <atomic>
-#include <thread>
-#include <mutex>
-#include <array>
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "../../../include/utils/TimerManager.hpp"
+#include "../../../include/utils/util.h"
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <chrono>
+#include <cstring>
 #include <fcntl.h>
-#include <unistd.h>
+#include <fstream>
+#include <iostream>
+#include <mutex>
+#include <nlohmann/json.hpp>
+#include <sstream>
+#include <string>
 #include <sys/stat.h>
 #include <sys/sysinfo.h>
-#include <cstring>
+#include <thread>
+#include <unistd.h>
+#include <vector>
 
 using json = nlohmann::json;
 using PluginNameType = systrace::constant::Plugin;
@@ -63,7 +63,7 @@ class FtracePlugin : public ICollector {
         std::thread worker;
     };
 
-    void per_cpu_splice_loop(CpuReader& reader);
+    void per_cpu_splice_loop(CpuReader &reader);
     bool init_ftrace();
     int get_local_rank();
     void reset_ftrace();
