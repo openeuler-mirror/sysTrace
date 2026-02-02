@@ -231,7 +231,9 @@ TraceTaskConfig FtracePlugin::parse_config_from_json(const nlohmann::json &param
             if (!func.is_string()) {
                 throw std::invalid_argument("func type error");
             }
-            core.trace_functions = func.get<std::string>();
+            std::string func_str = func.get<std::string>();
+            std::replace(func_str.begin(), func_str.end(), ',', ' ');
+            core.trace_functions = func_str;
         }
 
         if (params.contains("set_ftrace_pid")) {
