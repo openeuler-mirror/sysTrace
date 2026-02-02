@@ -26,7 +26,7 @@ extern "C" pid_t g_hooked_pid;
 PthreadPlugin::PthreadPlugin() {
     pluginName_ = PluginNameType::PTHREAD_LOCK_PLUGIN.data();
     if (is_main_process()) {
-
+        set_memlock_rlimit(EBPF_RLIM_LIMITED);
         bpf_skeleton_ = pthrd_sync_bpf__open_and_load();
         if (!bpf_skeleton_) {
             LOG_MODULE(ERROR, pluginName_) << "skel load error";

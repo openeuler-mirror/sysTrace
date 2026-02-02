@@ -33,7 +33,7 @@ UprobeLink::~UprobeLink() {
 GILPlugin::GILPlugin() {
     pluginName_ = PluginNameType::PYTHON_GIL_PLUGIN.data();
     if (is_main_process()) {
-
+        set_memlock_rlimit(EBPF_RLIM_LIMITED);
         bpf_skeleton_ = python_gil_bpf__open_and_load();
         if (!bpf_skeleton_) {
             LOG_MODULE(ERROR, pluginName_) << "skel load error";
