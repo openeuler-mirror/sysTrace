@@ -69,7 +69,12 @@ class UsageHelper {
                                             "events (use with events!=null)"},
                 },
 
-            }};
+            },
+            {"Trace",
+             "A command-line interface for interacting with the Linux kernel's"
+             " Ftrace subsystem to record and analyze system performance and "
+             "kernel events.",
+             {{"args=<args>", "trace-cmd args"}}}};
 
         std::cout << "\033[1;36m"
                   << "========================================================="
@@ -110,10 +115,12 @@ class UsageHelper {
         std::cout << "  sysTrace_cli enable CacheMiss duration=10 args=\"-p "
                      "12345 -e cache-miss\"\n";
         std::cout << "  sysTrace_cli enable GIL duration=10\n";
+        std::cout
+            << "  sysTrace_cli enable Trace args=\"record -e sched sleep 5\"\n";
         std::cout << "  sysTrace_cli enable Mutex duration=10\n";
         std::cout << "  sysTrace_cli enable CacheMiss args=\" -e "
                      "branch-misses,cache-misses,cache-references "
-                     "--timeout 5000\" duration=10\n";
+                     "--timeout 5000\"\n";
         std::cout << "  sysTrace_cli disable CPU\n";
         std::cout
             << "  sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 "
