@@ -49,6 +49,7 @@ struct Plugin {
     static constexpr std::string_view PYTHON_GIL_PLUGIN = "GIL";
     static constexpr std::string_view CACHE_MISS_PLUGIN = "CacheMiss";
     static constexpr std::string_view FTRACE_PLUGIN = "Ftrace";
+    static constexpr std::string_view TRACE_CMD_PLUGIN = "Trace";
     static constexpr std::string_view PTHREAD_LOCK_PLUGIN = "Mutex";
     static constexpr std::string_view HBM_PLUGIN = "HBM";
     static constexpr std::string_view MEMORY_PLUGIN = "Memory";

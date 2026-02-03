@@ -227,6 +227,7 @@ void SysTrace::registerPlugins() {
     cm.register_plugin(std::make_shared<GILPlugin>());
     cm.register_plugin(std::make_shared<PthreadPlugin>());
     cm.register_plugin(std::make_shared<FtracePlugin>());
+    cm.register_plugin(std::make_shared<TracePlugin>());
 }
 
 void SysTrace::stopEventPoller() {

@@ -36,15 +36,28 @@ PLUGINS & SPECIFIC PARAMETERS:
   Mutex       Pthread Synchronization Latency (Mutex/RWLock/Spinlock/Sem)
     pid=<pid>       - trace target process
 
+  Ftrace      Linux Kernel Ftrace (Events, Function Graph, and Sched Tracing)
+    cpu_list="0-15" - Trace specific CPUs (e.g., "0-3,5")
+    events="<group>/<event>,<group>/<event>"- Enable tracepoints: irq, sched, syscalls, raw_syscalls, vmscan, compaction
+    function_tracer="function_graph|function"- Set ftrace tracer (default: nop)
+    func="func1 func2"- Filter kernel functions to trace (wildcards supported: "*mmap")
+    func_stack_trace=1- Enable kernel stack trace for functions (use with function_tracer=function)
+    event_stack_trace=1- Enable kernel stack trace for events (use with events!=null)
+
+  Trace       A command-line interface for interacting with the Linux kernel's Ftrace subsystem to record and analyze system performance and kernel events.
+    args=<args>     - trace-cmd args
+
 EXAMPLES:
   sysTrace_cli enable MSPTI event=marker,kernel,api duration=10
   sysTrace_cli enable IO duration=10
   sysTrace_cli enable Memory duration=10
   sysTrace_cli enable CacheMiss duration=10 args="-p 12345 -e cache-miss"
   sysTrace_cli enable GIL duration=10
+  sysTrace_cli enable Trace args="record -e sched sleep 5"
   sysTrace_cli enable Mutex duration=10
-  sysTrace_cli enable CacheMiss args=" -e branch-misses,cache-misses,cache-references --timeout 5000" duration=10
+  sysTrace_cli enable CacheMiss args=" -e branch-misses,cache-misses,cache-references --timeout 5000"
   sysTrace_cli disable CPU
+  sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex"
 =========================================================
 ~~~
 
@@ -60,6 +73,7 @@ EXAMPLES:
 | CacheMiss |    Hardware Cache Miss Rates and Memory Access Efficiency    | ./sysTrace_cli enable CacheMiss args="-p 27638 -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads --timeout 20000" |
 | Mutex     | Pthread Synchronization Latency (Mutex/RWLock/Spinlock/Sem)  |                      ./sysTrace_cli enable Mutex duration=10 |
 | Ftrace    | Linux Kernel Ftrace (Events, Function Graph, and Sched Tracing) | ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit" |
+| Trace     | **trace-cmd** is a command-line interface for interacting with the Linux kernel's **Ftrace** subsystem to record and analyze system performance and kernel events. |    ./sysTrace_cli enable Trace args="record -e sched sleep 5 |
 
 ## 4、使用示例
 ### 4.1 HBM
@@ -494,5 +508,32 @@ drwxr-xr-x 2 root root 4096 Jan 31 16:56 tmp
 
 ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="compaction/mm_compaction_begin,compaction/mm_compaction_end"
 
+~~~
+
+
+
+### 4.9 Trace
+
+~~~bash
+# 采集指令 args参数为 trace-cmd 参数
+./sysTrace_cli enable Trace args="record -e sched sleep 5"
+
+# 指令发送成功
+[ACK] /tmp/sysTrace_134561.sock: SUCCESS
+[ACK] /tmp/sysTrace_134562.sock: SUCCESS
+
+# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
+[2026-02-03 14:45:10.326] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"args":"record -e sched sleep 5"},"path":"Trace"}
+[2026-02-03 14:45:10.327] [Control] [RANK 0] [INFO] Enabling plugin: Trace with params: {"args":"record -e sched sleep 5"}
+[2026-02-03 14:45:10.407] [Trace] [RANK 0] [INFO] cmd = trace-cmd record -e sched sleep 5
+[2026-02-03 14:45:10.432] [Control] [RANK 0] [INFO] Response sent: SUCCESS
+[2026-02-03 14:45:25.113] [Trace] [RANK 0] [INFO]  stop.
+
+# 采集结果,默认路径是/home/sysTrace/Trace
+[root@localhost Trace]# pwd
+/home/sysTrace/Trace
+[root@localhost Trace]# ll
+total 649772
+-rw-r--r-- 1 root root 665362432 Feb  3 14:45 trace.dat
 ~~~
 
