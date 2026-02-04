@@ -32,15 +32,22 @@ class MSPTIHcclFileWriter {
     }
 
     void writeRecord(std::ofstream &f, const msptiActivityMarker &a) {
-        f << a.flag << "," << a.id << "," << a.kind << "," << s(a.name) << ","
-          << a.sourceKind << "," << a.timestamp << ",";
-        if (a.sourceKind == MSPTI_ACTIVITY_SOURCE_KIND_DEVICE) {
-            f << a.objectId.ds.deviceId << "," << a.objectId.ds.streamId
-              << ",,";
-        } else {
-            f << ",," << a.objectId.pt.processId << ","
-              << a.objectId.pt.threadId;
+        std::string safeName = a.name;
+        for (char &c : safeName) {
+            if (c == ',')
+                c = '!';
         }
+        f << a.flag << "," << a.id << "," << a.kind << "," << safeName << ","
+          << a.sourceKind << "," << a.timestamp << ",";
+
+        if (a.sourceKind == MSPTI_ACTIVITY_SOURCE_KIND_HOST) {
+            f << a.objectId.pt.processId << "," << a.objectId.pt.threadId << ","
+              << a.objectId.pt.processId << "," << a.objectId.pt.threadId;
+        } else if (a.sourceKind == MSPTI_ACTIVITY_SOURCE_KIND_DEVICE) {
+            f << a.objectId.ds.deviceId << "," << a.objectId.ds.streamId << ","
+              << a.objectId.ds.deviceId << "," << a.objectId.ds.streamId;
+        }
+
         f << "\n";
     }
 
