@@ -27,7 +27,7 @@ class CacheMissPlugin : public ICollector {
     CacheMissPlugin() {
         pluginName_ = PluginNameType::CACHE_MISS_PLUGIN.data();
         std::string dir = std::string(get_sys_trace_root_dir()) + pluginName_;
-        mkdir(dir.c_str(), 0755);
+        systrace::util::fs_utils::CreateDirectoryIfNotExists(dir);
         output_ =
             dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
             "_rank_" +

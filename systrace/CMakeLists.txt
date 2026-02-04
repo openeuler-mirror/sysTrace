@@ -46,8 +46,8 @@ add_library(common STATIC
     ${PROJECT_SOURCE_DIR}/include/utils/util.cc
     ${PROJECT_SOURCE_DIR}/include/utils/TimerManager.hpp
 )
-target_include_directories(common PUBLIC 
-    ${PROJECT_SOURCE_DIR}/include 
+target_include_directories(common PUBLIC
+    ${PROJECT_SOURCE_DIR}/include
     ${Python3_INCLUDE_DIRS}
 )
 
@@ -66,9 +66,7 @@ if(HAS_BTF_SUPPORT)
     add_subdirectory(src/os)
 endif()
 
-add_subdirectory(src/plugins/ebpf)
-
-add_library(sysTrace_hook SHARED
+set(SYSTRACE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/trace/systrace_manager.cc
     ${PROJECT_SOURCE_DIR}/src/trace/library_loader.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_loader.cc
@@ -81,11 +79,22 @@ add_library(sysTrace_hook SHARED
     ${PROJECT_SOURCE_DIR}/src/cann/io_hook.c
     ${PROJECT_SOURCE_DIR}/src/plugins/manager/ControlManager.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/HbmPlugin.hpp
-    ${PROJECT_SOURCE_DIR}/src/plugins/gil/GilPlugin.cpp
-    ${PROJECT_SOURCE_DIR}/src/plugins/pthread/PthreadPlugin.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/ebpfPluginBase/EbpfCollectorBase.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/ftrace/FtracePlugin.cpp
 )
+
+if(HAS_BPF_SUPPORT)
+    message(STATUS "Enabling BPF modules")
+    list(APPEND SYSTRACE_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/plugins/gil/GilPlugin.cpp
+        ${PROJECT_SOURCE_DIR}/src/plugins/pthread/PthreadPlugin.cpp
+    )
+    add_subdirectory(src/plugins/ebpf)
+else()
+    message(WARNING "Disabling BPF modules")
+endif()
+
+add_library(sysTrace_hook SHARED ${SYSTRACE_SOURCES})
 
 add_executable(sysTrace_cli
     ${PROJECT_SOURCE_DIR}/client/sysTracecli.cpp
@@ -96,8 +105,11 @@ if(HAS_BTF_SUPPORT)
     target_compile_definitions(sysTrace_hook PRIVATE HAS_BTF_SUPPORT=1)
 endif()
 
+if(HAS_BPF_SUPPORT)
+    target_compile_definitions(sysTrace_hook PRIVATE HAS_BPF_SUPPORT=1)
+endif()
+
 target_link_libraries(sysTrace_hook
-    ebpf_module
     common
     ${Python3_LIBRARIES}
     ${PB_LIBS}
@@ -112,4 +124,9 @@ endif()
 
 if(NOT USE_JSON_FORMAT)
     target_link_libraries(sysTrace_cli general_pb2)
+endif()
+
+if(HAS_BPF_SUPPORT)
+    target_link_libraries(sysTrace_hook ebpf_module)
+    message(STATUS "Linking ebpf_module library")
 endif()
