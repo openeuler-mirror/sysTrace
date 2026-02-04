@@ -10,12 +10,18 @@
  *NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
  *Mulan PSL v2 for more details. Author: curry Create: 2025-06-20 Description:
  ******************************************************************************/
+#include <dirent.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <google/protobuf-c/protobuf-c.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -519,6 +525,30 @@ void os_probe_disable_event(os_probe_type_e type) {
     close(trace_cfg_map_fd);
 }
 
+void check_npu() {
+    int max_retries = 600;
+    int interval_ms = 100;
+    for (int i = 0; i < max_retries; i++) {
+        FILE *fp = fopen("/proc/self/maps", "r");
+        if (!fp) {
+            break;
+        }
+        char line[512];
+        while (fgets(line, sizeof(line), fp)) {
+            line[strcspn(line, "\n")] = 0;
+            char *ptr = strstr(line, "/dev/davinci");
+            if (ptr) {
+                fclose(fp);
+                usleep(50000);
+                return;
+            }
+        }
+        fclose(fp);
+        usleep(interval_ms * 1000);
+    }
+    sleep(60);
+}
+
 int run_osprobe() {
     int ret = 0;
     struct bpf_buffer *buffer = NULL;
@@ -543,7 +573,8 @@ int run_osprobe() {
 
         (void)update_filter_map_by_kernel_thread();
 
-        sleep(60);
+        check_npu();
+
         (void)update_filter_map_by_npu_smi();
 
         while (!g_stop) {
