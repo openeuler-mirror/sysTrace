@@ -1,4 +1,5 @@
 #include "GilPlugin.h"
+#include "../../../include/common/constant.h"
 
 #define MAP_HOOK_PID_PATH "/sys/fs/bpf/sysTrace/__osprobe_rank_pid"
 #define PROC_FILTER_RANK_MAP_PATH "/sys/fs/bpf/sysTrace/__osprobe_proc_filter"
@@ -40,7 +41,7 @@ GILPlugin::GILPlugin() {
             return;
         }
 
-        std::string dir = std::string(SYS_TRACE_ROOT_DIR) + pluginName_;
+        std::string dir = std::string(get_sys_trace_root_dir()) + pluginName_;
         mkdir(dir.c_str(), 0755);
         output_ = dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
                   "_rank_" + std::to_string(get_local_rank()) + ".json";

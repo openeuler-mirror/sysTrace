@@ -1,4 +1,5 @@
 #include "FtracePlugin.h"
+#include "../../../include/common/constant.h"
 
 extern "C" pid_t g_hooked_pid;
 
@@ -6,7 +7,7 @@ FtracePlugin::FtracePlugin() {
     pluginName_ = PluginNameType::FTRACE_PLUGIN.data();
     active_.store(false);
     stop_flag_.store(true);
-    std::string dir = std::string(SYS_TRACE_ROOT_DIR) + pluginName_;
+    std::string dir = std::string(get_sys_trace_root_dir()) + pluginName_;
     mkdir(dir.c_str(), 0755);
     output_ = dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
               "_rank_" + std::to_string(get_local_rank()) + ".log";
@@ -33,7 +34,8 @@ bool FtracePlugin::start(const json &params, int duration) {
         if (!init_ftrace())
             throw std::runtime_error("Ftrace init fail");
 
-        output_dir_ = std::string(SYS_TRACE_ROOT_DIR) + pluginName_ + "/tmp";
+        output_dir_ =
+            std::string(get_sys_trace_root_dir()) + pluginName_ + "/tmp";
         mkdir(output_dir_.c_str(), 0755);
 
         stop_flag_.store(false);

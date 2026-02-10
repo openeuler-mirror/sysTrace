@@ -26,7 +26,7 @@ class TracePlugin : public ICollector {
   public:
     TracePlugin() {
         pluginName_ = PluginNameType::TRACE_CMD_PLUGIN.data();
-        work_dir_ = std::string(SYS_TRACE_ROOT_DIR) + pluginName_;
+        work_dir_ = std::string(get_sys_trace_root_dir()) + pluginName_;
         mkdir(work_dir_.c_str(), 0755);
     }
     bool start(const json &params, int duration) override {
