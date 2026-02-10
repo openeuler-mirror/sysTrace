@@ -10,10 +10,11 @@
  *NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
  *Mulan PSL v2 for more details. Author: curry Create: 2025-06-20 Description:
  ******************************************************************************/
+#define _GNU_SOURCE
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <google/protobuf-c/protobuf-c.h>
+#include <inttypes.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -24,6 +25,33 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+#ifdef USE_JSON
+typedef struct {
+    uint64_t key;
+    uint64_t start_us;
+    uint64_t dur;
+    uint64_t rundelay;
+    uint32_t os_event_type;
+    uint32_t rank;
+    char *comm;
+    char *nxt_comm;
+    uint32_t nxt_pid;
+} JSONOSprobeEntry;
+
+typedef struct {
+    JSONOSprobeEntry **osprobe_entries;
+    size_t n_osprobe_entries;
+} JSONOSprobe;
+
+#define OSPROBE_STRUCT JSONOSprobe
+#define OSPROBE_ENTRY_STRUCT JSONOSprobeEntry
+#else
+#include "../../protos/systrace.pb-c.h"
+#include <google/protobuf-c/protobuf-c.h>
+#define OSPROBE_STRUCT OSprobe
+#define OSPROBE_ENTRY_STRUCT OSprobeEntry
+#endif
 
 #ifdef BPF_PROG_KERN
 #undef BPF_PROG_KERN
@@ -37,15 +65,16 @@
 #define SYS_TRACE_ROOT_DIR "/home/sysTrace/"
 #endif
 
+#include "../../include/common/constant.h"
 #include "../../include/utils/TimeUtil.hpp"
-#include "../../protos/systrace.pb-c.h"
+#include "../cann/common_hook.h"
 #include "bpf.h"
 #include "os_cpu.skel.h"
 #include "os_mem.skel.h"
 #include "os_probe.h"
 
 #define MAX_PATH_LEN 512
-#define LOG_INTERVAL_SEC 120
+#define LOG_INTERVAL_SEC_FOR_OS 120
 #define RM_MAP_PATH "/usr/bin/rm -rf /sys/fs/bpf/sysTrace*"
 #define PROC_FILTER_MAP_PATH "/sys/fs/bpf/sysTrace/__osprobe_proc_filter"
 #define KERNEL_FILTER_MAP_PATH "/sys/fs/bpf/sysTrace/__osprobe_kernel_filter"
@@ -96,12 +125,6 @@
     MAP_SET_COMMON_PIN_PATHS(probe_name, end, load);                           \
     MAP_INIT_BPF_BUFFER_SHARED(probe_name, osprobe_map_0, &buffer, load);
 
-#define MAP_SET_PIN_SINGLE(probe_name, osprobe_map, osprobe_map_path, end,     \
-                           load, buffer)                                       \
-    MAP_SET_PIN_PATH(probe_name, osprobe_map, osprobe_map_path, load);         \
-    MAP_SET_PIN_PATH(probe_name, proc_filter_map, PROC_FILTER_MAP_PATH, load); \
-    MAP_INIT_BPF_BUFFER_SHARED(probe_name, osprobe_map, &buffer, load);
-
 static pthread_mutex_t file_mutex = PTHREAD_MUTEX_INITIALIZER;
 int g_stop = 0;
 
@@ -113,7 +136,7 @@ static int local_rank;
 static struct bpf_prog_s *prog = NULL;
 
 typedef struct {
-    OSprobe *osprobe;
+    OSPROBE_STRUCT *osprobe;
     time_t last_log_time;
 } OSprobe_ThreadData;
 
@@ -130,13 +153,24 @@ void initialize_osprobe() {
     local_rank = local_rank_str ? atoi(local_rank_str) : 0;
 }
 
-static void free_osprobe(OSprobe *osprobe) {
-    if (!osprobe)
+static void free_osprobe_entries(OSPROBE_STRUCT *osprobe) {
+    if (!osprobe || !osprobe->osprobe_entries)
         return;
-
-    // 释放分配记录
     for (size_t i = 0; i < osprobe->n_osprobe_entries; i++) {
-        OSprobeEntry *entry = osprobe->osprobe_entries[i];
+        OSPROBE_ENTRY_STRUCT *entry = osprobe->osprobe_entries[i];
+        if (!entry)
+            continue;
+#ifdef USE_JSON
+        if (entry->comm)
+            free(entry->comm);
+        if (entry->nxt_comm)
+            free(entry->nxt_comm);
+#else
+        if (entry->comm && entry->comm != protobuf_c_empty_string)
+            free((void *)entry->comm);
+        if (entry->nxt_comm && entry->nxt_comm != protobuf_c_empty_string)
+            free((void *)entry->nxt_comm);
+#endif
         free(entry);
     }
     free(osprobe->osprobe_entries);
@@ -147,7 +181,7 @@ static void free_osprobe(OSprobe *osprobe) {
 static void free_thread_data(void *data) {
     OSprobe_ThreadData *td = (OSprobe_ThreadData *)data;
     if (td && td->osprobe) {
-        free_osprobe(td->osprobe);
+        free_osprobe_entries(td->osprobe);
         free(td->osprobe);
     }
     free(td);
@@ -159,121 +193,168 @@ static void make_key() {
 
 static OSprobe_ThreadData *get_thread_data() {
     OSprobe_ThreadData *td;
-
     pthread_once(&key_once, make_key);
     td = pthread_getspecific(thread_data_key);
 
     if (!td) {
         td = calloc(1, sizeof(OSprobe_ThreadData));
-        td->osprobe = calloc(1, sizeof(OSprobe));
+        td->osprobe = calloc(1, sizeof(OSPROBE_STRUCT));
+#ifndef USE_JSON
         osprobe__init(td->osprobe);
+#endif
         td->last_log_time = time(NULL);
         pthread_setspecific(thread_data_key, td);
     }
-
     return td;
 }
 
 static void add_osprobe_entry(trace_event_data_t *evt_data) {
     OSprobe_ThreadData *td = get_thread_data();
+    if (!td || !evt_data)
+        return;
 
-    OSprobeEntry *entry = malloc(sizeof(OSprobeEntry));
-    if (entry == NULL) {
-        perror("malloc failed");
-        exit(EXIT_FAILURE);
-    }
+    OSPROBE_ENTRY_STRUCT *entry = malloc(sizeof(OSPROBE_ENTRY_STRUCT));
+    if (entry == NULL)
+        return;
+
+#ifndef USE_JSON
     osprobe_entry__init(entry);
+#else
+    memset(entry, 0, sizeof(JSONOSprobeEntry));
+#endif
+
     entry->key = evt_data->key;
     entry->start_us = monotonic_ns_to_utc_us(evt_data->start_time);
     entry->dur = evt_data->duration / NSEC_PER_USEC;
     entry->rundelay = evt_data->delay;
-    entry->os_event_type = (u32)evt_data->type;
+    entry->os_event_type = (uint32_t)evt_data->type;
     entry->rank = rank;
-    entry->comm = strdup(evt_data->comm);
 
+#ifdef USE_JSON
+    entry->comm = strdup(evt_data->comm);
+    if (!entry->comm) {
+        free(entry);
+        return;
+    }
+    entry->nxt_comm = NULL;
+    entry->nxt_pid = 0;
     if (entry->os_event_type == EVENT_TYPE_OFFCPU &&
         evt_data->next_comm[0] != '\0') {
         entry->nxt_comm = strdup(evt_data->next_comm);
+        if (!entry->nxt_comm) {
+            free(entry->comm);
+            free(entry);
+            return;
+        }
         entry->nxt_pid = evt_data->next_pid;
     }
+#else
+    if (entry->comm && entry->comm != protobuf_c_empty_string) {
+        free((void *)entry->comm);
+    }
+    entry->comm = strdup(evt_data->comm);
+    if (!entry->comm) {
+        free(entry);
+        return;
+    }
+
+    if (entry->nxt_comm && entry->nxt_comm != protobuf_c_empty_string) {
+        free((void *)entry->nxt_comm);
+        entry->nxt_comm = NULL;
+    }
+
+    entry->nxt_pid = 0;
+    if (entry->os_event_type == EVENT_TYPE_OFFCPU &&
+        evt_data->next_comm[0] != '\0') {
+        entry->nxt_comm = strdup(evt_data->next_comm);
+        if (!entry->nxt_comm) {
+            free((void *)entry->comm);
+            free(entry);
+            return;
+        }
+        entry->nxt_pid = evt_data->next_pid;
+    } else {
+        entry->nxt_comm = (char *)protobuf_c_empty_string;
+    }
+#endif
 
     td->osprobe->n_osprobe_entries++;
-    td->osprobe->osprobe_entries =
-        realloc(td->osprobe->osprobe_entries,
-                td->osprobe->n_osprobe_entries * sizeof(OSprobeEntry *));
-
+    td->osprobe->osprobe_entries = realloc(td->osprobe->osprobe_entries,
+                                           td->osprobe->n_osprobe_entries *
+                                               sizeof(OSPROBE_ENTRY_STRUCT *));
     td->osprobe->osprobe_entries[td->osprobe->n_osprobe_entries - 1] = entry;
 }
 
-static void get_log_filename(time_t current, char *buf, size_t buf_size) {
-    struct tm *tm = localtime(&current);
-
-    const char *dir_path = SYS_TRACE_ROOT_DIR "osprobe";
-    if (access(dir_path, F_OK) != 0) {
-        if (mkdir(dir_path, 0755) != 0 && errno != EEXIST) {
-            perror("Failed to create directory");
-            snprintf(buf, buf_size, "os_trace_%04d%02d%02d_%02d_rank_%d_%d.pb",
-                     tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-                     tm->tm_hour, rank, g_hooked_pid);
-            return;
-        }
-    }
-    snprintf(buf, buf_size, "%s/os_trace_%04d%02d%02d_%02d_rank_%d_%d.pb",
-             dir_path, tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday,
-             tm->tm_hour, rank, g_hooked_pid);
-}
-
 static char is_ready_to_write(OSprobe_ThreadData *td, time_t *current) {
-    OSprobe *osprobe = td->osprobe;
+    OSPROBE_STRUCT *osprobe = td->osprobe;
     if (!osprobe || (osprobe->n_osprobe_entries == 0)) {
         return 0;
     }
 
     *current = time(NULL);
     if (osprobe->n_osprobe_entries < LOG_ITEMS_MIN) {
-        if (*current - td->last_log_time < LOG_INTERVAL_SEC) {
+        if (*current - td->last_log_time < LOG_INTERVAL_SEC_FOR_OS) {
             return 0;
         }
     }
-
     return 1;
 }
 
 static void write_protobuf_to_file() {
     time_t current;
-    uint8_t *buf;
     OSprobe_ThreadData *td = get_thread_data();
-    if (!td) {
+    if (!td)
         return;
-    }
 
     if (!is_ready_to_write(td, &current)) {
         return;
     }
-    if (pthread_mutex_trylock(&file_mutex) ==
-        0) { // pthread_mutex_trylock or pthread_mutex_lock
-        char filename[256];
-        get_log_filename(current, filename, sizeof(filename));
-        size_t len = osprobe__get_packed_size(td->osprobe);
-        buf = malloc(len);
-        osprobe__pack(td->osprobe, buf);
 
+    if (pthread_mutex_trylock(&file_mutex) == 0) {
+        char filename[256];
+#ifdef USE_JSON
+        get_log_filename(filename, sizeof(filename), "osprobe", JSON);
+#else
+        get_log_filename(filename, sizeof(filename), "osprobe", PB);
+#endif
+
+#ifdef USE_JSON
         FILE *fp = fopen(filename, "ab");
         if (fp) {
-            fwrite(buf, len, 1, fp);
+            fprintf(fp, "{\"os_entries\":[");
+            for (size_t i = 0; i < td->osprobe->n_osprobe_entries; i++) {
+                OSPROBE_ENTRY_STRUCT *e = td->osprobe->osprobe_entries[i];
+                fprintf(fp,
+                        "%s{\"key\":%" PRIu64 ",\"start\":%" PRIu64
+                        ",\"dur\":%" PRIu64 ",\"delay\":%" PRIu64
+                        ",\"type\":%u,\"rank\":%d,\"comm\":\"%s\",\"ncomm\":\"%"
+                        "s\",\"npid\":%u}",
+                        (i == 0 ? "" : ","), e->key, e->start_us, e->dur,
+                        e->rundelay, e->os_event_type, (int)e->rank, e->comm,
+                        e->nxt_comm ? e->nxt_comm : "", e->nxt_pid);
+            }
+            fprintf(fp, "]}\n");
             fclose(fp);
         }
-
+#else
+        size_t len = osprobe__get_packed_size(td->osprobe);
+        uint8_t *buf = malloc(len);
+        if (buf) {
+            osprobe__pack(td->osprobe, buf);
+            FILE *fp = fopen(filename, "ab");
+            if (fp) {
+                fwrite(buf, len, 1, fp);
+                fclose(fp);
+            }
+            free(buf);
+        }
+#endif
         pthread_mutex_unlock(&file_mutex);
     } else {
         return;
     }
 
-    if (buf) {
-        free(buf);
-    }
-
-    free_osprobe(td->osprobe);
+    free_osprobe_entries(td->osprobe);
     td->last_log_time = current;
 }
 
@@ -308,15 +389,10 @@ static int load_mem_probe(struct bpf_prog_s *prog, struct bpf_buffer *buffer) {
 
     int ret = bpf_buffer__open(buffer, recv_bpf_msg, NULL, NULL);
     if (ret) {
-        fprintf(stderr,
-                "[OS_PROBE RANK_%d] Open osprobe bpf_buffer failed: %s.\n",
-                rank, strerror(errno));
         bpf_buffer__free(buffer);
         goto err;
     }
-    prog->buffers[prog->num] = buffer;
-    prog->num++;
-
+    prog->buffers[prog->num++] = buffer;
     return 0;
 err:
     UNLOAD(os_mem);
@@ -333,15 +409,10 @@ static int load_cpu_probe(struct bpf_prog_s *prog, struct bpf_buffer *buffer) {
 
     int ret = bpf_buffer__open(buffer, recv_bpf_msg, NULL, NULL);
     if (ret) {
-        fprintf(stderr,
-                "[OS_PROBE RANK_%d] Open osprobe bpf_buffer failed: %s.\n",
-                rank, strerror(errno));
         bpf_buffer__free(buffer);
         goto err;
     }
-    prog->buffers[prog->num] = buffer;
-    prog->num++;
-
+    prog->buffers[prog->num++] = buffer;
     return 0;
 err:
     UNLOAD(os_cpu);
@@ -497,6 +568,14 @@ void cleanup_osprobe() {
         pclose(fp);
 }
 
+static void signal_handler(int sig) {
+    (void)sig;
+    cleanup_osprobe();
+    _exit(0);
+}
+
+static void exit_handler(void) { cleanup_osprobe(); }
+
 void os_probe_enable_event(os_probe_type_e type) {
     int trace_cfg_map_fd = bpf_obj_get(TRACE_CFG_MAP_PATH);
     int value = 1;
@@ -554,6 +633,11 @@ int run_osprobe() {
     struct bpf_buffer *buffer = NULL;
 
     initialize_osprobe();
+
+    signal(SIGINT, signal_handler);
+    signal(SIGTERM, signal_handler);
+    signal(SIGQUIT, signal_handler);
+    atexit(exit_handler);
 
     if (local_rank == 0) {
         prog = alloc_bpf_prog();

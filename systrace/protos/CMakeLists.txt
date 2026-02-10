@@ -1,17 +1,22 @@
-project(general_pb2)
+if(NOT USE_JSON_FORMAT)
+    project(general_pb2)
 
-set(PB_FILES systrace.pb.cc systrace.pb-c.c)
+    set(PB_FILES systrace.pb.cc systrace.pb-c.c)
 
-add_library(${PROJECT_NAME} STATIC ${PB_FILES})
+    add_library(${PROJECT_NAME} STATIC ${PB_FILES})
 
-include_directories(${PROJECT_SOURCE_DIR}
-    ${GOOGLE_PROTOBUF_DIR}/include
-)
+    include_directories(${PROJECT_SOURCE_DIR}
+        ${GOOGLE_PROTOBUF_DIR}/include
+    )
 
-link_directories(${GOOGLE_PROTOBUF_DIR}/lib/)
+    link_directories(${GOOGLE_PROTOBUF_DIR}/lib/)
 
-target_link_libraries(${PROJECT_NAME}
-    protobuf
-    protobuf-c
-)
-
+    target_link_libraries(${PROJECT_NAME}
+        protobuf
+        protobuf-c
+    )
+    
+    message(STATUS "Protobuf library [general_pb2] initialized.")
+else()
+    message(STATUS "JSON Mode: Skipping Protobuf library [general_pb2] build.")
+endif()

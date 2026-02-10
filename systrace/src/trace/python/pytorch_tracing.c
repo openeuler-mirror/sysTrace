@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+
 #include "pytorch_tracing.h"
 
 Stagetype determine_stage_type(const char *function_name) {
