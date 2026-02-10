@@ -1,4 +1,5 @@
 #include "PthreadPlugin.h"
+#include "../../../include/common/constant.h"
 #include "../../../include/utils/TimeUtil.hpp"
 
 static const char *names[] = {"UNKNOWN",
@@ -32,7 +33,7 @@ PthreadPlugin::PthreadPlugin() {
             LOG_MODULE(ERROR, pluginName_) << "skel load error";
             return;
         }
-        std::string dir = std::string(SYS_TRACE_ROOT_DIR) + pluginName_;
+        std::string dir = std::string(get_sys_trace_root_dir()) + pluginName_;
         mkdir(dir.c_str(), 0755);
         output_ = dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
                   "_rank_" + std::to_string(get_local_rank()) + ".json";

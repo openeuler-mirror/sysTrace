@@ -26,7 +26,7 @@ class CacheMissPlugin : public ICollector {
   public:
     CacheMissPlugin() {
         pluginName_ = PluginNameType::CACHE_MISS_PLUGIN.data();
-        std::string dir = std::string(SYS_TRACE_ROOT_DIR) + pluginName_;
+        std::string dir = std::string(get_sys_trace_root_dir()) + pluginName_;
         mkdir(dir.c_str(), 0755);
         output_ =
             dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +

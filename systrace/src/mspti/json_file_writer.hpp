@@ -23,7 +23,8 @@ class MSPTIHcclFileWriter {
 
     std::string getFn(const std::string &type, int rank) {
         const char *path = std::getenv("METRIC_PATH");
-        std::string p = path ? path : SYS_TRACE_ROOT_DIR "mspti/";
+        std::string p =
+            path ? path : std::string(get_sys_trace_root_dir()) + "mspti/";
         systrace::util::fs_utils::CreateDirectoryIfNotExists(p);
         if (!p.empty() && p.back() != '/')
             p += "/";

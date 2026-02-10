@@ -11,6 +11,12 @@ extern "C" {
 extern int global_stage_id;
 extern int global_stage_type;
 
+extern char g_sys_trace_root_dir[512];
+
+void init_sys_trace_root_dir();
+
+const char *get_sys_trace_root_dir();
+
 #ifdef __cplusplus
 }
 #endif
@@ -40,8 +46,9 @@ struct Cli {
 struct TorchTraceConstant {
   public:
     static constexpr int DEFAULT_TRACE_COUNT = 1000;
-    static constexpr std::string_view DEFAULT_TRACE_DUMP_PATH =
-        SYS_TRACE_ROOT_DIR "timeline";
+    static std::string DEFAULT_TRACE_DUMP_PATH() {
+        return std::string(get_sys_trace_root_dir()) + "timeline";
+    }
 };
 
 struct Plugin {

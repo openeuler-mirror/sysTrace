@@ -42,6 +42,7 @@ if(NOT USE_JSON_FORMAT)
 endif()
 add_library(common STATIC
     ${PROJECT_SOURCE_DIR}/include/log/logging.cc
+    ${PROJECT_SOURCE_DIR}/include/common/constant.c
     ${PROJECT_SOURCE_DIR}/include/utils/util.cc
     ${PROJECT_SOURCE_DIR}/include/utils/TimerManager.hpp
 )

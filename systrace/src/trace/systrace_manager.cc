@@ -97,8 +97,8 @@ void PyTorchTrace::registerTracingFunctions() {
 bool PyTorchTrace::triggerTrace() { return has_trigger_trace_.exchange(true); }
 
 void PyTorchTrace::dumpPyTorchTracing() {
-    const std::string &dump_path =
-        std::string(constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH);
+    const std::string dump_path =
+        constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH();
 
     if (util::fs_utils::CreateDirectoryIfNotExists(dump_path)) {
         LOG_MODULE(ERROR, "PyTorchTrace")
@@ -204,7 +204,7 @@ void PyTorchTrace::processFunctionTracingData(size_t function_index) {
         }
     }
     for (auto data : data_holders) {
-            pytorch_tracing_library_->ReleaseTracingData(
+        pytorch_tracing_library_->ReleaseTracingData(
             data, PY_TRACING_EMPTY_POOL, function_index);
     }
 }
@@ -233,8 +233,8 @@ void PyTorchTrace::writerLoop() {
             }
         }
         if (!batch.empty()) {
-            const std::string &dump_path = std::string(
-                constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH);
+            const std::string dump_path =
+                constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH();
             std::string file_path =
                 dump_path + "/" +
                 util::fs_utils::GenerateClusterUniqueFilename(".json");
@@ -249,8 +249,8 @@ void PyTorchTrace::writerLoop() {
 }
 #else
 void PyTorchTrace::writeTraceToFile() {
-    const std::string &dump_path =
-        std::string(constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH);
+    const std::string dump_path =
+        constant::TorchTraceConstant::DEFAULT_TRACE_DUMP_PATH();
     std::string file_path =
         dump_path + "/" +
         util::fs_utils::GenerateClusterUniqueFilename(".timeline");
@@ -305,6 +305,9 @@ void SysTrace::registerPlugins() {
 void SysTrace::initializeSystem() {
     if (!systrace::util::config::GlobalConfig::Instance().enable)
         return;
+
+    init_sys_trace_root_dir();
+
     systrace::util::InitializeSystemUtilities();
     registerPlugins();
     ControlManager::getInstance().start();

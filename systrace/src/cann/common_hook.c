@@ -30,8 +30,8 @@ void get_log_filename(char *buf, size_t buf_size, const char *path_suffix,
     const char *final_ext = (ext && strlen(ext) > 0) ? ext : "log";
 
     char path[PATH_LEN] = {0};
-    int ret =
-        snprintf(path, sizeof(path), "%s/%s", SYS_TRACE_ROOT_DIR, path_suffix);
+    int ret = snprintf(path, sizeof(path), "%s/%s", get_sys_trace_root_dir(),
+                       path_suffix);
 
     if (ret < 0 || (size_t)ret >= sizeof(path)) {
         snprintf(buf, buf_size, "%s_trace_rank%d_%d.%s", path_suffix, rank,
