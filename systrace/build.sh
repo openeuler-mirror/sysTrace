@@ -43,6 +43,14 @@ check_btf() {
     return 1
 }
 
+check_bpf() {
+    grep -q "CONFIG_BPF_SYSCALL=y" "/boot/config-$(uname -r)" 2>/dev/null && return 0
+    [ -f "/proc/config.gz" ] && zgrep -q "CONFIG_BPF_SYSCALL=y" /proc/config.gz 2>/dev/null && return 0
+    [ -f "/proc/sys/net/core/bpf_jit_enable" ] && return 0
+    mount | grep -q "type bpf" && return 0
+    return 1
+}
+
 build() {
     cd "$BUILD_DIR"
     cmake_flags=""
@@ -54,8 +62,8 @@ build() {
     fi
 
     check_btf && cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=ON" || cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=OFF"
-    
-    cmake .. $cmake_flags
+    check_bpf && f_bpf="-DHAS_BPF_SUPPORT=ON" || f_bpf="-DHAS_BPF_SUPPORT=OFF"
+    cmake .. $cmake_flags $f_bpf
     make -j $(nproc)
     cd ..
 }

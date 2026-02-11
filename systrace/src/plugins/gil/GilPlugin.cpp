@@ -1,4 +1,5 @@
 #include "GilPlugin.h"
+#include "../ebpf/python_gil.skel.h"
 #include "../../../include/common/constant.h"
 
 #define MAP_HOOK_PID_PATH "/sys/fs/bpf/sysTrace/__osprobe_rank_pid"
@@ -42,7 +43,7 @@ GILPlugin::GILPlugin() {
         }
 
         std::string dir = std::string(get_sys_trace_root_dir()) + pluginName_;
-        mkdir(dir.c_str(), 0755);
+        systrace::util::fs_utils::CreateDirectoryIfNotExists(dir);
         output_ = dir + "/" + get_id() + "_" + std::to_string(g_hooked_pid) +
                   "_rank_" + std::to_string(get_local_rank()) + ".json";
 

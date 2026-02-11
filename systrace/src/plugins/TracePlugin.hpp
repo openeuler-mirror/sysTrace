@@ -27,7 +27,7 @@ class TracePlugin : public ICollector {
     TracePlugin() {
         pluginName_ = PluginNameType::TRACE_CMD_PLUGIN.data();
         work_dir_ = std::string(get_sys_trace_root_dir()) + pluginName_;
-        mkdir(work_dir_.c_str(), 0755);
+        systrace::util::fs_utils::CreateDirectoryIfNotExists(work_dir_);
     }
     bool start(const json &params, int duration) override {
         if (systrace::util::config::GlobalConfig::Instance().local_rank != 0) {

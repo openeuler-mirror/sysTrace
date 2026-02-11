@@ -9,7 +9,6 @@
 #include "../../../include/utils/TimeUtil.hpp"
 #include "../../../include/utils/TimerManager.hpp"
 #include "../../../include/utils/util.h"
-#include "../ebpf/python_gil.skel.h"
 #include "../ebpfPluginBase/EbpfCollectorBase.h"
 #include <algorithm>
 #include <atomic>

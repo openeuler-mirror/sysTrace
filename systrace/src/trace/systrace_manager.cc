@@ -315,10 +315,12 @@ void SysTrace::registerPlugins() {
     cm.register_plugin(std::make_shared<MemoryPlugin>());
     cm.register_plugin(std::make_shared<CpuPlugin>());
     cm.register_plugin(std::make_shared<CacheMissPlugin>());
-    cm.register_plugin(std::make_shared<GILPlugin>());
-    cm.register_plugin(std::make_shared<PthreadPlugin>());
     cm.register_plugin(std::make_shared<FtracePlugin>());
     cm.register_plugin(std::make_shared<TracePlugin>());
+#ifdef HAS_BPF_SUPPORT
+    cm.register_plugin(std::make_shared<GILPlugin>());
+    cm.register_plugin(std::make_shared<PthreadPlugin>());
+#endif
 }
 
 void SysTrace::initializeSystem() {
