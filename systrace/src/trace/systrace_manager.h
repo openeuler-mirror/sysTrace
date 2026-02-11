@@ -90,6 +90,7 @@ class SysTrace {
     void startEventPoller();
     void stopEventPoller();
     void eventPollerMain();
+    bool isMsptiLibraryLoaded();
     static void cleanup();
 
 #ifdef HAS_BTF_SUPPORT

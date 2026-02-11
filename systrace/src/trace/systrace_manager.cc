@@ -1,7 +1,9 @@
 #include "systrace_manager.h"
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <string>
 
 int global_stage_id = 0;
 int global_stage_type = 0;
@@ -288,10 +290,27 @@ SysTrace::~SysTrace() {
 #endif
 }
 
+bool SysTrace::isMsptiLibraryLoaded() {
+    const char *ld_preload = std::getenv("LD_PRELOAD");
+    if (!ld_preload) {
+        return false;
+    }
+    std::string preload_str(ld_preload);
+    return preload_str.find("libmspti.so") != std::string::npos;
+}
+
 void SysTrace::registerPlugins() {
     auto &cm = ControlManager::getInstance();
     cm.register_plugin(std::make_shared<HbmPlugin>());
-    cm.register_plugin(std::make_shared<MsptiPlugin>());
+
+    if (isMsptiLibraryLoaded()) {
+        cm.register_plugin(std::make_shared<MsptiPlugin>());
+    } else {
+        LOG_MODULE(INFO, "SysTrace")
+            << "libmspti.so not found in LD_PRELOAD, skipping MsptiPlugin "
+               "registration";
+    }
+
     cm.register_plugin(std::make_shared<IOPlugin>());
     cm.register_plugin(std::make_shared<MemoryPlugin>());
     cm.register_plugin(std::make_shared<CpuPlugin>());
@@ -312,7 +331,6 @@ void SysTrace::initializeSystem() {
     registerPlugins();
     ControlManager::getInstance().start();
 
-    MSPTITracker::getInstance();
     PyTorchTrace::getInstance();
 #ifdef HAS_BTF_SUPPORT
     os_probe_ = std::thread(&run_osprobe);
