@@ -1,11 +1,56 @@
 # sysTrace采集使用指南
-## 1、前置条件
-参考[部署指南](./0.quickstart.md)安装部署sysTrace
 
-## 2、使用方法
-项目编译完成后，在build目录中存在 sysTrace_cli 可执行程序
-~~~bash
-./sysTrace_cli -h
+## 1. 前置条件
+
+参考[部署指南](./0.quickstart.md)安装部署sysTrace。
+
+## 2. 使用方法
+
+### 2.1 配置项
+
+#### 2.1.1 设置日志落盘位置，默认 /var/log/sysTrace
+
+```bash
+export SYSTRACE_LOG_PATH=/var/log/sysTrace
+```
+
+#### 2.1.2 设置日志级别，默认 INFO
+
+日志级别从高到低依次为：
+
+- DEBUG
+- WARN
+- INFO
+- ERROR
+- FATAL
+
+```bash
+export SYSTRACE_LOG_LEVEL=INFO
+```
+
+#### 2.1.3 设置采集数据落盘位置，默认 /home/sysTrace
+
+```bash
+export SYSTRACE_DUMP_PATH=/home/sysTrace
+```
+
+### 2.2 命令行工具sysTrace_cli
+
+#### 2.2.1 sysTrace_cli
+
+sysTrace_cli是sysTrace项目自带的命令行工具，用于和训练/推理任务中的sysTrace服务通讯，开启各个采集项。
+
+项目编译完成后，sysTrace_cli在build目录中。sysTrace_cli使用前提：通过LD_PRELOAD 把libsysTrace.so注入到推理/训练任务中。推理/训练任务正常启动。
+
+#### 2.2.2 sysTrace_cli 使用方式
+
+```bash
+./build/sysTrace_cli -h   #显示帮助文档
+```
+
+输出信息：
+
+```
 =========================================================
 USAGE:
   sysTrace_cli <action> <plugin> [key=value ...]
@@ -57,273 +102,260 @@ EXAMPLES:
   sysTrace_cli enable Mutex duration=10
   sysTrace_cli enable CacheMiss args=" -e branch-misses,cache-misses,cache-references --timeout 5000"
   sysTrace_cli disable CPU
-  sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex"
+  sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex"
 =========================================================
-~~~
+```
 
-## 3、功能列表
-| plugin    |                           适用场景                           |                                                     命令示例 |
-| :-------- | :----------------------------------------------------------: | -----------------------------------------------------------: |
-| HBM       |                           HBM事件                            |                        ./sysTrace_cli enable HBM duration=10 |
-| IO        |           Disk and Network I/O Latency/Throughput            |                         ./sysTrace_cli enable IO duration=10 |
-| MSPTI     |        NVIDIA/Atlas Activity Tracing (HCCL, Kernels)         |                      ./sysTrace_cli enable MSPTI duration=10 |
-| CPU       |           CPU Utilization and Context Switch Trace           |                        ./sysTrace_cli enable CPU duration=10 |
-| Memory    |             Memory Allocation and Leak Detection             |                     ./sysTrace_cli enable Memory duration=10 |
-| GIL       | Python Global Interpreter Lock (GIL) Contention and Latency Trace |                       ./sysTrace_cli enable GIL  duration=10 |
-| CacheMiss |    Hardware Cache Miss Rates and Memory Access Efficiency    | ./sysTrace_cli enable CacheMiss args="-p 27638 -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads --timeout 20000" |
-| Mutex     | Pthread Synchronization Latency (Mutex/RWLock/Spinlock/Sem)  |                      ./sysTrace_cli enable Mutex duration=10 |
-| Ftrace    | Linux Kernel Ftrace (Events, Function Graph, and Sched Tracing) | ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit" |
-| Trace     | **trace-cmd** is a command-line interface for interacting with the Linux kernel's **Ftrace** subsystem to record and analyze system performance and kernel events. |    ./sysTrace_cli enable Trace args="record -e sched sleep 5 |
+## 3. 采集项列表
 
-## 4、使用示例
+| Plugin   | 适用场景 | 命令示例 |
+| :------- | :------- | :------- |
+| HBM      | HBM事件 | `./sysTrace_cli enable HBM duration=10` |
+| IO       | 磁盘和网络I/O延迟/吞吐量 | `./sysTrace_cli enable IO duration=10` |
+| MSPTI    | NVIDIA/Atlas活动跟踪（HCCL，内核） | `./sysTrace_cli enable MSPTI duration=10` |
+| CPU      | CPU利用率和上下文切换跟踪 | `./sysTrace_cli enable CPU duration=10` |
+| Memory   | 内存分配和泄漏检测 | `./sysTrace_cli enable Memory duration=10` |
+| GIL      | Python全局解释器锁（GIL）争用和延迟跟踪 | `./sysTrace_cli enable GIL duration=10` |
+| CacheMiss | 硬件缓存未命中率和内存访问效率 | `./sysTrace_cli enable CacheMiss args="-p 27638 -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads --timeout 20000"` |
+| Mutex    | Pthread同步延迟（互斥锁/读写锁/自旋锁/信号量） | `./sysTrace_cli enable Mutex duration=10` |
+| Ftrace   | Linux内核Ftrace（事件、函数图和调度跟踪） | `./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit"` |
+| Trace    | trace-cmd命令行接口，用于Linux内核Ftrace子系统 | `./sysTrace_cli enable Trace args="record -e sched sleep 5"` |
+
+## 4. 使用示例
+
 ### 4.1 HBM
-~~~bash
-# 采集指令
-./sysTrace_cli enable HBM duration=10
 
-# 指令发送成功
+采集指令：
+
+```bash
+./sysTrace_cli enable HBM duration=10    #duration 为采集的时长，单位秒
+```
+
+指令发送成功，一张卡一条sock记录：
+
+```
 [ACK] /tmp/sysTrace_1868164.sock: SUCCESS
 [ACK] /tmp/sysTrace_1868165.sock: SUCCESS
+```
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 09:40:33.868] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"HBM"}
-[2026-01-30 09:40:33.868] [Control] [RANK 0] [INFO] Enabling plugin: HBM with params: {"duration":"10"}
-[2026-01-30 09:40:33.868] [HBM] [RANK 0] [INFO] HBM trace started.
-[2026-01-30 09:40:33.869] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 09:40:33.869] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"HBM"}
-[2026-01-30 09:40:33.869] [Control] [RANK 1] [INFO] Enabling plugin: HBM with params: {"duration":"10"}
-[2026-01-30 09:40:33.869] [HBM] [RANK 1] [INFO] HBM trace started.
-[2026-01-30 09:40:33.870] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 09:40:43.869] [HBM] [RANK 0] [INFO] HBM trace stopped.
-[2026-01-30 09:40:43.870] [HBM] [RANK 1] [INFO] HBM trace stopped.
+采集结果（默认保存位置： /home/sysTrace/hbm_trace）：
 
-#采集结果
-[root@localhost hbm_trace]# pwd
-/home/sysTrace/hbm_trace
-[root@localhost hbm_trace]# ll
-total 64
+```bash
 -rw-r--r-- 1 root root 30900 Jan 30 09:40 hbm_trace_rank0_1868164.pb
 -rw-r--r-- 1 root root 30684 Jan 30 09:40 hbm_trace_rank1_1868165.pb
-~~~
-
-
+```
 
 ### 4.2 IO
 
-~~~bash
-# 采集指令
+采集指令：
+
+```bash
 ./sysTrace_cli enable IO duration=10
+```
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1868164.sock: SUCCESS
-[ACK] /tmp/sysTrace_1868165.sock: SUCCESS
+采集结果（默认保存位置：/home/sysTrace/io_trace）：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 09:45:40.106] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"IO"}
-[2026-01-30 09:45:40.107] [Control] [RANK 0] [INFO] Enabling plugin: IO with params: {"duration":"10"}
-[2026-01-30 09:45:40.107] [IO] [RANK 0] [INFO] IO trace started.
-[2026-01-30 09:45:40.107] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 09:45:40.107] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"IO"}
-[2026-01-30 09:45:40.108] [Control] [RANK 1] [INFO] Enabling plugin: IO with params: {"duration":"10"}
-[2026-01-30 09:45:40.108] [IO] [RANK 1] [INFO] IO trace started.
-[2026-01-30 09:45:40.108] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 09:45:50.107] [IO] [RANK 0] [INFO] IO trace stopped.
-[2026-01-30 09:45:50.108] [IO] [RANK 1] [INFO] IO trace stopped.
-
-#采集结果
-[root@localhost io_trace]# pwd
-/home/sysTrace/io_trace
-[root@localhost io_trace]# ll
-total 60
+```bash
 -rw-r--r-- 1 root root 42450 Jan 30 09:45 io_trace_rank0_1868164.pb
 -rw-r--r-- 1 root root 12629 Jan 30 09:45 io_trace_rank1_1868165.pb
-~~~
-
-
+```
 
 ### 4.3 MSPTI
 
-~~~bash
-# 采集指令
+采集指令：
+
+```bash
 ./sysTrace_cli enable MSPTI duration=10
+```
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1868164.sock: SUCCESS
-[ACK] /tmp/sysTrace_1868165.sock: SUCCESS
+采集结果（默认保存位置：/home/sysTrace/mspti）：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 09:48:37.849] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"MSPTI"}
-[2026-01-30 09:48:37.849] [Control] [RANK 0] [INFO] Enabling plugin: MSPTI with params: {"duration":"10"}
-[2026-01-30 09:48:37.850] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 09:48:37.850] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"MSPTI"}
-[2026-01-30 09:48:37.850] [Control] [RANK 1] [INFO] Enabling plugin: MSPTI with params: {"duration":"10"}
-[2026-01-30 09:48:37.851] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 09:48:37.879] [MSPTI] [RANK 0] [INFO] Enabled Activity Kind: 1
-[2026-01-30 09:48:37.908] [MSPTI] [RANK 1] [INFO] Enabled Activity Kind: 1
-[2026-01-30 09:48:47.885] [MSPTI] [RANK 0] [INFO] Disabled Activity Kind: 1
-[2026-01-30 09:48:47.914] [MSPTI] [RANK 1] [INFO] Disabled Activity Kind: 1
-
-#采集结果
-[root@localhost mspti]# pwd
-/home/sysTrace/mspti
-[root@localhost mspti]# ll
-total 1288
+```bash
 -rw-r--r-- 1 root root 658179 Jan 30 09:48 mspti-marker-76.53.151.141-0.csv
 -rw-r--r-- 1 root root 658179 Jan 30 09:48 mspti-marker-76.53.151.141-1.csv
-~~~
-
-
+```
 
 ### 4.4 CPU
 
-~~~bash
-# 采集指令
+采集指令：
+
+```bash
 ./sysTrace_cli enable CPU duration=10
+```
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1868164.sock: SUCCESS
-[ACK] /tmp/sysTrace_1868165.sock: SUCCESS
+采集结果（CPU采集结果落盘和Memory为同一个文件，默认保存位置：/home/sysTrace/osprobe）：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 09:51:23.697] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"CPU"}
-[2026-01-30 09:51:23.697] [Control] [RANK 0] [INFO] Enabling plugin: CPU with params: {"duration":"10"}
-[2026-01-30 09:51:23.698] [CPU] [RANK 0] [INFO] CPU trace started.
-[2026-01-30 09:51:23.698] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 09:51:23.698] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"CPU"}
-[2026-01-30 09:51:23.699] [Control] [RANK 1] [INFO] Enabling plugin: CPU with params: {"duration":"10"}
-[2026-01-30 09:51:23.699] [CPU] [RANK 1] [INFO] CPU trace started.
-[2026-01-30 09:51:23.699] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 09:51:33.698] [CPU] [RANK 0] [INFO] CPU trace stopped.
-[2026-01-30 09:51:33.700] [CPU] [RANK 1] [INFO] CPU trace stopped.
-
-#采集结果 (CPU采集结果落盘和Memory为同一个文件)
-[root@localhost osprobe]# pwd
-/home/sysTrace/osprobe
-[root@localhost osprobe]# ll
-total 260
+```bash
 -rw-r--r-- 1 root root 128010 Jan 30 09:51 os_trace_20260130_09_rank_0_1868164.pb
 -rw-r--r-- 1 root root 133567 Jan 30 09:51 os_trace_20260130_09_rank_1_1868165.pb
-~~~
-
-
+```
 
 ### 4.5 Memory
 
-~~~bash
-# 采集指令
+采集指令：
+
+```bash
 ./sysTrace_cli enable Memory duration=10
+```
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1868164.sock: SUCCESS
-[ACK] /tmp/sysTrace_1868165.sock: SUCCESS
+采集结果（Memory采集结果落盘和CPU为同一个文件，默认保存位置：/home/sysTrace/osprobe）：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 10:06:01.392] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"Memory"}
-[2026-01-30 10:06:01.392] [Control] [RANK 0] [INFO] Enabling plugin: Memory with params: {"duration":"10"}
-[2026-01-30 10:06:01.392] [Memory] [RANK 0] [INFO] Memory trace started.
-[2026-01-30 10:06:01.393] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 10:06:01.393] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"Memory"}
-[2026-01-30 10:06:01.393] [Control] [RANK 1] [INFO] Enabling plugin: Memory with params: {"duration":"10"}
-[2026-01-30 10:06:01.394] [Memory] [RANK 1] [INFO] Memory trace started.
-[2026-01-30 10:06:01.394] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 10:06:11.393] [Memory] [RANK 0] [INFO] Memory trace stopped.
-[2026-01-30 10:06:11.394] [Memory] [RANK 1] [INFO] Memory trace stopped.
-
-#采集结果 (Memory采集结果落盘和CPU为同一个文件)
-[root@localhost osprobe]# pwd
-/home/sysTrace/osprobe
-[root@localhost osprobe]# ll
-total 260
+```bash
 -rw-r--r-- 1 root root 128010 Jan 30 09:51 os_trace_20260130_09_rank_0_1868164.pb
 -rw-r--r-- 1 root root 133567 Jan 30 09:51 os_trace_20260130_09_rank_1_1868165.pb
-~~~
-
-
+```
 
 ### 4.6 GIL
 
-~~~bash
-#示例一，默认采集AI主进程（运行在NPU卡上的主进程 npu-smi info） GIL信息
-# 采集指令 
+#### 示例一：默认采集AI主进程（运行在NPU卡上的主进程 npu-smi info）GIL信息
+
+采集指令：
+
+```bash
 ./sysTrace_cli enable GIL duration=10
+```
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1901644.sock: SUCCESS
-[ACK] /tmp/sysTrace_1901645.sock: SUCCESS
+采集结果（GIL多卡数据已聚合到同一文件，默认保存位置：/home/sysTrace/GIL）：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 10:34:45.138] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"GIL"}
-[2026-01-30 10:34:45.139] [Control] [RANK 0] [INFO] Enabling plugin: GIL with params: {"duration":"10"}
-[2026-01-30 10:34:45.269] [GIL] [RANK 0] [INFO] Output file: /home/sysTrace/GIL/GIL_1901644_rank_0.json
-[2026-01-30 10:34:45.269] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 10:34:45.270] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"GIL"}
-[2026-01-30 10:34:45.270] [Control] [RANK 1] [INFO] Enabling plugin: GIL with params: {"duration":"10"}
-[2026-01-30 10:34:45.270] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 10:34:55.591] [GIL] [RANK 0] [INFO]  trace stop.
-
-#采集结果 (GIL多卡数据已聚合到同一文件)
-[root@localhost GIL]# pwd
-/home/sysTrace/GIL
-[root@localhost GIL]# ll
-total 9884
+```bash
 -rw-r--r-- 1 root root 10120449 Jan 30 10:34 GIL_1901644_rank_0.json
+```
 
-#示例二，通过pid参数同时采集指定pid GIL信息。多个pid用,分隔。
-# 采集指令 
-./sysTrace_cli enable GIL duration=10 pid=1907448
+#### 示例二：通过pid参数同时采集指定pid GIL信息（多个pid用,分隔）
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1901644.sock: SUCCESS
-[ACK] /tmp/sysTrace_1901645.sock: SUCCESS
+采集指令：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 10:37:28.187] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10","pid":"1907448"},"path":"GIL"}
-[2026-01-30 10:37:28.188] [Control] [RANK 0] [INFO] Enabling plugin: GIL with params: {"duration":"10","pid":"1907448"}
-[2026-01-30 10:37:28.260] [GIL] [RANK 0] [INFO] Output file: /home/sysTrace/GIL/GIL_1901644_rank_0.json
-[2026-01-30 10:37:28.260] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 10:37:28.260] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10","pid":"1907448"},"path":"GIL"}
-[2026-01-30 10:37:28.261] [Control] [RANK 1] [INFO] Enabling plugin: GIL with params: {"duration":"10","pid":"1907448"}
-[2026-01-30 10:37:28.261] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 10:37:38.661] [GIL] [RANK 0] [INFO]  trace stop.
-
-#采集结果 (GIL多卡数据已聚合到同一文件)，可上传到 https://www.ui.perfetto.dev/ 进行分析
-[root@localhost GIL]# pwd
-/home/sysTrace/GIL
-[root@localhost GIL]# ll
-total 13172
--rw-r--r-- 1 root root 13487979 Jan 30 10:37 GIL_1901644_rank_0.json
-~~~
-
-
+```bash
+./sysTrace_cli enable GIL duration=10 pid=1907448,213123
+```
 
 ### 4.7 CacheMiss
 
-~~~bash
-# 采集指令 参数说明 args -e 必选 采集事件; --timeout 必选 采集时长单位毫秒; 可选-p 指定pid 
+前提：需要安装perf工具。
+
+采集指令：
+
+```bash
 ./sysTrace_cli enable CacheMiss args=" -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"
+```
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1901644.sock: SUCCESS
-[ACK] /tmp/sysTrace_1901645.sock: SUCCESS
+参数说明：
 
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 11:02:11.697] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"args":" -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"},"path":"CacheMiss"}
-[2026-01-30 11:02:11.698] [Control] [RANK 0] [INFO] Enabling plugin: CacheMiss with params: {"args":" -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"}
-[2026-01-30 11:02:11.698] [CacheMiss] [RANK 0] [INFO]  Output file: /home/sysTrace/CacheMiss/CacheMiss_1935088_rank_0.txt
-[2026-01-30 11:02:11.764] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 11:02:11.765] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"args":" -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"},"path":"CacheMiss"}
-[2026-01-30 11:02:11.766] [Control] [RANK 1] [INFO] Enabling plugin: CacheMiss with params: {"args":" -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"}
-[2026-01-30 11:02:11.766] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 11:02:17.492] [CacheMiss] [RANK 0] [INFO]  stop.
+- `args` 参数中 `-e` 必选，用于指定采集事件
+- `--timeout` 必选，用于指定采集时长（单位：毫秒）
+- `-p` 可选，用于指定pid
 
-#采集结果
-[root@localhost CacheMiss]# pwd
-/home/sysTrace/CacheMiss
-[root@localhost CacheMiss]# ll
-total 4
+采集结果（默认保存位置：/home/sysTrace/CacheMiss）：
+
+```bash
 -rw-r--r-- 1 root root 2885 Jan 30 11:02 CacheMiss_1935088_rank_0.txt
+```
 
-cat  /home/sysTrace/CacheMiss/CacheMiss_1935088_rank_0.txt
+### 4.8 Mutex
+
+#### 采集事件列表
+
+| 函数名 | 说明 |
+| :------- | :------- |
+| pthread_mutex_lock | 互斥锁加锁（阻塞） |
+| pthread_mutex_timedlock | 互斥锁加锁（带超时） |
+| pthread_mutex_trylock | 互斥锁加锁（非阻塞） |
+| pthread_rwlock_rdlock | 读写锁读锁（阻塞） |
+| pthread_rwlock_wrlock | 读写锁写锁（阻塞） |
+| pthread_rwlock_timedrdlock | 读写锁读锁（带超时） |
+| pthread_rwlock_timedwrlock | 读写锁写锁（带超时） |
+| pthread_rwlock_tryrdlock | 读写锁读锁（非阻塞） |
+| pthread_rwlock_trywrlock | 读写锁写锁（非阻塞） |
+| pthread_spin_lock | 自旋锁加锁（阻塞） |
+| pthread_spin_trylock | 自旋锁加锁（非阻塞） |
+| pthread_timedjoin_np | 线程等待加入（带超时） |
+| pthread_tryjoin_np | 线程等待加入（非阻塞） |
+| pthread_yield | 线程让出CPU |
+| sem_timedwait | 信号量等待（带超时） |
+| sem_trywait | 信号量等待（非阻塞） |
+| sem_wait | 信号量等待（阻塞） |
+
+#### 示例一：默认采集AI主进程（运行在NPU卡上的主进程 npu-smi info）Mutex信息
+
+采集指令：
+
+```bash
+./sysTrace_cli enable Mutex duration=10
+```
+
+采集结果（Mutex多卡数据已聚合到同一文件，默认保存位置：/home/sysTrace/Mutex）：
+
+```bash
+-rw-r--r-- 1 root root 872775 Jan 30 10:48 Mutex_1901644_rank_0.json
+```
+
+#### 示例二：通过pid参数同时采集指定pid Mutex信息（多个pid用,分隔）
+
+采集指令：
+
+```bash
+./sysTrace_cli enable Mutex duration=10 pid=1907448,231233
+```
+
+采集结果（Mutex多卡数据已聚合到同一文件）：
+
+```bash
+-rw-r--r-- 1 root root 729376 Jan 30 10:53 Mutex_1901644_rank_0.json
+```
+
+### 4.9 Ftrace
+
+采集指令：
+
+```bash
+./sysTrace_cli enable Ftrace duration=10 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex" cpu_list=0-15 <set_event_pid=1234>
+```
+
+参数说明：
+
+- `cpu_list` 必选，用于指定采集的cpu范围，支持0-3,5格式
+- `events` 用于指定采集事件
+- `func` 用于指定采集函数名
+- `set_event_pid` 可选，用于采集指定PID的trace event事件（对function trace等不生效）
+- `set_ftrace_pid` 可选，用于采集指定PID的所有ftrace事件
+- `buffer_size_kb` 可选，用于指定ftrace的缓存大小，默认32768
+- `event_stack_trace` 可选，用于指定是否开启事件栈，true开启 false关闭，默认关闭
+- `func_stack_trace` 可选，用于指定是否开启函数栈，true开启 false关闭，默认关闭
+- `function_tracer` 可选，用于指定函数追踪模式
+
+采集结果（默认保存位置：/home/sysTrace/Ftrace）：
+
+```bash
+-rw-r--r-- 1 root root 870 Jan 31 16:56 Ftrace_3249973_rank_0.log
+```
+
+### 4.10 Trace
+
+前提：需要安装trace-cmd工具。
+
+采集指令（args参数为 trace-cmd 参数）：
+
+```bash
+./sysTrace_cli enable Trace args="record -e sched sleep 5"
+```
+
+采集结果（默认保存位置：/home/sysTrace/Trace）：
+
+```bash
+-rw-r--r-- 1 root root 665362432 Feb  3 14:45 trace.dat
+```
+
+## 5 结果转换可视化
+
+### 5.1 GIL
+
+采集结果为json，可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
+
+### 5.2 CacheMiss
+
+采集结果为文本，可直接查看：
+
+```
 # started on Fri Jan 30 11:02:12 2026
 
 
@@ -358,182 +390,70 @@ cat  /home/sysTrace/CacheMiss/CacheMiss_1935088_rank_0.txt
           16126045      r007c                                                         (42.75%)
        61314085780      r0008                                                         (42.73%)
        69243999676      r0011                                                         (46.28%)
+```
 
-       5.015744890 seconds time elapsed
-~~~
+### 5.3 Mutex
 
- 
+采集结果为json，可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
 
-### 4.7 Mutex
+### 5.4 Ftrace
 
-~~~bash
-#采集的事件如下：
-#define PTHREAD_MUTEX_LOCK_NAME         "pthread_mutex_lock"
-#define PTHREAD_MUTEX_TIMEDLOCK_NAME    "pthread_mutex_timedlock"
-#define PTHREAD_MUTEX_TRYLOCK_NAME      "pthread_mutex_trylock"
-#define PTHREAD_RWLOCK_RDLOCK_NAME      "pthread_rwlock_rdlock"
-#define PTHREAD_RWLOCK_WRLOCK_NAME      "pthread_rwlock_wrlock"
-#define PTHREAD_RWLOCK_TIMEDRDLOCK_NAME "pthread_rwlock_timedrdlock"
-#define PTHREAD_RWLOCK_TIMEDWRLOCK_NAME "pthread_rwlock_timedwrlock"
-#define PTHREAD_RWLOCK_TRYRDLOCK_NAME   "pthread_rwlock_tryrdlock"
-#define PTHREAD_RWLOCK_TRYWRLOCK_NAME   "pthread_rwlock_trywrlock"
-#define PTHREAD_SPIN_LOCK_NAME          "pthread_spin_lock"
-#define PTHREAD_SPIN_TRYLOCK_NAME       "pthread_spin_trylock"
-#define PTHREAD_TIMEDJOIN_NP_NAME       "pthread_timedjoin_np"
-#define PTHREAD_TRYJOIN_NP_NAME         "pthread_tryjoin_np"
-#define PTHREAD_YIELD_NAME              "pthread_yield"
-#define SEM_TIMEDWAIT_NAME              "sem_timedwait"
-#define SEM_TRYWAIT_NAME                "sem_trywait"
-#define SEM_WAIT_NAME                   "sem_wait"
+采集结果为文本，可自行查看。以下为提供了采集结果转换脚本的事件，注意不支持开启栈。
 
-#示例一，默认采集AI主进程（运行在NPU卡上的主进程 npu-smi info）Mutex信息
-# 采集指令 
-./sysTrace_cli enable Mutex duration=10
+#### 5.4.1 sched
 
-# 指令发送成功
-[ACK] /tmp/sysTrace_1901644.sock: SUCCESS
-[ACK] /tmp/sysTrace_1901645.sock: SUCCESS
-
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 10:48:10.497] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"Mutex"}
-[2026-01-30 10:48:10.498] [Control] [RANK 0] [INFO] Enabling plugin: Mutex with params: {"duration":"10"}
-[2026-01-30 10:48:10.583] [Mutex] [RANK 0] [INFO] Output file: /home/sysTrace/Mutex/Mutex_1901644_rank_0.json
-[2026-01-30 10:48:10.583] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 10:48:10.583] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10"},"path":"Mutex"}
-[2026-01-30 10:48:10.584] [Control] [RANK 1] [INFO] Enabling plugin: Mutex with params: {"duration":"10"}
-[2026-01-30 10:48:10.584] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 10:48:20.583] [Mutex] [RANK 0] [INFO] trace stop.
-
-#采集结果 (Mutex多卡数据已聚合到同一文件)
-[root@localhost Mutex]# pwd
-/home/sysTrace/Mutex
-[root@localhost Mutex]# ll
-total 856
--rw-r--r-- 1 root root 872775 Jan 30 10:48 Mutex_1901644_rank_0.json
-
-#示例二，通过pid参数同时采集指定pid Mutex信息。多个pid用,分隔。
-# 采集指令 
-./sysTrace_cli enable Mutex duration=10 pid=1907448
-
-# 指令发送成功
-[ACK] /tmp/sysTrace_1901644.sock: SUCCESS
-[ACK] /tmp/sysTrace_1901645.sock: SUCCESS
-
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-30 10:53:19.845] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"duration":"10","pid":"1907448"},"path":"Mutex"}
-[2026-01-30 10:53:19.845] [Control] [RANK 0] [INFO] Enabling plugin: Mutex with params: {"duration":"10","pid":"1907448"}
-[2026-01-30 10:53:19.950] [Mutex] [RANK 0] [INFO] Output file: /home/sysTrace/Mutex/Mutex_1901644_rank_0.json
-[2026-01-30 10:53:19.951] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-30 10:53:19.951] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"duration":"10","pid":"1907448"},"path":"Mutex"}
-[2026-01-30 10:53:19.951] [Control] [RANK 1] [INFO] Enabling plugin: Mutex with params: {"duration":"10","pid":"1907448"}
-[2026-01-30 10:53:19.951] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-30 10:53:29.950] [Mutex] [RANK 0] [INFO] trace stop.
-
-#采集结果 (Mutex多卡数据已聚合到同一文件)，可上传到 https://www.ui.perfetto.dev/ 进行分析
-[root@localhost Mutex]# pwd
-/home/sysTrace/Mutex
-[root@localhost Mutex]# ll
-total 716
--rw-r--r-- 1 root root 729376 Jan 30 10:53 Mutex_1901644_rank_0.json
-~~~
-
- 
-
-### 4.8 Ftrace
-
-~~~bash
-# 采集指令 
- ./sysTrace_cli enable Ftrace duration=10  events="syscalls/sys_enter_futex,syscalls/sys_exit_futex" cpu_list=0-15
-
-# 指令发送成功
-[ACK] /tmp/sysTrace_3249973.sock: SUCCESS
-[ACK] /tmp/sysTrace_3249974.sock: SUCCESS
-
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-01-31 16:56:31.848] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"},"path":"Ftrace"}
-[2026-01-31 16:56:31.848] [Control] [RANK 0] [INFO] Enabling plugin: Ftrace with params: {"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"}
-[2026-01-31 16:56:32.172] [Ftrace] [RANK 0] [INFO] Parallel Ftrace started. Output file: /home/sysTrace/Ftrace/Ftrace_3249973_rank_0.log
-[2026-01-31 16:56:32.172] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-01-31 16:56:32.172] [Control] [RANK 1] [INFO] Received cmd: {"action":"enable","params":{"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"},"path":"Ftrace"}
-[2026-01-31 16:56:32.173] [Control] [RANK 1] [INFO] Enabling plugin: Ftrace with params: {"cpu_list":"0-15","duration":"10","events":"syscalls/sys_enter_futex,syscalls/sys_exit_futex"}
-[2026-01-31 16:56:32.173] [Control] [RANK 1] [INFO] Response sent: SUCCESS
-[2026-01-31 16:56:43.183] [Ftrace] [RANK 0] [INFO] Parallel ftrace stop.
-
-#采集结果 log是采集结果
-[root@localhost Ftrace]# pwd
-/home/sysTrace/Ftrace
-[root@localhost Ftrace]# ll
-total 4
--rw-r--r-- 1 root root  870 Jan 31 16:56 Ftrace_3249973_rank_0.log
-drwxr-xr-x 2 root root 4096 Jan 31 16:56 tmp
-
-常用指令：
 1. 系统软中断跟踪（仅启用软中断事件）
 
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="irq/softirq_entry,irq/softirq_exit,irq/softirq_raise"
+```bash
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="irq/softirq_entry,irq/softirq_exit,irq/softirq_raise"
+```
 
 2. 系统硬中断跟踪（仅启用硬中断事件）
 
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="irq/irq_handler_entry,irq/irq_handler_exit"
+```bash
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="irq/irq_handler_entry,irq/irq_handler_exit"
+```
 
-3. 系统所有系统调用跟踪（raw_syscalls 全量）
+3. 任务调度跟踪（仅调度相关事件）
 
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit"
+```bash
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="sched/sched_switch,sched/sched_wakeup,sched/sched_waking,sched/sched_migrate_task,sched/sched_wakeup_new"
+```
 
-4. 特定系统调用 (Futex) 跟踪（仅 Futex 调用）
+可以使用 **systrace/convert** 目录下的 **convert_ftrace.py** 转换脚本转换成json格式，可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
 
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex"
+转换脚本使用方式：
 
-5. 特定系统调用 (sys_write) 跟踪（仅 write 调用）
+```bash
+python convert_ftrace.py --input <Ftrace_3249973_rank_0.log> --output <output.json> --type <sched>
+```
 
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="syscalls/sys_enter_write,syscalls/sys_exit_write"
+#### 5.4.2 mmap_lock
 
-6. 任务调度跟踪（仅调度相关事件）
-
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="sched/sched_switch,sched/sched_wakeup,sched/sched_waking,sched/sched_migrate_task,sched/sched_wakeup_new"
-
-7. 内核函数跟踪 (hal_kernel_svm_dam_desc_create)（function_graph 追踪器） --数据量较大
-
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 tracer=function_graph func="hal_kernel_svm_dam_desc_create"
-
-8. 内核函数跟踪 (mmap/munmap/do_page_fault)（function 追踪器） --数据量较大
-
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 tracer=function func="*mmap,*munmap,do_page_fault" stack_trace=1
-
-9. 内存页表跟踪 (vmscan 全量事件)
-
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="vmscan/mm_vmscan_wakeup_kswapd,vmscan/mm_vmscan_direct_reclaim_begin,vmscan/mm_vmscan_direct_reclaim_end,vmscan/mm_vmscan_memcg_reclaim_begin,vmscan/mm_vmscan_memcg_reclaim_end,vmscan/mm_vmscan_node_reclaim_begin,vmscan/mm_vmscan_node_reclaim_end,vmscan/mm_vmscan_kswapd_wake,vmscan/mm_vmscan_kswapd_sleep"
-
-10. 内存页表跟踪 (compaction 事件)
-
-./sysTrace_cli enable Ftrace duration=10 cpu_list=0-191 events="compaction/mm_compaction_begin,compaction/mm_compaction_end"
-
-~~~
-
-
-
-### 4.9 Trace
+内核mmap_lock事件
 
 ~~~bash
-# 采集指令 args参数为 trace-cmd 参数
-./sysTrace_cli enable Trace args="record -e sched sleep 5"
-
-# 指令发送成功
-[ACK] /tmp/sysTrace_134561.sock: SUCCESS
-[ACK] /tmp/sysTrace_134562.sock: SUCCESS
-
-# 日志查看   tail -f /var/log/sysTrace/sysTrace_latest.log
-[2026-02-03 14:45:10.326] [Control] [RANK 0] [INFO] Received cmd: {"action":"enable","params":{"args":"record -e sched sleep 5"},"path":"Trace"}
-[2026-02-03 14:45:10.327] [Control] [RANK 0] [INFO] Enabling plugin: Trace with params: {"args":"record -e sched sleep 5"}
-[2026-02-03 14:45:10.407] [Trace] [RANK 0] [INFO] cmd = trace-cmd record -e sched sleep 5
-[2026-02-03 14:45:10.432] [Control] [RANK 0] [INFO] Response sent: SUCCESS
-[2026-02-03 14:45:25.113] [Trace] [RANK 0] [INFO]  stop.
-
-# 采集结果,默认路径是/home/sysTrace/Trace
-[root@localhost Trace]# pwd
-/home/sysTrace/Trace
-[root@localhost Trace]# ll
-total 649772
--rw-r--r-- 1 root root 665362432 Feb  3 14:45 trace.dat
+./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="mmap_lock/mmap_lock_start_locking,mmap_lock/mmap_lock_acquire_returned,mmap_lock/mmap_lock_released"
 ~~~
 
+转换脚本使用方式：
+
+~~~bash
+python convert_ftrace.py --input <Ftrace_3249973_rank_0.log> --output <output.json> --type <mmaplock>
+~~~
+
+### 5.5 Trace
+
+采集结果为二进制或文本，可自行查看。
+
+### 5.6 采集结果汇总展示
+
+采集项结果（包括转换后）为json格式的，可以使用转换脚本（systrace/convert/trace_aggregator.py）汇总到一个文件进行展示。
+
+展示脚本使用方式：
+
+```bash
+python trace_aggregator.py --input <json_dir> --output <merged.json>
+```
+
+merged.json 可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
