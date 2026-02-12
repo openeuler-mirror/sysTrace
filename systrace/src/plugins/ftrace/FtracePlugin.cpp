@@ -104,12 +104,11 @@ void FtracePlugin::stop() {
                 << "Parallel ftrace stop. All CPU buffers flushed.";
             reset_ftrace();
 
-            active_.store(false);
             LOG_MODULE(DEBUG, pluginName_)
                 << "All collection threads joined. Starting data aggregation "
                    "and processing...";
             process_raw_data();
-
+            active_.store(false);
             output_dir_.clear();
             cpu_readers_.clear();
             LOG_MODULE(INFO, pluginName_) << "Parallel ftrace stop.";
@@ -197,15 +196,24 @@ bool FtracePlugin::init_ftrace() {
                                 task_config_.core_config.function_tracer);
         PluginUtils::write_file(ftrace_path_ + "set_ftrace_filter",
                                 task_config_.core_config.trace_functions);
+        PluginUtils::write_file(ftrace_path_ + "options/func_stack_trace",
+                                task_config_.core_config.func_stack_trace ? "1" : "0");
     }
     if (!task_config_.core_config.ftrace_pid.empty()) {
         PluginUtils::write_file(ftrace_path_ + "set_ftrace_pid",
                                 task_config_.core_config.ftrace_pid);
+    } else{
+        PluginUtils::write_file(ftrace_path_ + "set_ftrace_pid",
+                                "");
     }
     if (!task_config_.core_config.event_pid.empty()) {
         PluginUtils::write_file(ftrace_path_ + "set_event_pid",
                                 task_config_.core_config.event_pid);
+    } else{
+        PluginUtils::write_file(ftrace_path_ + "set_event_pid",
+                                "");
     }
+    PluginUtils::write_file(ftrace_path_ + "trace_clock", "boot");
     PluginUtils::write_file(ftrace_path_ + "options/stacktrace",
                             task_config_.core_config.stack_trace ? "1" : "0");
     PluginUtils::write_file(ftrace_path_ + "tracing_on", "1");
@@ -288,7 +296,9 @@ FtracePlugin::parse_config_from_json(const nlohmann::json &params) {
             if (!sfp.is_string()) {
                 throw std::invalid_argument("trace_pid type error");
             }
-            core.ftrace_pid = sfp.get<std::string>();
+            std::string ftrace_pid_str = sfp.get<std::string>();
+            std::replace(ftrace_pid_str.begin(), ftrace_pid_str.end(), ',', ' ');
+            core.ftrace_pid = ftrace_pid_str;
         }
 
         if (params.contains("set_event_pid")) {
@@ -296,7 +306,9 @@ FtracePlugin::parse_config_from_json(const nlohmann::json &params) {
             if (!sep.is_string()) {
                 throw std::invalid_argument("event_pid type error");
             }
-            core.event_pid = sep.get<std::string>();
+            std::string event_pid_str = sep.get<std::string>();
+            std::replace(event_pid_str.begin(), event_pid_str.end(), ',', ' ');
+            core.event_pid = event_pid_str;
         }
 
         if (params.contains("buffer_size_kb")) {
