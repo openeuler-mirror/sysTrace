@@ -196,22 +196,21 @@ bool FtracePlugin::init_ftrace() {
                                 task_config_.core_config.function_tracer);
         PluginUtils::write_file(ftrace_path_ + "set_ftrace_filter",
                                 task_config_.core_config.trace_functions);
-        PluginUtils::write_file(ftrace_path_ + "options/func_stack_trace",
-                                task_config_.core_config.func_stack_trace ? "1" : "0");
+        PluginUtils::write_file(
+            ftrace_path_ + "options/func_stack_trace",
+            task_config_.core_config.func_stack_trace ? "1" : "0");
     }
     if (!task_config_.core_config.ftrace_pid.empty()) {
         PluginUtils::write_file(ftrace_path_ + "set_ftrace_pid",
                                 task_config_.core_config.ftrace_pid);
-    } else{
-        PluginUtils::write_file(ftrace_path_ + "set_ftrace_pid",
-                                "");
+    } else {
+        PluginUtils::write_file(ftrace_path_ + "set_ftrace_pid", "");
     }
     if (!task_config_.core_config.event_pid.empty()) {
         PluginUtils::write_file(ftrace_path_ + "set_event_pid",
                                 task_config_.core_config.event_pid);
-    } else{
-        PluginUtils::write_file(ftrace_path_ + "set_event_pid",
-                                "");
+    } else {
+        PluginUtils::write_file(ftrace_path_ + "set_event_pid", "");
     }
     PluginUtils::write_file(ftrace_path_ + "trace_clock", "boot");
     PluginUtils::write_file(ftrace_path_ + "options/stacktrace",
@@ -297,7 +296,8 @@ FtracePlugin::parse_config_from_json(const nlohmann::json &params) {
                 throw std::invalid_argument("trace_pid type error");
             }
             std::string ftrace_pid_str = sfp.get<std::string>();
-            std::replace(ftrace_pid_str.begin(), ftrace_pid_str.end(), ',', ' ');
+            std::replace(ftrace_pid_str.begin(), ftrace_pid_str.end(), ',',
+                         ' ');
             core.ftrace_pid = ftrace_pid_str;
         }
 

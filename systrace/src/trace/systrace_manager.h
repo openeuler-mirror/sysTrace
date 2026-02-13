@@ -3,7 +3,9 @@
 #include "../../include/log/logging.h"
 #include "../../include/utils/util.h"
 #include "../plugins/CacheMissPlugin.hpp"
+#ifdef HAS_BTF_SUPPORT
 #include "../plugins/EbpfPlugin.hpp"
+#endif
 #include "../plugins/HbmPlugin.hpp"
 #include "../plugins/IOPlugin.hpp"
 #include "../plugins/MsptiTrackerPlugin.hpp"

@@ -312,8 +312,10 @@ void SysTrace::registerPlugins() {
     }
 
     cm.register_plugin(std::make_shared<IOPlugin>());
+#ifdef HAS_BTF_SUPPORT
     cm.register_plugin(std::make_shared<MemoryPlugin>());
     cm.register_plugin(std::make_shared<CpuPlugin>());
+#endif
     cm.register_plugin(std::make_shared<CacheMissPlugin>());
     cm.register_plugin(std::make_shared<FtracePlugin>());
     cm.register_plugin(std::make_shared<TracePlugin>());

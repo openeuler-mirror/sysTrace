@@ -140,12 +140,11 @@ static void *load_symbol(const char *func_name) {
 
     void *func = dlsym(g_hal_lib, func_name);
     if (!func) {
-        std::cout << "[Hook]"
-                  << "Failed to dlsym: " << func_name << " " << dlerror()
-                  << std::endl;
+        std::cout << "[Hook]" << "Failed to dlsym: " << func_name << " "
+                  << dlerror() << std::endl;
     } else {
-        std::cout << "[Hook]"
-                  << "Successfully hooked " << func_name << std::endl;
+        std::cout << "[Hook]" << "Successfully hooked " << func_name
+                  << std::endl;
     }
     return func;
 }
