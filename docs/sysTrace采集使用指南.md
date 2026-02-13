@@ -1,54 +1,73 @@
-# sysTrace采集使用指南
+# sysTrace 采集使用指南
 
 ## 1. 前置条件
 
-参考[部署指南](./0.quickstart.md)安装部署sysTrace。
+使用前请参考[部署指南](./0.quickstart.md)完成 sysTrace 的安装部署。
 
-## 2. 使用方法
+## 2. 环境配置
 
-### 2.1 配置项
+### 2.1 日志配置
 
-#### 2.1.1 设置日志落盘位置，默认 /var/log/sysTrace
+#### 2.1.1 日志落盘位置
+
+默认路径：`/var/log/sysTrace`
 
 ```bash
 export SYSTRACE_LOG_PATH=/var/log/sysTrace
 ```
 
-#### 2.1.2 设置日志级别，默认 INFO
+#### 2.1.2 日志级别
 
-日志级别从高到低依次为：
+默认级别：`INFO`
 
-- DEBUG
-- WARN
-- INFO
-- ERROR
-- FATAL
+日志级别从高到低依次为：`DEBUG`、`WARN`、`INFO`、`ERROR`、`FATAL`
 
 ```bash
 export SYSTRACE_LOG_LEVEL=INFO
 ```
 
-#### 2.1.3 设置采集数据落盘位置，默认 /home/sysTrace
+### 2.2 数据存储配置
+
+#### 2.2.1 采集数据落盘位置
+
+默认路径：`/home/sysTrace`
 
 ```bash
 export SYSTRACE_DUMP_PATH=/home/sysTrace
 ```
 
-### 2.2 命令行工具sysTrace_cli
+## 3. 命令行工具
 
-#### 2.2.1 sysTrace_cli
+### 3.1 工具说明
 
-sysTrace_cli是sysTrace项目自带的命令行工具，用于和训练/推理任务中的sysTrace服务通讯，开启各个采集项。
+`sysTrace_cli` 是 sysTrace 项目自带的命令行工具，用于与训练/推理任务中的 sysTrace 服务通信，控制各采集项的启停。
 
-项目编译完成后，sysTrace_cli在build目录中。sysTrace_cli使用前提：通过LD_PRELOAD 把libsysTrace.so注入到推理/训练任务中。推理/训练任务正常启动。
+**使用前提：**
 
-#### 2.2.2 sysTrace_cli 使用方式
+- 项目编译完成后，`sysTrace_cli` 位于 `build` 目录
+- 需通过 `LD_PRELOAD` 将 `libsysTrace.so` 注入到推理/训练任务中
+- 推理/训练任务已正常启动
+
+### 3.2 使用方式
+
+通过 设置`LD_PRELOAD` 环境变量将 `libsysTrace.so` 动态库加载到 AI 推理/训练任务中，从而启用 sysTrace 的数据采集功能。
 
 ```bash
-./build/sysTrace_cli -h   #显示帮助文档
+export LD_PRELOAD=$LD_PRELOAD:<path-to-sysTrace>/systrace/build/libsysTrace.so
 ```
 
-输出信息：
+> **注意：** 
+>
+> - `<path-to-sysTrace>` 需要替换为实际的 sysTrace 项目路径
+> - 编译时选择的数据格式（pb/json）会影响采集数据的格式
+
+### 3.3 命令格式
+
+```bash
+./build/sysTrace_cli -h
+```
+
+**输出信息：**
 
 ```
 =========================================================
@@ -99,265 +118,531 @@ EXAMPLES:
   sysTrace_cli enable CacheMiss duration=10 args="-p 12345 -e cache-miss"
   sysTrace_cli enable GIL duration=10
   sysTrace_cli enable Trace args="record -e sched sleep 5"
+  sysTrace_cli disable CPU
   sysTrace_cli enable Mutex duration=10
   sysTrace_cli enable CacheMiss args=" -e branch-misses,cache-misses,cache-references --timeout 5000"
   sysTrace_cli disable CPU
-  sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex"
+  sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="syscalls/sys_enter_futex,syscalls/sys_exit_futext"
 =========================================================
 ```
 
-## 3. 采集项列表
+## 4. 采集项列表
 
-| Plugin   | 适用场景 | 命令示例 |
-| :------- | :------- | :------- |
-| HBM      | HBM事件 | `./sysTrace_cli enable HBM duration=10` |
-| IO       | 磁盘和网络I/O延迟/吞吐量 | `./sysTrace_cli enable IO duration=10` |
-| MSPTI    | NVIDIA/Atlas活动跟踪（HCCL，内核） | `./sysTrace_cli enable MSPTI duration=10` |
-| CPU      | CPU利用率和上下文切换跟踪 | `./sysTrace_cli enable CPU duration=10` |
-| Memory   | 内存分配和泄漏检测 | `./sysTrace_cli enable Memory duration=10` |
-| GIL      | Python全局解释器锁（GIL）争用和延迟跟踪 | `./sysTrace_cli enable GIL duration=10` |
-| CacheMiss | 硬件缓存未命中率和内存访问效率 | `./sysTrace_cli enable CacheMiss args="-p 27638 -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads --timeout 20000"` |
-| Mutex    | Pthread同步延迟（互斥锁/读写锁/自旋锁/信号量） | `./sysTrace_cli enable Mutex duration=10` |
-| Ftrace   | Linux内核Ftrace（事件、函数图和调度跟踪） | `./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit"` |
-| Trace    | trace-cmd命令行接口，用于Linux内核Ftrace子系统 | `./sysTrace_cli enable Trace args="record -e sched sleep 5"` |
+| Plugin    | 适用场景                                           | 命令示例                                                     |
+| :-------- | :------------------------------------------------- | :----------------------------------------------------------- |
+| HBM       | HBM事件                                            | `./sysTrace_cli enable HBM duration=10`                      |
+| IO        | 磁盘和网络I/O延迟/吞吐量                           | `./sysTrace_cli enable IO duration=10`                       |
+| MSPTI     | NVIDIA/Atlas活动跟踪（HCCL，内核）                 | `./sysTrace_cli enable MSPTI duration=10`                    |
+| CPU       | CPU上下文切换跟踪                                  | `./sysTrace_cli enable CPU duration=10`                      |
+| Memory    | 内存分配检测                                       | `./sysTrace_cli enable Memory duration=10`                   |
+| GIL       | Python全局解释器锁（GIL）争用和延迟跟踪            | `./sysTrace_cli enable GIL duration=10`                      |
+| CacheMiss | 硬件缓存未命中率和内存访问效率                     | `./sysTrace_cli enable CacheMiss args="-p 27638 -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads --timeout 20000"` |
+| Mutex     | Pthread同步延迟（互斥锁/读写锁/自旋锁/信号量）     | `./sysTrace_cli enable Mutex duration=10`                    |
+| Ftrace    | Linux内核Ftrace（事件、函数图和调度跟踪）          | `./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="raw_syscalls/sys_enter,raw_syscalls/sys_exit"` |
+| Trace     | trace-cmd命令行接口，用于Linux（内核Ftrace子系统） | `./sysTrace_cli enable Trace args="record -e sched sleep 5"` |
 
-## 4. 使用示例
+## 5. 数据格式说明
 
-### 4.1 HBM
+### 5.1 HBM 数据格式
 
-采集指令：
+采集 HBM 事件数据，包括内存持有情况，用于判断是否发生 HBM OOM 故障。
 
-```bash
-./sysTrace_cli enable HBM duration=10    #duration 为采集的时长，单位秒
+**数据格式：** pb/json
+
+### 5.2 IO 数据格式
+
+采集磁盘和网络 I/O 延迟/吞吐量数据。
+
+**数据格式：** pb/json
+
+### 5.3 MSPTI 数据格式
+
+采集 NVIDIA/Atlas 活动跟踪数据，包括通信算子下发/执行信息，用于判断是否发生算子慢的情况。
+
+**数据格式：** CSV
+
+**数据字段：**
+
+```python
+Flag,Id,Kind,Name,SourceKind,Timestamp,msptiObjectId_Ds_DeviceId,msptiObjectId_Ds_StreamId,msptiObjectId_Pt_ProcessId,msptiObjectId_Pt_ThreadId
 ```
 
-指令发送成功，一张卡一条sock记录：
+### 5.4 CPU 数据格式
+
+采集 CPU 上下文切换跟踪数据，用于判断 AI 训练中是否存在其他进程抢占 CPU 导致训练慢的问题。
+
+**数据格式：** pb/json
+
+**数据结构：**
+
+```protobuf
+message OSprobe {
+  repeated OSprobeEntry OSprobe_entries = 1;
+}
+
+message OSprobeEntry {
+  uint32 key = 1; // pid/cpuid
+  uint64 start_us = 2; // 事件的开始时间
+  uint64 dur = 3; // 事件的持续时间
+  uint64 rundelay = 4; // cpu调度时延
+  uint32 OS_event_type = 5; // 事件类型
+  uint32 rank = 6; // 卡号
+  string comm = 7; // 当前进程
+  string nxt_comm = 8; // 即将执行的进程名字
+  uint32 nxt_pid = 9; // 即将执行进程的pid
+}
+```
+
+### 5.5 Memory 数据格式
+
+采集 CANN 层的内存数据，包括内存申请和释放的调用栈信息。
+
+**数据格式：** pb/json
+
+**数据结构：**
+
+```protobuf
+message ProcMem {
+  uint32 pid = 1; // 线程号
+  repeated MemAllocEntry mem_alloc_stacks = 2;  // 内存申请调用栈
+  repeated MemFreeEntry mem_free_stacks = 3; // 内存释放调用栈
+}
+
+message MemAllocEntry {
+  uint64 alloc_ptr = 1; // 内存申请起始地址
+  uint32 stage_id = 2; // 训练迭代轮次
+  StageType stage_type = 3; // 当前迭代阶段
+  uint64 mem_size = 4; // 内存申请大小
+  repeated StackFrame stack_frames = 5; // 内存申请调用栈
+}
+
+message MemFreeEntry {
+  uint64 alloc_ptr = 1; // 内存释放起始地址
+  uint32 stage_id = 2; // 训练迭代轮次
+  StageType stage_type = 3; // 当前迭代阶段
+}
+```
+
+> **注意：** Memory 和 CPU 采集结果保存到同一个文件
+
+### 5.6 GIL 数据格式
+
+采集 Python 全局解释器锁（GIL）争用和延迟跟踪数据。
+
+**数据格式：** json
+
+### 5.7 CacheMiss 数据格式
+
+采集硬件缓存未命中率和内存访问效率数据。
+
+**数据格式：** 文本
+
+### 5.8 Mutex 数据格式
+
+采集 Pthread 同步延迟数据，包括互斥锁/读写锁/自旋锁/信号量等。
+
+**数据格式：** json
+
+**支持的采集事件：**
+
+| 函数名                     | 说明                   |
+| :------------------------- | :--------------------- |
+| pthread_mutex_lock         | 互斥锁加锁（阻塞）     |
+| pthread_mutex_timedlock    | 互斥锁加锁（带超时）   |
+| pthread_mutex_trylock      | 互斥锁加锁（非阻塞）   |
+| pthread_rwlock_rdlock      | 读写锁读锁（阻塞）     |
+| pthread_rwlock_wrlock      | 读写锁写锁（阻塞）     |
+| pthread_rwlock_timedrdlock | 读写锁读锁（带超时）   |
+| pthread_rwlock_timedwrlock | 读写锁写锁（带超时）   |
+| pthread_rwlock_tryrdlock   | 读写锁读锁（非阻塞）   |
+| pthread_rwlock_trywrlock   | 读写锁写锁（非阻塞）   |
+| pthread_spin_lock          | 自旋锁加锁（阻塞）     |
+| pthread_spin_trylock       | 自旋锁加锁（非阻塞）   |
+| pthread_timedjoin_np       | 线程等待加入（带超时） |
+| pthread_tryjoin_np         | 线程等待加入（非阻塞） |
+| pthread_yield              | 线程让出 CPU           |
+| sem_timedwait              | 信号量等待（带超时）   |
+| sem_trywait                | 信号量等待（非阻塞）   |
+| sem_wait                   | 信号量等待（阻塞）     |
+
+### 5.9 Ftrace 数据格式
+
+采集 Linux 内核 Ftrace 数据，包括事件、函数图和调度跟踪。
+
+**数据格式：** 文本
+
+### 5.10 Trace 数据格式
+
+采集 trace-cmd 命令行接口数据，用于 Linux 内核 Ftrace 子系统。
+
+**数据格式：** 二进制或文本
+
+## 6. 使用示例
+
+### 6.1 HBM
+
+**采集指令：**
+
+```bash
+./sysTrace_cli enable HBM duration=10
+```
+
+> **说明：** `duration` 为采集时长，单位为秒
+
+**执行成功后输出：**
 
 ```
 [ACK] /tmp/sysTrace_1868164.sock: SUCCESS
 [ACK] /tmp/sysTrace_1868165.sock: SUCCESS
 ```
 
-采集结果（默认保存位置： /home/sysTrace/hbm_trace）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/hbm_trace`
+
+**数据格式：** pb/json
 
 ```bash
 -rw-r--r-- 1 root root 30900 Jan 30 09:40 hbm_trace_rank0_1868164.pb
 -rw-r--r-- 1 root root 30684 Jan 30 09:40 hbm_trace_rank1_1868165.pb
 ```
 
-### 4.2 IO
+### 6.2 IO
 
-采集指令：
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable IO duration=10
 ```
 
-采集结果（默认保存位置：/home/sysTrace/io_trace）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/io_trace`
+
+**数据格式：** pb/json
 
 ```bash
 -rw-r--r-- 1 root root 42450 Jan 30 09:45 io_trace_rank0_1868164.pb
 -rw-r--r-- 1 root root 12629 Jan 30 09:45 io_trace_rank1_1868165.pb
 ```
 
-### 4.3 MSPTI
+### 6.3 MSPTI
 
-采集指令：
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable MSPTI duration=10
 ```
 
-采集结果（默认保存位置：/home/sysTrace/mspti）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/mspti`
+
+**数据格式：** CSV
 
 ```bash
 -rw-r--r-- 1 root root 658179 Jan 30 09:48 mspti-marker-76.53.151.141-0.csv
 -rw-r--r-- 1 root root 658179 Jan 30 09:48 mspti-marker-76.53.151.141-1.csv
 ```
 
-### 4.4 CPU
+### 6.4 CPU
 
-采集指令：
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable CPU duration=10
 ```
 
-采集结果（CPU采集结果落盘和Memory为同一个文件，默认保存位置：/home/sysTrace/osprobe）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/osprobe`
+
+**数据格式：** pb/json
+
+> **注意：** CPU 和 Memory 采集结果保存到同一个文件
 
 ```bash
 -rw-r--r-- 1 root root 128010 Jan 30 09:51 os_trace_20260130_09_rank_0_1868164.pb
 -rw-r--r-- 1 root root 133567 Jan 30 09:51 os_trace_20260130_09_rank_1_1868165.pb
 ```
 
-### 4.5 Memory
+### 6.5 Memory
 
-采集指令：
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable Memory duration=10
 ```
 
-采集结果（Memory采集结果落盘和CPU为同一个文件，默认保存位置：/home/sysTrace/osprobe）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/osprobe`
+
+**数据格式：** pb/json
+
+> **注意：** Memory 和 CPU 采集结果保存到同一个文件
 
 ```bash
 -rw-r--r-- 1 root root 128010 Jan 30 09:51 os_trace_20260130_09_rank_0_1868164.pb
 -rw-r--r-- 1 root root 133567 Jan 30 09:51 os_trace_20260130_09_rank_1_1868165.pb
 ```
 
-### 4.6 GIL
+### 6.6 GIL
 
-#### 示例一：默认采集AI主进程（运行在NPU卡上的主进程 npu-smi info）GIL信息
+#### 示例一：采集 AI 主进程 GIL 信息
 
-采集指令：
+默认采集运行在 NPU 卡上的主进程（可通过 `npu-smi info` 查看）
+
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable GIL duration=10
 ```
 
-采集结果（GIL多卡数据已聚合到同一文件，默认保存位置：/home/sysTrace/GIL）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/GIL`
+
+**数据格式：** json
+
+> **注意：** 多卡数据已聚合到同一文件
 
 ```bash
 -rw-r--r-- 1 root root 10120449 Jan 30 10:34 GIL_1901644_rank_0.json
 ```
 
-#### 示例二：通过pid参数同时采集指定pid GIL信息（多个pid用,分隔）
+#### 示例二：采集指定进程 GIL 信息
 
-采集指令：
+通过 `pid` 参数指定目标进程，多个 PID 用逗号分隔
+
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable GIL duration=10 pid=1907448,213123
 ```
 
-### 4.7 CacheMiss
+### 6.7 CacheMiss
 
-前提：需要安装perf工具。
+**前置条件：** 需安装 `perf` 工具
 
-采集指令：
+**采集指令：**
 
 ```bash
-./sysTrace_cli enable CacheMiss args=" -e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"
+./sysTrace_cli enable CacheMiss args="-e branch-misses,cache-misses,cache-references,L1-dcache-load-misses,L1-dcache-loads,L1-icache-load-misses,L1-icache-loads,LLC-load-misses,LLC-loads,dTLB-load-misses,dTLB-loads,iTLB-load-misses,iTLB-loads,context-switches,r6013,r6014,r7004,r7005,r7006,r7007,r5023,r102e,r102f,r27,r16,r60d6,r007c,r0008,r0011 --timeout 5000"
 ```
 
-参数说明：
+**参数说明：**
 
-- `args` 参数中 `-e` 必选，用于指定采集事件
-- `--timeout` 必选，用于指定采集时长（单位：毫秒）
-- `-p` 可选，用于指定pid
+| 参数        | 必填 | 说明                       |
+| :---------- | :--- | :------------------------- |
+| `-e`        | 是   | 指定采集事件               |
+| `--timeout` | 是   | 指定采集时长（单位：毫秒） |
+| `-p`        | 否   | 指定进程 PID               |
 
-采集结果（默认保存位置：/home/sysTrace/CacheMiss）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/CacheMiss`
+
+**数据格式：** 文本
 
 ```bash
 -rw-r--r-- 1 root root 2885 Jan 30 11:02 CacheMiss_1935088_rank_0.txt
 ```
 
-### 4.8 Mutex
+### 6.8 Mutex
 
-#### 采集事件列表
+#### 支持的采集事件
 
-| 函数名 | 说明 |
-| :------- | :------- |
-| pthread_mutex_lock | 互斥锁加锁（阻塞） |
-| pthread_mutex_timedlock | 互斥锁加锁（带超时） |
-| pthread_mutex_trylock | 互斥锁加锁（非阻塞） |
-| pthread_rwlock_rdlock | 读写锁读锁（阻塞） |
-| pthread_rwlock_wrlock | 读写锁写锁（阻塞） |
-| pthread_rwlock_timedrdlock | 读写锁读锁（带超时） |
-| pthread_rwlock_timedwrlock | 读写锁写锁（带超时） |
-| pthread_rwlock_tryrdlock | 读写锁读锁（非阻塞） |
-| pthread_rwlock_trywrlock | 读写锁写锁（非阻塞） |
-| pthread_spin_lock | 自旋锁加锁（阻塞） |
-| pthread_spin_trylock | 自旋锁加锁（非阻塞） |
-| pthread_timedjoin_np | 线程等待加入（带超时） |
-| pthread_tryjoin_np | 线程等待加入（非阻塞） |
-| pthread_yield | 线程让出CPU |
-| sem_timedwait | 信号量等待（带超时） |
-| sem_trywait | 信号量等待（非阻塞） |
-| sem_wait | 信号量等待（阻塞） |
+| 函数名                     | 说明                   |
+| :------------------------- | :--------------------- |
+| pthread_mutex_lock         | 互斥锁加锁（阻塞）     |
+| pthread_mutex_timedlock    | 互斥锁加锁（带超时）   |
+| pthread_mutex_trylock      | 互斥锁加锁（非阻塞）   |
+| pthread_rwlock_rdlock      | 读写锁读锁（阻塞）     |
+| pthread_rwlock_wrlock      | 读写锁写锁（阻塞）     |
+| pthread_rwlock_timedrdlock | 读写锁读锁（带超时）   |
+| pthread_rwlock_timedwrlock | 读写锁写锁（带超时）   |
+| pthread_rwlock_tryrdlock   | 读写锁读锁（非阻塞）   |
+| pthread_rwlock_trywrlock   | 读写锁写锁（非阻塞）   |
+| pthread_spin_lock          | 自旋锁加锁（阻塞）     |
+| pthread_spin_trylock       | 自旋锁加锁（非阻塞）   |
+| pthread_timedjoin_np       | 线程等待加入（带超时） |
+| pthread_tryjoin_np         | 线程等待加入（非阻塞） |
+| pthread_yield              | 线程让出 CPU           |
+| sem_timedwait              | 信号量等待（带超时）   |
+| sem_trywait                | 信号量等待（非阻塞）   |
+| sem_wait                   | 信号量等待（阻塞）     |
 
-#### 示例一：默认采集AI主进程（运行在NPU卡上的主进程 npu-smi info）Mutex信息
+#### 示例一：采集 AI 主进程 Mutex 信息
 
-采集指令：
+默认采集运行在 NPU 卡上的主进程（可通过 `npu-smi info` 查看）
+
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable Mutex duration=10
 ```
 
-采集结果（Mutex多卡数据已聚合到同一文件，默认保存位置：/home/sysTrace/Mutex）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/Mutex`
+
+> **注意：** 多卡数据已聚合到同一文件
 
 ```bash
 -rw-r--r-- 1 root root 872775 Jan 30 10:48 Mutex_1901644_rank_0.json
 ```
 
-#### 示例二：通过pid参数同时采集指定pid Mutex信息（多个pid用,分隔）
+#### 示例二：采集指定进程 Mutex 信息
 
-采集指令：
+通过 `pid` 参数指定目标进程，多个 PID 用逗号分隔
+
+**采集指令：**
 
 ```bash
 ./sysTrace_cli enable Mutex duration=10 pid=1907448,231233
 ```
 
-采集结果（Mutex多卡数据已聚合到同一文件）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/Mutex`
+
+> **注意：** 多卡数据已聚合到同一文件
 
 ```bash
 -rw-r--r-- 1 root root 729376 Jan 30 10:53 Mutex_1901644_rank_0.json
 ```
 
-### 4.9 Ftrace
+### 6.9 Ftrace
 
-采集指令：
+**采集指令：**
 
 ```bash
-./sysTrace_cli enable Ftrace duration=10 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex" cpu_list=0-15 <set_event_pid=1234>
+./sysTrace_cli enable Ftrace duration=10 events="syscalls/sys_enter_futex,syscalls/sys_exit_futex" cpu_list=0-15
 ```
 
-参数说明：
+**参数说明：**
 
-- `cpu_list` 必选，用于指定采集的cpu范围，支持0-3,5格式
-- `events` 用于指定采集事件
-- `func` 用于指定采集函数名
-- `set_event_pid` 可选，用于采集指定PID的trace event事件（对function trace等不生效）
-- `set_ftrace_pid` 可选，用于采集指定PID的所有ftrace事件
-- `buffer_size_kb` 可选，用于指定ftrace的缓存大小，默认32768
-- `event_stack_trace` 可选，用于指定是否开启事件栈，true开启 false关闭，默认关闭
-- `func_stack_trace` 可选，用于指定是否开启函数栈，true开启 false关闭，默认关闭
-- `function_tracer` 可选，用于指定函数追踪模式
+| 参数                | 必填 | 说明                                                         |
+| :------------------ | :--- | :----------------------------------------------------------- |
+| `cpu_list`          | 是   | 指定采集的 CPU 范围，支持 `0-3,5` 格式                       |
+| `events`            | 否   | 指定采集事件                                                 |
+| `func`              | 否   | 指定采集函数名                                               |
+| `set_event_pid`     | 否   | 采集指定 PID 的 trace event 事件（对 function trace 等不生效） |
+| `set_ftrace_pid`    | 否   | 采集指定 PID 的所有 ftrace 事件                              |
+| `buffer_size_kb`    | 否   | 指定 ftrace 的缓存大小，默认 32768                           |
+| `event_stack_trace` | 否   | 是否开启事件栈，true 开启 false 关闭，默认关闭               |
+| `func_stack_trace`  | 否   | 是否开启函数栈，true 开启 false 关闭，默认关闭               |
+| `function_tracer`   | 否   | 指定函数追踪模式                                             |
 
-采集结果（默认保存位置：/home/sysTrace/Ftrace）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/Ftrace`
 
 ```bash
 -rw-r--r-- 1 root root 870 Jan 31 16:56 Ftrace_3249973_rank_0.log
 ```
 
-### 4.10 Trace
+### 6.10 Trace
 
-前提：需要安装trace-cmd工具。
+**前置条件：** 需安装 `trace-cmd` 工具
 
-采集指令（args参数为 trace-cmd 参数）：
+**采集指令：**
+
+`args` 参数为 `trace-cmd` 的参数
 
 ```bash
 ./sysTrace_cli enable Trace args="record -e sched sleep 5"
 ```
 
-采集结果（默认保存位置：/home/sysTrace/Trace）：
+**采集结果：**
+
+保存位置：`/home/sysTrace/Trace`
 
 ```bash
 -rw-r--r-- 1 root root 665362432 Feb  3 14:45 trace.dat
 ```
 
-## 5 结果转换可视化
+## 7. 数据转换
 
-### 5.1 GIL
+sysTrace 支持 pb 和 json 格式落盘。**只有 pb 格式数据需要安装 protobuf 并拷贝 sysTrace_pb2.py**，json 格式数据可直接使用。
 
-采集结果为json，可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
+### 7.1 前置准备（仅 pb 格式）
 
-### 5.2 CacheMiss
+**1. 拷贝 sysTrace_pb2.py 到 convert 目录下**
 
-采集结果为文本，可直接查看：
+```bash
+cp <path-to-sysTrace>/systrace/protos/sysTrace_pb2.py <path-to-sysTrace>/systrace/convert
+```
+
+**2. 安装转换脚本依赖包（仅 pb 格式需要）**
+
+> **注意：** 以下版本号非强要求，仅需要保证 protobuf 和 protobuf-compiler 保持一致即可，可通过 `protoc --version` 确认
+
+```bash
+pip install protobuf==3.20.3
+```
+
+### 7.2 转换内存 OOM 数据（pb/json）
+
+```bash
+python <path-to-sysTrace>/systrace/convert/convert_mem_to_flamegraph.py --input <path-to-hbm_trace_xxx_rank0.pb> --output <output_file>
+```
+
+### 7.3 转换 torch_npu 数据（pb/json）
+
+**转换命令：**
+
+```bash
+python <path-to-sysTrace>/systrace/convert/convert_pytorch_to_timeline.py --input <input_file> --output <output_file>
+```
+
+### 7.4 转换通信算子数据（CSV 格式）
+
+**转换命令：**
+
+```bash
+python <path-to-sysTrace>/systrace/convert/convert_mspti_timeline.py --input <input_file> --output <output_file>
+```
+
+### 7.5 转换 offcpu/oncpu 事件（pb/json）
+
+**转换命令：**
+
+```bash
+python <path-to-sysTrace>/systrace/convert/convert_osprobe_to_timeline.py --input <input_file> --output <output_file>
+```
+
+### 7.6 转换 IO 数据（pb/json）
+
+**转换命令：**
+
+```bash
+python <path-to-sysTrace>/systrace/convert/convert_io_to_timeline.py --input <input_file> --output <output_file>
+```
+
+## 8. 数据展示
+
+将最终的 JSON 数据上传到 [Perfetto](https://ui.perfetto.dev/) 并展示，通过 **Open trace file** 加载数据。
+
+## 9. 结果可视化
+
+### 9.1 GIL
+
+**数据格式：** JSON
+
+**可视化方式：** 可上传到 [Perfetto](https://www.ui.perfetto.dev/) 或 MindInsight 进行展示
+
+### 9.2 CacheMiss
+
+**数据格式：** 文本
+
+**查看方式：** 直接查看文件内容
+
+**示例输出：**
 
 ```
 # started on Fri Jan 30 11:02:12 2026
-
 
  Performance counter stats for 'system wide':
 
@@ -392,68 +677,85 @@ EXAMPLES:
        69243999676      r0011                                                         (46.28%)
 ```
 
-### 5.3 Mutex
+### 9.3 Mutex
 
-采集结果为json，可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
+**数据格式：** JSON
 
-### 5.4 Ftrace
+**可视化方式：** 可上传到 [Perfetto](https://www.ui.perfetto.dev/) 或 MindInsight 进行展示
 
-采集结果为文本，可自行查看。以下为提供了采集结果转换脚本的事件，注意不支持开启栈。
+### 9.4 Ftrace
 
-#### 5.4.1 sched
+**数据格式：** 文本
 
-1. 系统软中断跟踪（仅启用软中断事件）
+**查看方式：** 直接查看文件内容
+
+**转换脚本：** 以下事件类型支持转换为 JSON 格式（注意：不支持开启栈）
+
+#### 9.4.1 sched 事件
+
+**1. 系统软中断跟踪**
 
 ```bash
 ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="irq/softirq_entry,irq/softirq_exit,irq/softirq_raise"
 ```
 
-2. 系统硬中断跟踪（仅启用硬中断事件）
+**2. 系统硬中断跟踪**
 
 ```bash
 ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="irq/irq_handler_entry,irq/irq_handler_exit"
 ```
 
-3. 任务调度跟踪（仅调度相关事件）
+**3. 任务调度跟踪**
 
 ```bash
 ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="sched/sched_switch,sched/sched_wakeup,sched/sched_waking,sched/sched_migrate_task,sched/sched_wakeup_new"
 ```
 
-可以使用 **systrace/convert** 目录下的 **convert_ftrace.py** 转换脚本转换成json格式，可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
-
-转换脚本使用方式：
+**转换脚本使用：**
 
 ```bash
-python convert_ftrace.py --input <Ftrace_3249973_rank_0.log> --output <output.json> --type <sched>
+python systrace/convert/convert_ftrace.py --input <input_file> --output <output.json> --type sched
 ```
 
-#### 5.4.2 mmap_lock
+转换后的 JSON 文件可上传到 [Perfetto](https://www.ui.perfetto.dev/) 或 MindInsight 进行展示
 
-内核mmap_lock事件
+#### 9.4.2 mmap_lock 事件
 
-~~~bash
+**采集指令：**
+
+```bash
 ./sysTrace_cli enable Ftrace duration=10 cpu_list=0-31 events="mmap_lock/mmap_lock_start_locking,mmap_lock/mmap_lock_acquire_returned,mmap_lock/mmap_lock_released"
-~~~
-
-转换脚本使用方式：
-
-~~~bash
-python convert_ftrace.py --input <Ftrace_3249973_rank_0.log> --output <output.json> --type <mmaplock>
-~~~
-
-### 5.5 Trace
-
-采集结果为二进制或文本，可自行查看。
-
-### 5.6 采集结果汇总展示
-
-采集项结果（包括转换后）为json格式的，可以使用转换脚本（systrace/convert/trace_aggregator.py）汇总到一个文件进行展示。
-
-展示脚本使用方式：
-
-```bash
-python trace_aggregator.py --input <json_dir> --output <merged.json>
 ```
 
-merged.json 可上传到 https://www.ui.perfetto.dev/ 或者MindInsight进行展示。
+**转换脚本使用：**
+
+```bash
+python systrace/convert/convert_ftrace.py --input <input_file> --output <output.json> --type mmaplock
+```
+
+### 9.5 Trace
+
+**数据格式：** 二进制或文本
+
+**查看方式：** 直接查看文件内容
+
+### 9.6 采集结果汇总展示
+
+**功能说明：** 将多个 JSON 格式的采集结果汇总到一个文件中，便于统一展示
+
+**脚本位置：** `systrace/convert/trace_aggregator.py`
+
+**使用方式：**
+
+```bash
+python systrace/convert/trace_aggregator.py --input <input_dir> --output <output_file>
+```
+
+**参数说明：**
+
+| 参数       | 说明               |
+| :--------- | :----------------- |
+| `--input`  | JSON 文件所在目录  |
+| `--output` | 输出的合并文件路径 |
+
+**可视化方式：** 合并后的 `output_file` 可上传到 [Perfetto](https://www.ui.perfetto.dev/) 或 MindInsight 进行展示
