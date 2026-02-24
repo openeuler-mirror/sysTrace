@@ -10,7 +10,7 @@ failslow-openapi 支持本地或者远程获取远程目标服务器的systrace 
 
 ## 从本仓库源码安装运行（适用于开发者）
 ### 下载源码
- git clone https://gitee.com/openeuler/sysTrace.git
+ git clone https://gitcode.com/openeuler/sysTrace.git
 ### 安装 failslow
 工程./systrace目录下执行下面命令：
 python3 setup.py install

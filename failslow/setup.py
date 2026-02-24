@@ -32,7 +32,7 @@ setup(
     author="bin huang",
     author_email="huangbin58@huawei.com",
     description="Fail Slow Detection for AI Model Training and Inference",
-    url="https://gitee.com/openeuler/sysTrace",
+    url="https://gitcode.com/openeuler/sysTrace",
     keywords=["Fail Slow Detection", "Group Compare", "AI Model"],
     packages=find_packages(where=".", exclude=("tests", "tests.*")),
     data_files=[

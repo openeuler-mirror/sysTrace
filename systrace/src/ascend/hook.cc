@@ -1,17 +1,17 @@
 #include "hook.h"
 #include "../../include/log/logging.h"
 #include "../src/trace/systrace_manager.h"
+#include <array>
 #include <chrono>
 #include <cstdlib>
 #include <dlfcn.h>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <stdio.h>
 #include <string>
 #include <thread>
 #include <unistd.h>
-#include <array>
-#include <memory>
 
 // Minimal forward declarations for Python C API types,
 // used with dynamically-resolved symbols (no link-time libpython dependency).
@@ -38,12 +38,12 @@ static std::string get_mindspore_lib_path() {
 }
 
 static void find_python_path_cmd() {
-    const char *cmd = "python3 -c \"import sys, os, sysconfig; "
+    const char *cmd = "python -c \"import sys, os, sysconfig; "
                       "l=sysconfig.get_config_var('LIBDIR'); "
                       "s=sysconfig.get_config_var('INSTSONAME'); "
                       "p=os.path.join(l, s) if l and s else ''; "
-                      "print(p if p and os.path.exists(p) and ('.so' in s or "
-                      "'.dylib' in s) else sys.executable)\" 2>&1";
+                      "print(p if p and os.path.exists(p) and ('.so' in s "
+                      ") else sys.executable)\" 2>&1";
     std::array<char, 512> buffer;
     std::string result;
     FILE *pipe_ptr = popen(cmd, "r");
@@ -58,10 +58,15 @@ static void find_python_path_cmd() {
         result += buffer.data();
     }
     result.erase(result.find_last_not_of("\r\n ") + 1);
-
     if (!result.empty()) {
-        std::strncpy(g_python_lib_path, result.c_str(),
-                     sizeof(g_python_lib_path) - 1);
+        char real_path[512];
+        if (realpath(result.c_str(), real_path)) {
+            std::strncpy(g_python_lib_path, real_path,
+                         sizeof(g_python_lib_path) - 1);
+        } else {
+            std::strncpy(g_python_lib_path, result.c_str(),
+                         sizeof(g_python_lib_path) - 1);
+        }
         g_python_lib_path[sizeof(g_python_lib_path) - 1] = '\0';
     } else {
         systrace_log_error("Hook", "Failed to auto-detect python path!",
@@ -147,11 +152,12 @@ static void *load_symbol(const char *func_name) {
 
     void *func = dlsym(g_hal_lib, func_name);
     if (!func) {
-        std::cout << "[Hook]" << "Failed to dlsym: " << func_name << " "
-                  << dlerror() << std::endl;
-    } else {
-        std::cout << "[Hook]" << "Successfully hooked " << func_name
+        std::cout << "[Hook]"
+                  << "Failed to dlsym: " << func_name << " " << dlerror()
                   << std::endl;
+    } else {
+        std::cout << "[Hook]"
+                  << "Successfully hooked " << func_name << std::endl;
     }
     return func;
 }
@@ -184,13 +190,13 @@ static bool init_python_api() {
     }
 
     bool success = true;
-#define LOAD_PY_FUNC(name)                                                            \
-    do {                                                                              \
-        g_python_api.name =                                                           \
-            reinterpret_cast<decltype(g_python_api.name)>(dlsym(handle, #name));     \
-        if (!g_python_api.name) {                                                     \
-            success = false;                                                          \
-        }                                                                             \
+#define LOAD_PY_FUNC(name)                                                     \
+    do {                                                                       \
+        g_python_api.name = reinterpret_cast<decltype(g_python_api.name)>(     \
+            dlsym(handle, #name));                                             \
+        if (!g_python_api.name) {                                              \
+            success = false;                                                   \
+        }                                                                      \
     } while (0)
 
     LOAD_PY_FUNC(PyGILState_Ensure);
@@ -224,21 +230,23 @@ void set_rank() {
     for (int i = 0; i < max_retries; ++i) {
         PyGILState_STATE gstate = g_python_api.PyGILState_Ensure();
 
-        PyObject *parallel_mod =
-            g_python_api.PyImport_ImportModule("vllm.distributed.parallel_state");
+        PyObject *parallel_mod = g_python_api.PyImport_ImportModule(
+            "vllm.distributed.parallel_state");
         if (parallel_mod) {
-            PyObject *get_group_func =
-                g_python_api.PyObject_GetAttrString(parallel_mod, "get_world_group");
+            PyObject *get_group_func = g_python_api.PyObject_GetAttrString(
+                parallel_mod, "get_world_group");
 
-            if (get_group_func && g_python_api.PyCallable_Check(get_group_func)) {
+            if (get_group_func &&
+                g_python_api.PyCallable_Check(get_group_func)) {
                 PyObject *world_group =
                     g_python_api.PyObject_CallObject(get_group_func, nullptr);
 
                 if (world_group) {
-                    PyObject *py_rank =
-                        g_python_api.PyObject_GetAttrString(world_group, "rank");
-                    PyObject *py_local_rank = g_python_api.PyObject_GetAttrString(
-                        world_group, "local_rank");
+                    PyObject *py_rank = g_python_api.PyObject_GetAttrString(
+                        world_group, "rank");
+                    PyObject *py_local_rank =
+                        g_python_api.PyObject_GetAttrString(world_group,
+                                                            "local_rank");
 
                     if (py_rank && py_local_rank) {
                         long gr = g_python_api.PyLong_AsLong(py_rank);
@@ -287,8 +295,6 @@ void set_rank() {
     setenv("RANK", gr_str.c_str(), 1);
 }
 
-static std::once_flag global_delayed_init_flag;
-
 bool check_rank_env() {
     const char *r_str = getenv("RANK");
     if (!r_str)
@@ -307,12 +313,86 @@ bool check_local_rank_env() {
     return true;
 }
 
-void async_delayed_init() {
-    try {
+std::string get_process_cmdline(pid_t pid) {
+    std::string cmdline_path = "/proc/" + std::to_string(pid) + "/cmdline";
+    std::string cmdline;
 
-        if (!(check_rank_env() && check_local_rank_env())) {
-            set_rank();
+    int fd = open(cmdline_path.c_str(), O_RDONLY);
+    if (fd == -1) {
+        return "";
+    }
+
+    char buffer[4096];
+    ssize_t read_size = read(fd, buffer, sizeof(buffer) - 1);
+    close(fd);
+
+    if (read_size <= 0) {
+        return "";
+    }
+
+    buffer[read_size] = '\0';
+    std::stringstream ss;
+    for (ssize_t i = 0; i < read_size; ++i) {
+        if (buffer[i] == '\0') {
+            if (ss.tellp() > 0 && ss.str().back() != ' ') {
+                ss << " ";
+            }
+        } else {
+            ss << buffer[i];
         }
+    }
+
+    cmdline = ss.str();
+    cmdline.erase(0, cmdline.find_first_not_of(" "));
+    cmdline.erase(cmdline.find_last_not_of(" ") + 1);
+
+    return cmdline;
+}
+
+pid_t get_parent_pid(pid_t pid) {
+    std::string stat_path = "/proc/" + std::to_string(pid) + "/stat";
+    std::ifstream stat_file(stat_path);
+    if (!stat_file.is_open()) {
+        return -1;
+    }
+
+    std::string line;
+    std::getline(stat_file, line);
+    stat_file.close();
+
+    std::istringstream iss(line);
+    std::string dummy;
+    pid_t ppid;
+
+    iss >> dummy >> dummy >> dummy >> ppid;
+    return ppid;
+}
+
+bool is_process_spawned_by_vllm() {
+    pid_t current_pid = getpid();
+    const int MAX_DEPTH = 10;
+    int depth = 0;
+
+    while (current_pid > 1 && depth < MAX_DEPTH) {
+        std::string cmdline = get_process_cmdline(current_pid);
+        if (!cmdline.empty()) {
+            std::string lower_cmdline = cmdline;
+            std::transform(lower_cmdline.begin(), lower_cmdline.end(),
+                           lower_cmdline.begin(), ::tolower);
+            if (lower_cmdline.find("vllm") != std::string::npos) {
+                return true;
+            }
+        }
+
+        current_pid = get_parent_pid(current_pid);
+        depth++;
+    }
+
+    return false;
+}
+
+void init_systrace() {
+    try {
         const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");
         std::string log_path = (log_path_env && strlen(log_path_env) > 0)
                                    ? std::string(log_path_env)
@@ -324,13 +404,24 @@ void async_delayed_init() {
         systrace_log_error("Hook", "Delayed init failed: %s", e.what());
     }
 }
+static std::once_flag global_delayed_init_flag;
+
+void async_delayed_init() {
+    set_rank();
+    init_systrace();
+}
 
 #define HOOKED_FUNCTION(func_ptr, func_name, ...)                              \
     do {                                                                       \
-        std::call_once(global_delayed_init_flag, []() {                        \
-            std::thread t(async_delayed_init);                                 \
-            t.detach();                                                        \
-        });                                                                    \
+        if (!(check_rank_env() && check_local_rank_env()) &&                   \
+            is_process_spawned_by_vllm()) {                                    \
+            std::call_once(global_delayed_init_flag, []() {                    \
+                std::thread t(async_delayed_init);                             \
+                t.detach();                                                    \
+            });                                                                \
+        } else {                                                               \
+            init_systrace();                                                   \
+        }                                                                      \
         if (!func_ptr) {                                                       \
             func_ptr = (decltype(func_ptr))load_symbol(func_name);             \
             if (!func_ptr)                                                     \

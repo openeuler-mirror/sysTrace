@@ -3,7 +3,7 @@
 systrace-failslow运行的参数，主要通过**model_config.json**和**metic_config.json**配置，其中前者配置代码运行相关的参数，后者配置算法配置相关的参数。
 
 
-全部配置文件归档在[config](https://gitee.com/openeuler/sysTrace/tree/master/config)目录。
+全部配置文件归档在[config](https://gitcode.com/openeuler/sysTrace/tree/master/config)目录。
 
 
 ## 配置文件目录结构

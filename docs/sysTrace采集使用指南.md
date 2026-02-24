@@ -633,6 +633,14 @@ python <path-to-sysTrace>/systrace/convert/convert_io_to_timeline.py --input <in
 
 **可视化方式：** 可上传到 [Perfetto](https://www.ui.perfetto.dev/) 或 MindInsight 进行展示
 
+**转换脚本使用(可选)：**
+
+```bash
+python systrace/convert/convert_gil.py --input <input_file> --output <output.json>
+```
+
+转换后的 JSON 文件可上传到 [Perfetto](https://www.ui.perfetto.dev/) 或 MindInsight 进行展示
+
 ### 9.2 CacheMiss
 
 **数据格式：** 文本

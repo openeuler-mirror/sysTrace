@@ -29,7 +29,7 @@ failslow 直接从本地目录读取通信算子数据，需要在配置文件�
 
 ## 从本仓库源码安装运行（适用于开发者）
 ### 下载源码
- git clone https://gitee.com/openeuler/sysTrace.git
+ git clone https://gitcode.com/openeuler/sysTrace.git
 ### 安装
 工程./systrace目录下执行下面命令：
 python3 setup.py install
