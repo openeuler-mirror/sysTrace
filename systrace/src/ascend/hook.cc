@@ -1,7 +1,6 @@
 #include "hook.h"
 #include "../../include/log/logging.h"
 #include "../src/trace/systrace_manager.h"
-#include <Python.h>
 #include <chrono>
 #include <cstdlib>
 #include <dlfcn.h>
@@ -11,6 +10,14 @@
 #include <string>
 #include <thread>
 #include <unistd.h>
+#include <array>
+#include <memory>
+
+// Minimal forward declarations for Python C API types,
+// used with dynamically-resolved symbols (no link-time libpython dependency).
+struct _object;
+typedef struct _object PyObject;
+typedef int PyGILState_STATE;
 
 static std::string get_mindspore_lib_path() {
     const char *cmd = "python -c \"import mindspore as ms; import os; "
@@ -149,7 +156,64 @@ static void *load_symbol(const char *func_name) {
     return func;
 }
 
+struct PythonApi {
+    PyGILState_STATE (*PyGILState_Ensure)(void);
+    void (*PyGILState_Release)(PyGILState_STATE);
+    PyObject *(*PyImport_ImportModule)(const char *);
+    PyObject *(*PyObject_GetAttrString)(PyObject *, const char *);
+    int (*PyCallable_Check)(PyObject *);
+    PyObject *(*PyObject_CallObject)(PyObject *, PyObject *);
+    long (*PyLong_AsLong)(PyObject *);
+    void (*PyErr_Clear)(void);
+    void (*Py_DecRef)(PyObject *);
+};
+
+static PythonApi g_python_api = {};
+
+static bool init_python_api() {
+    static bool initialized = false;
+    static bool ok = false;
+    if (initialized) {
+        return ok;
+    }
+    initialized = true;
+
+    void *handle = dlopen(nullptr, RTLD_LAZY);
+    if (!handle) {
+        return false;
+    }
+
+    bool success = true;
+#define LOAD_PY_FUNC(name)                                                            \
+    do {                                                                              \
+        g_python_api.name =                                                           \
+            reinterpret_cast<decltype(g_python_api.name)>(dlsym(handle, #name));     \
+        if (!g_python_api.name) {                                                     \
+            success = false;                                                          \
+        }                                                                             \
+    } while (0)
+
+    LOAD_PY_FUNC(PyGILState_Ensure);
+    LOAD_PY_FUNC(PyGILState_Release);
+    LOAD_PY_FUNC(PyImport_ImportModule);
+    LOAD_PY_FUNC(PyObject_GetAttrString);
+    LOAD_PY_FUNC(PyCallable_Check);
+    LOAD_PY_FUNC(PyObject_CallObject);
+    LOAD_PY_FUNC(PyLong_AsLong);
+    LOAD_PY_FUNC(PyErr_Clear);
+    LOAD_PY_FUNC(Py_DecRef);
+
+#undef LOAD_PY_FUNC
+
+    ok = success;
+    return ok;
+}
+
 void set_rank() {
+    if (!init_python_api()) {
+        return;
+    }
+
     int local_rank = -1;
     int global_rank = -1;
     bool success = false;
@@ -158,43 +222,53 @@ void set_rank() {
     const int sleep_ms = 100;
 
     for (int i = 0; i < max_retries; ++i) {
-        PyGILState_STATE gstate = PyGILState_Ensure();
+        PyGILState_STATE gstate = g_python_api.PyGILState_Ensure();
 
         PyObject *parallel_mod =
-            PyImport_ImportModule("vllm.distributed.parallel_state");
+            g_python_api.PyImport_ImportModule("vllm.distributed.parallel_state");
         if (parallel_mod) {
             PyObject *get_group_func =
-                PyObject_GetAttrString(parallel_mod, "get_world_group");
+                g_python_api.PyObject_GetAttrString(parallel_mod, "get_world_group");
 
-            if (get_group_func && PyCallable_Check(get_group_func)) {
+            if (get_group_func && g_python_api.PyCallable_Check(get_group_func)) {
                 PyObject *world_group =
-                    PyObject_CallObject(get_group_func, nullptr);
+                    g_python_api.PyObject_CallObject(get_group_func, nullptr);
 
-                if (world_group && world_group != Py_None) {
+                if (world_group) {
                     PyObject *py_rank =
-                        PyObject_GetAttrString(world_group, "rank");
-                    PyObject *py_local_rank =
-                        PyObject_GetAttrString(world_group, "local_rank");
+                        g_python_api.PyObject_GetAttrString(world_group, "rank");
+                    PyObject *py_local_rank = g_python_api.PyObject_GetAttrString(
+                        world_group, "local_rank");
 
-                    if (py_rank && py_rank != Py_None && py_local_rank &&
-                        py_local_rank != Py_None) {
-                        global_rank = (int)PyLong_AsLong(py_rank);
-                        local_rank = (int)PyLong_AsLong(py_local_rank);
-                        success = true;
+                    if (py_rank && py_local_rank) {
+                        long gr = g_python_api.PyLong_AsLong(py_rank);
+                        long lr = g_python_api.PyLong_AsLong(py_local_rank);
+                        if (gr >= 0 && lr >= 0) {
+                            global_rank = static_cast<int>(gr);
+                            local_rank = static_cast<int>(lr);
+                            success = true;
+                        }
                     }
 
-                    Py_XDECREF(py_rank);
-                    Py_XDECREF(py_local_rank);
-                    Py_DECREF(world_group);
+                    if (py_rank) {
+                        g_python_api.Py_DecRef(py_rank);
+                    }
+                    if (py_local_rank) {
+                        g_python_api.Py_DecRef(py_local_rank);
+                    }
+                    g_python_api.Py_DecRef(world_group);
                 }
-                Py_XDECREF(get_group_func);
+
+                if (get_group_func) {
+                    g_python_api.Py_DecRef(get_group_func);
+                }
             }
-            Py_DECREF(parallel_mod);
-        } else {
-            PyErr_Clear();
+            g_python_api.Py_DecRef(parallel_mod);
+        } else if (g_python_api.PyErr_Clear) {
+            g_python_api.PyErr_Clear();
         }
 
-        PyGILState_Release(gstate);
+        g_python_api.PyGILState_Release(gstate);
 
         if (success) {
             break;
@@ -202,13 +276,15 @@ void set_rank() {
         std::this_thread::sleep_for(std::chrono::milliseconds(sleep_ms));
     }
 
-    if (success) {
-        std::string lr_str = std::to_string(local_rank);
-        std::string gr_str = std::to_string(global_rank);
-
-        setenv("LOCAL_RANK", lr_str.c_str(), 1);
-        setenv("RANK", gr_str.c_str(), 1);
+    if (!success) {
+        return;
     }
+
+    std::string lr_str = std::to_string(local_rank);
+    std::string gr_str = std::to_string(global_rank);
+
+    setenv("LOCAL_RANK", lr_str.c_str(), 1);
+    setenv("RANK", gr_str.c_str(), 1);
 }
 
 static std::once_flag global_delayed_init_flag;

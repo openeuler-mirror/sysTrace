@@ -1,6 +1,37 @@
 #!/bin/bash
 
-MODE=${1:-"proto"}
+MODE="proto"
+PYTHON_TRACING_FLAG="ON"
+
+usage() {
+    echo "Usage: $0 --mode=json|proto --python-tracing=on|off"
+    exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --mode=*)
+            MODE="${1#*=}"
+            shift
+            ;;
+        --python-tracing=*)
+            val="${1#*=}"
+            if [[ "$val" == "on" ]]; then
+                PYTHON_TRACING_FLAG="ON"
+            elif [[ "$val" == "off" ]]; then
+                PYTHON_TRACING_FLAG="OFF"
+            else
+                echo "Invalid value for --python-tracing: $val (expected on|off)"
+                usage
+            fi
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            usage
+            ;;
+    esac
+done
 CONFIG_DIR="/etc/systrace/config"
 PY_FUNC_LIST="config/PyFuncList"
 BPF_MOUNT="/sys/fs/bpf"
@@ -63,7 +94,7 @@ build() {
 
     check_btf && cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=ON" || cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=OFF"
     check_bpf && f_bpf="-DHAS_BPF_SUPPORT=ON" || f_bpf="-DHAS_BPF_SUPPORT=OFF"
-    cmake .. $cmake_flags $f_bpf
+    cmake .. $cmake_flags $f_bpf -DENABLE_PYTHON_TRACING=$PYTHON_TRACING_FLAG
     make -j $(nproc)
     cd ..
 }

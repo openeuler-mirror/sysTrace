@@ -335,11 +335,15 @@ void SysTrace::initializeSystem() {
     registerPlugins();
     ControlManager::getInstance().start();
 
+#ifdef ENABLE_PYTHON_TRACING
     PyTorchTrace::getInstance();
+#endif
 #ifdef HAS_BTF_SUPPORT
     os_probe_ = std::thread(&run_osprobe);
 #endif
+#ifdef ENABLE_PYTHON_TRACING
     startEventPoller();
+#endif
 }
 
 void SysTrace::startEventPoller() {
@@ -356,6 +360,7 @@ void SysTrace::stopEventPoller() {
 }
 
 void SysTrace::eventPollerMain() {
+#ifdef ENABLE_PYTHON_TRACING
     while (should_run_) {
         if (loop_count_++ % TRACE_INTERVAL == 0) {
             if (PyTorchTrace::getInstance().triggerTrace()) {
@@ -365,6 +370,7 @@ void SysTrace::eventPollerMain() {
         std::this_thread::sleep_for(POLL_INTERVAL);
     }
     PyTorchTrace::getInstance().dumpPyTorchTracing();
+#endif
 }
 
 #ifdef HAS_BTF_SUPPORT
@@ -377,7 +383,9 @@ void SysTrace::stopOsProbePoller() {
 
 void SysTrace::cleanup() {
     if (instance_) {
+#ifdef ENABLE_PYTHON_TRACING
         PyTorchTrace::getInstance().dumpPyTorchTracing();
+#endif
     }
 #ifdef HAS_BTF_SUPPORT
     instance_->stopOsProbePoller();

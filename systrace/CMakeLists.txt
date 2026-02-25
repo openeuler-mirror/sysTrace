@@ -10,6 +10,7 @@ set(CMAKE_INSTALL_RPATH "")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 option(USE_JSON_FORMAT "Build with JSON output and NO protobuf link" OFF)
 option(HAS_BTF_SUPPORT "Enable BPF modules with BTF support" OFF)
+option(ENABLE_PYTHON_TRACING "Enable Python-based tracing (links libpython)" ON)
 
 if(USE_JSON_FORMAT)
     add_definitions(-DUSE_JSON)
@@ -34,7 +35,12 @@ include_directories(
     ${MSPTI_INCLUDE}
 )
 
-find_package(Python3 REQUIRED COMPONENTS Development)
+if(ENABLE_PYTHON_TRACING)
+    message(STATUS ">>> Python tracing: ENABLED (will link libpython) <<<")
+    find_package(Python3 REQUIRED COMPONENTS Development)
+else()
+    message(STATUS ">>> Python tracing: DISABLED (no libpython link) <<<")
+endif()
 find_package(Threads REQUIRED)
 
 if(NOT USE_JSON_FORMAT)
@@ -48,8 +54,13 @@ add_library(common STATIC
 )
 target_include_directories(common PUBLIC
     ${PROJECT_SOURCE_DIR}/include
-    ${Python3_INCLUDE_DIRS}
 )
+
+if(ENABLE_PYTHON_TRACING)
+    target_include_directories(common PUBLIC
+        ${Python3_INCLUDE_DIRS}
+    )
+endif()
 
 
 if(NOT USE_JSON_FORMAT)
@@ -71,7 +82,6 @@ set(SYSTRACE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/trace/library_loader.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_loader.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_manager.cc
-    ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing.c
     ${PROJECT_SOURCE_DIR}/src/ascend/hook.cc
     ${PROJECT_SOURCE_DIR}/src/mspti/mspti_tracker.cpp
     ${PROJECT_SOURCE_DIR}/src/cann/common_hook.c
@@ -82,6 +92,12 @@ set(SYSTRACE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/plugins/ebpfPluginBase/EbpfCollectorBase.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/ftrace/FtracePlugin.cpp
 )
+
+if(ENABLE_PYTHON_TRACING)
+    list(APPEND SYSTRACE_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing.c
+    )
+endif()
 
 if(HAS_BPF_SUPPORT)
     message(STATUS "Enabling BPF modules")
@@ -109,14 +125,23 @@ if(HAS_BPF_SUPPORT)
     target_compile_definitions(sysTrace_hook PRIVATE HAS_BPF_SUPPORT=1)
 endif()
 
+if(ENABLE_PYTHON_TRACING)
+    target_compile_definitions(sysTrace_hook PRIVATE ENABLE_PYTHON_TRACING=1)
+endif()
+
 target_link_libraries(sysTrace_hook
     common
-    ${Python3_LIBRARIES}
     ${PB_LIBS}
     ${CMAKE_THREAD_LIBS}
     pthread
     -ldl
 )
+
+if(ENABLE_PYTHON_TRACING)
+    target_link_libraries(sysTrace_hook
+        ${Python3_LIBRARIES}
+    )
+endif()
 
 if(HAS_BTF_SUPPORT)
     target_link_libraries(sysTrace_hook os_probe)

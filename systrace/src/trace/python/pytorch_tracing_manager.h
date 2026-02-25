@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "../../../include/utils/util.h"
-#include "pytorch_tracing.h"
 #include "pytorch_tracing_data.h"
 
 namespace systrace {

@@ -9,9 +9,13 @@ set(BPFTOOL bpftool)
 # Find required libraries
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(LIBBPF REQUIRED libbpf)
-pkg_check_modules(PROTOBUF_C REQUIRED libprotobuf-c)
+
+# Protobuf-C is only needed in protobuf (non-JSON) mode
 if(NOT USE_JSON_FORMAT)
     pkg_check_modules(PROTOBUF_C REQUIRED libprotobuf-c)
+    set(OS_PROTOBUF_LIBS ${PROTOBUF_C_LIBRARIES})
+else()
+    set(OS_PROTOBUF_LIBS "")
 endif()
 
 # BPF compilation
@@ -59,7 +63,7 @@ add_dependencies(os_probe generate_skel_h_${PROJECT_NAME})
 # Link libraries
 target_link_libraries(os_probe
     ${LIBBPF_LIBRARIES}
-    ${PROTOBUF_C_LIBRARIES}
+    ${OS_PROTOBUF_LIBS}
     pthread
     z
     stdc++
