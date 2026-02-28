@@ -22,7 +22,7 @@ for root, dirs, files in os.walk(cfg_path):
     for file in files:
         os.remove(os.path.join(root, file))
 
-ser = "/usr/lib/systemd/system/systrac-failslow.service"
+ser = "/usr/lib/systemd/system/systrace-failslow.service"
 if os.path.isfile(ser):
     os.remove(ser)
 
@@ -32,12 +32,13 @@ setup(
     author="bin huang",
     author_email="huangbin58@huawei.com",
     description="Fail Slow Detection for AI Model Training and Inference",
-    url="https://gitee.com/openeuler/sysTrace",
+    url="https://gitcode.com/openeuler/sysTrace",
     keywords=["Fail Slow Detection", "Group Compare", "AI Model"],
     packages=find_packages(where=".", exclude=("tests", "tests.*")),
     data_files=[
-        ('/etc/systrace/config/', glob('config/metric_config.json')),
-        ('/etc/systrace/config/', glob('config/model_config.json')),
+        ('/etc/systrace/config/', glob('failslow/task/custom_v1/config.json')),
+        ('/etc/systrace/config/', glob('failslow/task/custom_v1/metric_config.json')),
+        ('/etc/systrace/config/', glob('failslow/task/custom_v1/model_config.json')),
         ('/usr/lib/systemd/system/', glob('service/*')),
     ],
     install_requires=[
@@ -46,11 +47,11 @@ setup(
         "joblib",
         "scikit_learn",
         "prometheus_client",
-        "protobuf"
+        "protobuf",
+        "pydantic",
     ],
     entry_points={
         "console_scripts": [
-            "systrace-slow=failslow.main:service_main",
             "systrace-failslow=failslow.main:main",
         ]
     }

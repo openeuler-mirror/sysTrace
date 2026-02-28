@@ -28,6 +28,27 @@ class SlowType:
     slow_cal = 0
     slow_comm = 1
 
+class NcclTableItem:
+    '''
+        gpu sample comm op data
+        Kernel,start_time,end_time
+    '''
+    kernel = "kernel"
+    launch_start_time = "t1"
+    launch_end_time = "t2"
+    exec_start_time = "t3"
+    exec_end_time = "t4"
+
+    ex_start_ts = "Start"
+    ex_end_ts = "End"
+    ex_comm_op = "Comm_op"
+    ex_count = "Count"
+
+    op_execute = "Excute_time"
+    op_launch = "Launch_time"
+
+    aggregate_window_size = "aggregate_window_size"
+    alg_timestamp = "timestamp"
 
 class TableItem:
     '''

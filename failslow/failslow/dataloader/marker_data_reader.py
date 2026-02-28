@@ -8,7 +8,7 @@ from collections import Counter
 from typing import List, Dict, Tuple
 
 from failslow.util.logging_utils import get_default_logger
-from failslow.util.constant import CommGroup, TableItem, MS_TO_NS
+from failslow.util.constant import CommGroup, TableItem, NcclTableItem, MS_TO_NS
 from failslow.process.convert_json2csv import convert_jsons2csv
 
 logger = get_default_logger(__name__)
@@ -19,7 +19,7 @@ def extract_step_time_from_log(root_path):
     with open(log_path, "r") as f:
         data = f.read()
 
-    pattern = r'elapsed time per iteration \(ms\): (\d+\.\d+)'
+    pattern = r"elapsed time per iteration \(ms\): (\d+\.\d+)"
     matches = re.findall(pattern, data)
 
     elapsed_times = [float(match) for match in matches]
@@ -30,8 +30,16 @@ def extract_step_time_from_log(root_path):
 
 
 class MarkerDataloader:
-    def __init__(self, root_path, start_time=None, end_time=None, is_filter_data=False):
+    def __init__(
+        self,
+        root_path,
+        gpu_or_npu,
+        start_time=None,
+        end_time=None,
+        is_filter_data=False,
+    ):
         self._root_path = root_path
+        self._gpu_or_npu = gpu_or_npu
         self.start_time = start_time
         self.end_time = end_time
         convert_jsons2csv(self._root_path)
@@ -58,7 +66,7 @@ class MarkerDataloader:
         for node_ip, ranks in self.node_id2ranks_dict.items():
             if rank in ranks:
                 return node_ip
-        
+
         return None
 
     def read_local_device_df_by_rank(self, rank: int):
@@ -110,31 +118,47 @@ class MarkerDataloader:
 
     def get_csv_files(self):
         if not os.path.exists(self._root_path):
-            logger.warning(f"Data path: {self._root_path} not exist, please confirm input data.")
+            logger.warning(
+                f"Data path: {self._root_path} not exist, please confirm input data."
+            )
             return []
-        return [file for file in os.listdir(self._root_path) if file.endswith("csv") and "device" not in file and "op_launch" not in file]
+        return [
+            file
+            for file in os.listdir(self._root_path)
+            if file.endswith("csv") and "device" not in file and "op_launch" not in file
+        ]
 
     def get_all_ranks(self) -> List:
         ranks = []
         for csv_file in self.csv_files:
-            rank = int(csv_file.split('.')[-2])
+            rank = int(csv_file.split(".")[-2])
             ranks.append(rank)
         logger.info(f"AI model all ranks: {ranks}")
         return ranks
 
-    def create_comm_groups(self, comm_names: List[str], slice_indices: List[int], comm_ops: List[str], rank,
-                           count_ops) -> List[CommGroup]:
+    def create_comm_groups(
+        self,
+        comm_names: List[str],
+        slice_indices: List[int],
+        comm_ops: List[str],
+        rank,
+        count_ops,
+    ) -> List[CommGroup]:
         comm_groups = []
         for comm_name, slice_index, comm_op in zip(comm_names, slice_indices, comm_ops):
-            ''' megatron slice index 0 for all ranks time sync'''
+            """megatron slice index 0 for all ranks time sync"""
             if slice_index == 0:
                 continue
             count_op = count_ops[comm_name]
-            comm_groups.append(CommGroup(comm_name, slice_index, comm_op, rank, count_op))
+            comm_groups.append(
+                CommGroup(comm_name, slice_index, comm_op, rank, count_op)
+            )
 
         return comm_groups
 
-    def extend_group_ranks(self, all_comm_groups: List[CommGroup], new_comm_groups: List[CommGroup]) -> None:
+    def extend_group_ranks(
+        self, all_comm_groups: List[CommGroup], new_comm_groups: List[CommGroup]
+    ) -> None:
         if all_comm_groups:
             extra_comm_groups = []
             for new_comm_group in new_comm_groups:
@@ -148,33 +172,55 @@ class MarkerDataloader:
         else:
             all_comm_groups.extend(new_comm_groups)
 
+    def extract_device_gpu_df(self, input_df: pd.DataFrame) -> pd.DataFrame:
+        """t3和t4是device侧的数据, 执行时间是t4-t3"""
+        df_device = input_df[["kernel", "t3", "t4"]]
+        return df_device
+
     def extract_device_df(self, input_df: pd.DataFrame) -> pd.DataFrame:
-        ''' sourcekind 1表示 device, 0表示host '''
+        """sourcekind 1表示 device, 0表示host"""
         df_device = input_df[input_df[TableItem.source_kind] == 1]
 
         return df_device
 
+    def extract_op_launch_gpu_df(self, input_df: pd.DataFrame) -> pd.DataFrame:
+        """t1和t2是host侧的数据, 下发时间是t3-t2"""
+        df_host = input_df[["kernel", "t2", "t3"]]
+        return df_host
+
     def extract_op_launch_df(self, input_df: pd.DataFrame) -> pd.DataFrame:
-        '''
+        """
             source_kind: 0 host, 1 device
             取: 0的max 1的min
         :param input_df:
         :return:
-        '''
-        mode_0_max_timestamp = input_df[input_df[TableItem.source_kind] == 0].groupby(TableItem.id)[
-            TableItem.timestamp].idxmax()
+        """
+        mode_0_max_timestamp = (
+            input_df[input_df[TableItem.source_kind] == 0]
+            .groupby(TableItem.id)[TableItem.timestamp]
+            .idxmax()
+        )
         result_mode_0 = input_df.loc[mode_0_max_timestamp]
 
-        mode_1_min_timestamp = input_df[input_df[TableItem.source_kind] == 1].groupby(TableItem.id)[
-            TableItem.timestamp].idxmin()
+        mode_1_min_timestamp = (
+            input_df[input_df[TableItem.source_kind] == 1]
+            .groupby(TableItem.id)[TableItem.timestamp]
+            .idxmin()
+        )
         result_mode_1 = input_df.loc[mode_1_min_timestamp]
 
-        final_result = pd.concat([result_mode_0, result_mode_1]).sort_values(by=TableItem.id)
+        final_result = pd.concat([result_mode_0, result_mode_1]).sort_values(
+            by=TableItem.id
+        )
 
         return final_result
 
     def extract_id2name_map(self, csv_file: str, input_df: pd.DataFrame) -> None:
-        id2name_map = input_df[input_df[TableItem.name].notna()].set_index(TableItem.id)[TableItem.name].to_dict()
+        id2name_map = (
+            input_df[input_df[TableItem.name].notna()]
+            .set_index(TableItem.id)[TableItem.name]
+            .to_dict()
+        )
         self.id2name_maps[csv_file] = id2name_map
 
     def extract_id2name_maps_for_all_csvs(self):
@@ -182,6 +228,33 @@ class MarkerDataloader:
             csv_path = os.path.join(self._root_path, csv_file)
             data_df = self.read_csv(csv_path)
             self.extract_id2name_map(csv_file, data_df)
+
+    def process_csv_file_gpu(self, csv_file):
+        comm_groups = {}
+        rank_info = {}
+        csv_path = os.path.join(self._root_path, csv_file)
+        data_df = self.read_csv(csv_path)
+        device_df = self.extract_device_gpu_df(data_df)
+        op_launch_df = self.extract_op_launch_gpu_df(data_df)
+
+        device_ids = int(csv_file.split(".")[-2])
+        node_id = csv_file.split("-")[1]
+        rank_info["csv_file"] = csv_file
+        rank_info["rank"] = device_ids
+        rank_info["node_id"] = node_id
+        if not len(device_df):
+            rank_info["is_empty"] = True
+        else:
+            rank_info["is_empty"] = False
+
+        device_df = self.process_gpu_df(device_df, csv_file)
+        op_launch_df = self.process_gpu_df(op_launch_df, csv_file, True)
+        device_path = self.save_device_df(device_df, csv_file)
+        host_path = self.save_op_launch_df(op_launch_df, csv_file)
+        rank_info["device_path"] = device_path
+        rank_info["host_path"] = host_path
+
+        return comm_groups, rank_info
 
     def process_csv_file(self, csv_file):
         rank_info = {}
@@ -208,31 +281,46 @@ class MarkerDataloader:
         rank_info["host_path"] = host_path
 
         if len(device_df):
-            comm_groups_ids = device_df[TableItem.ex_comm_group].unique()   
+            comm_groups_ids = device_df[TableItem.ex_comm_group].unique()
         else:
             comm_groups_ids = []
-        selected_indices, comm_ops = self.get_ops_by_comm_name(comm_groups_ids, device_df)
+        selected_indices, comm_ops = self.get_ops_by_comm_name(
+            comm_groups_ids, device_df
+        )
         count_ops = self.get_count_ops(comm_groups_ids, device_df)
 
-        logger.info(f"src file:{csv_file}, selected comm op index: {selected_indices}, comm ops: {comm_ops}")
-        comm_groups = self.create_comm_groups(comm_groups_ids, selected_indices, comm_ops, device_ids, count_ops)
-        return comm_groups, rank_info 
+        logger.info(
+            f"src file:{csv_file}, selected comm op index: {selected_indices}, comm ops: {comm_ops}"
+        )
+        comm_groups = self.create_comm_groups(
+            comm_groups_ids, selected_indices, comm_ops, device_ids, count_ops
+        )
+        return comm_groups, rank_info
 
     def extract_comm_domain(self):
-        self.extract_id2name_maps_for_all_csvs()
+        if self._gpu_or_npu == "npu":
+            self.extract_id2name_maps_for_all_csvs()
 
         all_comm_groups = []
-        max_processes = min(os.cpu_count()//2 or 1, len(self.csv_files))
+        max_processes = min(os.cpu_count() // 2 or 1, len(self.csv_files))
         with multiprocessing.Pool(processes=max_processes) as pool:
-            for comm_groups, rank_info in pool.imap_unordered(self.process_csv_file, self.csv_files):
+            if self._gpu_or_npu == "gpu":
+                csv_pool = pool.imap_unordered(
+                    self.process_csv_file_gpu, self.csv_files
+                )
+            else:
+                csv_pool = pool.imap_unordered(self.process_csv_file, self.csv_files)
+            for comm_groups, rank_info in csv_pool:
                 self.get_node_ids_from_filepath(rank_info["node_id"], rank_info["rank"])
                 if rank_info["is_empty"]:
                     self.empty_data_ranks.append(rank_info["rank"])
                 self.local_d_files[rank_info["csv_file"]] = rank_info["device_path"]
-                self.local_op_launch_files[rank_info["csv_file"]] = rank_info["host_path"]
-                
+                self.local_op_launch_files[rank_info["csv_file"]] = rank_info[
+                    "host_path"
+                ]
+
                 self.extend_group_ranks(all_comm_groups, comm_groups)
-                
+
         logger.info(f"node id and ranks: {self.node_id2ranks_dict}")
         all_comm_groups = self.get_fp_comm_groups(all_comm_groups)
         return all_comm_groups
@@ -255,16 +343,15 @@ class MarkerDataloader:
     #                 self.empty_data_ranks.append(rank_info["rank"])
     #             self.local_d_files[rank_info["csv_file"]] = rank_info["device_path"]
     #             self.local_op_launch_files[rank_info["csv_file"]] = rank_info["host_path"]
-                
+
     #             self.extend_group_ranks(all_comm_groups, comm_groups)
-                
+
     #     logger.info(f"node id and ranks: {self.node_id2ranks_dict}")
     #     all_comm_groups = self.get_fp_comm_groups(all_comm_groups)
     #     return all_comm_groups
 
-
     def get_node_ids_from_filepath(self, node_id: str, rank: int):
-        ''' csv_file: hccl_activity-9.13.100.7-.0.csv '''
+        """csv_file: hccl_activity-9.13.100.7-.0.csv"""
         if node_id not in self.node_id2ranks_dict.keys():
             self.node_id2ranks_dict[node_id] = [rank]
         else:
@@ -284,20 +371,63 @@ class MarkerDataloader:
                 if match_flag:
                     break
 
-    def process_df(self, data_df: pd.DataFrame, csv_file: str, op_ext=None) -> pd.DataFrame:
+    def process_gpu_df(
+        self, data_df: pd.DataFrame, csv_file: str, op_ext=None
+    ) -> pd.DataFrame:
+        # 根据op_ext参数设置不同的列名，并交换列的数据位置
+        if op_ext:
+            # 执行时间相关列，按exec_start_time, exec_end_time, kernel顺序排列
+            # 原始数据列顺序为[kernel, t3, t4]，需要重新排序为[t3, t4, kernel]
+            data_df = data_df.iloc[
+                :, [1, 2, 0]
+            ]  # 重新排序列：第2列(t3), 第3列(t4), 第1列(kernel)
+            data_df.columns = [
+                NcclTableItem.ex_start_ts,
+                NcclTableItem.ex_end_ts,
+                TableItem.ex_comm_op,
+            ]
+        else:
+            # 启动时间相关列，按launch_start_time, launch_end_time, kernel顺序排列
+            # 原始数据列顺序为[kernel, t2, t3]，需要重新排序为[t2, t3, kernel]
+            data_df = data_df.iloc[
+                :, [1, 2, 0]
+            ]  # 重新排序列：第2列(t2), 第3列(t3), 第1列(kernel)
+            data_df.columns = [
+                NcclTableItem.ex_start_ts,
+                NcclTableItem.ex_end_ts,
+                TableItem.ex_comm_op,
+            ]
+
+        return data_df
+
+    def process_df(
+        self, data_df: pd.DataFrame, csv_file: str, op_ext=None
+    ) -> pd.DataFrame:
         """
         对 DataFrame 进行处理，包括分组聚合、列拆分、添加新列等操作
         """
         id2name_dict = self.id2name_maps[csv_file]
         data_df.loc[:, TableItem.name] = data_df[TableItem.id].map(id2name_dict)
-        df = data_df.groupby(TableItem.id).agg({
-            TableItem.timestamp: ['min', 'max'],
-            TableItem.kind: 'first',
-            TableItem.source_kind: 'first',
-            TableItem.name: 'first',
-        }).reset_index()
-        df.columns = [TableItem.id, TableItem.ex_start_ts, TableItem.ex_end_ts, TableItem.kind, TableItem.source_kind,
-                      TableItem.name]
+        df = (
+            data_df.groupby(TableItem.id)
+            .agg(
+                {
+                    TableItem.timestamp: ["min", "max"],
+                    TableItem.kind: "first",
+                    TableItem.source_kind: "first",
+                    TableItem.name: "first",
+                }
+            )
+            .reset_index()
+        )
+        df.columns = [
+            TableItem.id,
+            TableItem.ex_start_ts,
+            TableItem.ex_end_ts,
+            TableItem.kind,
+            TableItem.source_kind,
+            TableItem.name,
+        ]
 
         metric_name = TableItem.ex_comm_op
         if op_ext:
@@ -305,23 +435,47 @@ class MarkerDataloader:
 
         if len(df):
             if "!" in df["Name"].iloc[0]:
-                df[[metric_name, TableItem.ex_comm_group, TableItem.ex_data_type, TableItem.ex_count]] = df[
-                    TableItem.name].str.replace('comm:', '').str.split('!', expand=True)
+                df[
+                    [
+                        metric_name,
+                        TableItem.ex_comm_group,
+                        TableItem.ex_data_type,
+                        TableItem.ex_count,
+                    ]
+                ] = (
+                    df[TableItem.name]
+                    .str.replace("comm:", "")
+                    .str.split("!", expand=True)
+                )
             else:
-                df[[metric_name, TableItem.ex_comm_group, TableItem.ex_data_type, TableItem.ex_count]] = df[
-                    TableItem.name].str.replace('comm:', '').str.split(',', expand=True)
+                df[
+                    [
+                        metric_name,
+                        TableItem.ex_comm_group,
+                        TableItem.ex_data_type,
+                        TableItem.ex_count,
+                    ]
+                ] = (
+                    df[TableItem.name]
+                    .str.replace("comm:", "")
+                    .str.split(",", expand=True)
+                )
 
         return df
 
     def extract_data_by_time_range(self, data: pd.DataFrame) -> pd.DataFrame:
         if self.end_time is None and self.start_time is None:
             # no detection
-            clip_data = data.iloc[0:0]
+            clip_data = data
+            # clip_data = data.iloc[0:0]
         else:
             if self.is_filter_data:
                 start_time = self.start_time * MS_TO_NS
                 end_time = self.end_time * MS_TO_NS
-                clip_data = data[(data[TableItem.ex_end_ts] >= start_time) & (data[TableItem.ex_end_ts] <= end_time)]
+                clip_data = data[
+                    (data[TableItem.ex_end_ts] >= start_time)
+                    & (data[TableItem.ex_end_ts] <= end_time)
+                ]
             else:
                 clip_data = data
 
@@ -330,9 +484,11 @@ class MarkerDataloader:
     def save_device_df(self, device_df: pd.DataFrame, csv_file: str) -> str:
         csv_path = os.path.join(self._root_path, csv_file)
         save_path = f"{csv_path[:-4]}_device.csv"
+        # logger.debug("save_device_df to path: %s (len %s)", save_path, len(device_df))
         device_df = self.extract_data_by_time_range(device_df)
+        # logger.debug("save_device_df to path: %s (len %s)", save_path, len(device_df))
         device_df.to_csv(save_path, index=False)
-        
+
         return save_path
 
     def save_op_launch_df(self, op_launch_df: pd.DataFrame, csv_file: str) -> str:
@@ -371,7 +527,9 @@ class MarkerDataloader:
                     if large_num_per_count > in_large_num_per_count:
                         fp_comm_groups[group_ranks] = comm_group
 
-        logger.info(f"comm groups: {len(comm_groups)}, fp comm groups: {len(fp_comm_groups)}")
+        logger.info(
+            f"comm groups: {len(comm_groups)}, fp comm groups: {len(fp_comm_groups)}"
+        )
         return list(fp_comm_groups.values())
 
     def _simple_match_groups(self, all_comm_ids: Dict, all_devices_id: Dict):
@@ -393,12 +551,16 @@ class MarkerDataloader:
             group_data_df = data_df[data_df[TableItem.ex_comm_group] == comm_group_id]
             ops = group_data_df[TableItem.ex_comm_op].unique()
             for op in ops:
-                count_ops[comm_group_id][op] = len(group_data_df[group_data_df[TableItem.ex_comm_op] == op])
+                count_ops[comm_group_id][op] = len(
+                    group_data_df[group_data_df[TableItem.ex_comm_op] == op]
+                )
 
         return count_ops
 
-    def get_ops_by_comm_name(self, comm_group_ids: List, data_df: pd.DataFrame) -> Tuple[List, List]:
-        '''表内所有的comm_groups找到第一个索引的索引号和算子'''
+    def get_ops_by_comm_name(
+        self, comm_group_ids: List, data_df: pd.DataFrame
+    ) -> Tuple[List, List]:
+        """表内所有的comm_groups找到第一个索引的索引号和算子"""
         selected_indices = []
         comm_ops = []
         for comm_id in comm_group_ids:
@@ -411,18 +573,16 @@ class MarkerDataloader:
 
         return selected_indices, comm_ops
 
-
     def convert_timestamp2datetime(self, data):
 
         dt_object = datetime.datetime.fromtimestamp(data / (1e9 * 1.0))
         # 格式化日期为字符串
-        date_time = dt_object.strftime('%Y-%m-%d %H:%M:%S')
+        date_time = dt_object.strftime("%Y-%m-%d %H:%M:%S")
         return date_time
-
 
     @staticmethod
     def _filter_deviation_data(data):
-        ''' filter data exceed or lower than 3 * means '''
+        """filter data exceed or lower than 3 * means"""
         processed_data = []
 
         mean_value = np.mean(data)

@@ -70,10 +70,10 @@ class SlidingWindowNSigma(object):
 
         if self.max_expert_upper_bound is not None:
             upper_bound = min(self.max_expert_upper_bound, upper_bound)
-        logger.debug("[%s] expert range: max_el:%s min_el:%s min_eu:%s max_el:%s.", self.metric_name,
-                     self.max_expert_lower_bound, self.min_expert_lower_bound, self.min_expert_upper_bound,
-                     self.max_expert_upper_bound)
-        logger.debug("[%s] Nsigma calculation: mean %s", self.metric_name, (mean, nsigma_upper_bound, upper_bound,))
+        #logger.debug("[%s] expert range: max_el:%s min_el:%s min_eu:%s max_el:%s.", self.metric_name,
+        #             self.max_expert_lower_bound, self.min_expert_lower_bound, self.min_expert_upper_bound,
+        #             self.max_expert_upper_bound)
+        #logger.debug("[%s] Nsigma calculation: mean %s", self.metric_name, (mean, nsigma_upper_bound, upper_bound,))
         return mean, lower_bound, upper_bound
 
     def train(self):
@@ -99,9 +99,9 @@ class SlidingWindowNSigma(object):
 
             return 0, self.lower_bound, self.upper_bound
         self.train()
-        logger.debug("[%s] training buffer %s.", self.metric_name, self.training_buffer)
-        logger.debug("[%s] datapoint:%s, lower_bound:%s, upper_bound:%s", self.metric_name, data_point,
-                     self.lower_bound, self.upper_bound)
+        # logger.debug("[%s] training buffer %s.", self.metric_name, self.training_buffer)
+        # logger.debug("[%s] datapoint:%s, lower_bound:%s, upper_bound:%s", self.metric_name, data_point,
+        #             self.lower_bound, self.upper_bound)
         if self.detect_type == 'lower_bound':
             if data_point < self.lower_bound:
                 return 1, self.lower_bound, self.upper_bound

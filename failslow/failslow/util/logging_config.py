@@ -6,10 +6,12 @@ LOGGER_LEVEL_ENV = {
     "DEBUG": logging.DEBUG,
     "INFO": logging.INFO,
     "WARN": logging.WARNING,
-    "ERROR": logging.ERROR
+    "ERROR": logging.ERROR,
 }
 
-LOG_FILE_ROOT = os.path.join(os.getenv('_APP_LOG_DIR', ""), os.getenv('POD_NAME', ""), 'log')
+LOG_FILE_ROOT = os.path.join(
+    os.getenv("_APP_LOG_DIR", ""), os.getenv("POD_NAME", ""), "log"
+)
 
 LOG_LEVEL = "INFO"
 # 压缩文件数量

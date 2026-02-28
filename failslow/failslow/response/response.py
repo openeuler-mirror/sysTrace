@@ -96,8 +96,9 @@ class NodeData(dict):
     kpi_data = typed_property('kpiData', list, False)
     rela_ids = typed_property("relaIds", list, False)
     omitted_devices = typed_property("omittedDevices", list, False)
+    anomaly_time_ranges = typed_property("anomalyTimeRanges", list, False)
 
-    def __init__(self, metric_name, device_label, method_type, server_ip="localhost", relate_device_labels=None, omitted_devices=None):
+    def __init__(self, metric_name, device_label, method_type, server_ip="localhost", relate_device_labels=None, omitted_devices=None, anomaly_time_ranges=None):
         super().__init__()
         # device_label: 1
         sys_id = device_label
@@ -111,6 +112,7 @@ class NodeData(dict):
         self.rela_ids = [int(item) for item in relate_device_labels] if relate_device_labels else []
         # self.omitted_devices = [item[-1] for item in omitted_devices] if omitted_devices else []
         self.omitted_devices = [int(item) for item in omitted_devices] if omitted_devices else []
+        self.anomaly_time_ranges = anomaly_time_ranges or []
 
     def __setattr__(self, key, value):
         if key.startswith("_"):

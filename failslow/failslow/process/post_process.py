@@ -86,10 +86,25 @@ class PostProcess():
     def _process_abnormal_device(self, detect_result: Dict, device_label: str, keep_devices: List,
                                  omitted_devices: List, metric_name: str) -> NodeData:
         method_type = detect_result["detect_result_type"][device_label].get(metric_name, "TIME")
-        time_stamp_data, values = detect_result["anomaly_locations"][device_label][metric_name]
+        
+        # 获取异常位置数据， (timestamps, values, anomaly_time_ranges)
+        anomaly_data = detect_result["anomaly_locations"][device_label][metric_name]
+        
+        time_stamp_data, values, anomaly_time_ranges = anomaly_data[0], anomaly_data[1], anomaly_data[2]
+
         label_dict = dict(zip(time_stamp_data.tolist(), values.tolist()))
         node_ip = self.get_node_id_by_rank(device_label)
-        abnormal_node_data = NodeData(metric_name, device_label, method_type, node_ip, keep_devices, omitted_devices)
+        
+        # 将异常时间范围信息传递给NodeData
+        abnormal_node_data = NodeData(
+            metric_name, 
+            device_label, 
+            method_type, 
+            node_ip, 
+            keep_devices, 
+            omitted_devices, 
+            anomaly_time_ranges
+        )
 
         if self.record_kpi_value:
             g_ts, g_value = detect_result["group_data"][device_label].values[:, 0], detect_result["group_data"][
@@ -105,7 +120,16 @@ class PostProcess():
         if keep_devices:
             for device_label in keep_devices:
                 node_ip = self.get_node_id_by_rank(device_label)
-                normal_node_data = NodeData(metric_name, device_label, "SPACE", node_ip)
+                # 正常设备通常不会有异常时间范围，但我们仍需要保持一致性
+                anomaly_data = detect_result["anomaly_locations"].get(device_label, {}).get(metric_name, (None, None, []))
+                
+                # 如果有异常时间范围信息，提取它
+                if len(anomaly_data) >= 3:
+                    anomaly_time_ranges = anomaly_data[2]
+                else:
+                    anomaly_time_ranges = []
+                
+                normal_node_data = NodeData(metric_name, device_label, "SPACE", node_ip, anomaly_time_ranges=anomaly_time_ranges)
                 if self.record_kpi_value:
                     g_ts, g_value = detect_result["group_data"][device_label].values[:, 0], detect_result["group_data"][
                                                                                                 device_label].values[:,
@@ -196,11 +220,31 @@ class PostProcess():
                     if raw_metric_name not in merged_anomaly_locations[rank]:
                         merged_anomaly_locations[rank][raw_metric_name] = timestamp_with_label
                     else:
-                        tmp_value = merged_anomaly_locations[rank][raw_metric_name][1] + timestamp_with_label[1]
-                        merged_anomaly_locations[rank][raw_metric_name] = (
-                            merged_anomaly_locations[rank][raw_metric_name][0],
-                            tmp_value.astype(np.bool).astype(np.float32)
-                        )
+                        # 处理异常时间范围的合并
+                        old_timestamps, old_values = merged_anomaly_locations[rank][raw_metric_name][0], \
+                                                     merged_anomaly_locations[rank][raw_metric_name][1]
+                        
+                        new_timestamps, new_values = timestamp_with_label[0], timestamp_with_label[1]
+                        
+                        # 合并时间戳和值
+                        combined_timestamps = np.concatenate((old_timestamps, new_timestamps))
+                        combined_values = np.concatenate((old_values, new_values)).astype(np.bool).astype(np.float32)
+                        
+                        # 如果存在异常时间范围，也需要合并
+                        if len(timestamp_with_label) >= 3 and len(merged_anomaly_locations[rank][raw_metric_name]) >= 3:
+                            old_ranges = merged_anomaly_locations[rank][raw_metric_name][2]
+                            new_ranges = timestamp_with_label[2]
+                            combined_ranges = old_ranges + new_ranges
+                            merged_anomaly_locations[rank][raw_metric_name] = (
+                                combined_timestamps,
+                                combined_values,
+                                combined_ranges
+                            )
+                        else:
+                            merged_anomaly_locations[rank][raw_metric_name] = (
+                                combined_timestamps,
+                                combined_values
+                            )
 
     def _merge_anomaly_types(self, merged_anomaly_type: dict, group_result_type: dict):
         for rank, result_type in group_result_type.items():

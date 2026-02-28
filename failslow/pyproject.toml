@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "failslow"
+version = "0.1.0"
+description = "FailSlow: A tool for analyzing and diagnosing performance degradation in AI training"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [ { name = "openEuler" } ]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "joblib",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "prometheus-client",
+    "protobuf",
+    "pydantic",
+    "pyyaml",
+    "scikit-learn",
+    "setuptools",
+    "xarray",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "coverage", "mkdocs"]
+
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "example*"]
+
+[dependency-groups]
+dev = [
+    "black>=24.8.0",
+    "kafka>=1.3.5",
+    "mkdocs-material",
+    "pylint",
+]
+
+
+[project.scripts]
+
+
+
+[tool.pylint."FORMAT"]
+max-line-length = 120

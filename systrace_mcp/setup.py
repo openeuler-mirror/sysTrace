@@ -16,7 +16,7 @@ from glob import glob
 from setuptools import setup, find_packages
 import os 
 
-ser = "/usr/lib/systemd/system/systrac-mcpserver.service"
+ser = "/usr/lib/systemd/system/systrace-mcpserver.service"
 if os.path.isfile(ser):
     os.remove(ser)
 setup(
@@ -25,7 +25,7 @@ setup(
     author="xu hou",
     author_email="houxu5@h-partners.com",
     description="MCP Server for SystraceFail Slow Detection for AI Model Training and Inference",
-    url="https://gitee.com/openeuler/sysTrace",
+    url="https://gitcode.com/openeuler/sysTrace",
     keywords=["Fail Slow Detection", "Group Compare", "AI Model", "MCP Server"],
     packages=find_packages(where=".", exclude=("tests", "tests.*")),
     data_files=[
