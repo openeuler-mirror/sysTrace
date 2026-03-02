@@ -215,7 +215,58 @@ static bool init_python_api() {
     return ok;
 }
 
-void set_rank() {
+bool parse_rank_from_cmdline(int &local_rank, int &global_rank) {
+    FILE *fp = fopen("/proc/self/cmdline", "r");
+    if (!fp) {
+        return false;
+    }
+
+    char cmdline[10240] = {0};
+    size_t len = fread(cmdline, 1, sizeof(cmdline) - 1, fp);
+    fclose(fp);
+
+    for (size_t i = 0; i < len; i++) {
+        if (cmdline[i] == '\0') {
+            cmdline[i] = ' ';
+        }
+    }
+
+    char *node_rank_ptr = strstr(cmdline, "--node_rank=");
+    if (node_rank_ptr) {
+        node_rank_ptr += strlen("--node_rank=");
+        global_rank = atoi(node_rank_ptr);
+    }
+
+    char *devices_ptr = strstr(cmdline, "--devices=");
+    if (devices_ptr) {
+        devices_ptr += strlen("--devices=");
+        if (strncmp(devices_ptr, "npu:", 4) == 0) {
+            local_rank = atoi(devices_ptr + 4);
+        }
+    }
+
+    return global_rank >= 0 && local_rank >= 0;
+}
+
+void set_rank_for_xllm() {
+    int local_rank = -1;
+    int global_rank = -1;
+
+    if (parse_rank_from_cmdline(local_rank, global_rank)) {
+
+        std::string lr_str = std::to_string(local_rank);
+        std::string gr_str = std::to_string(global_rank);
+
+        setenv("LOCAL_RANK", lr_str.c_str(), 1);
+        setenv("RANK", gr_str.c_str(), 1);
+
+    } else {
+        std::cout << "[Hook][XLLM] Failed to get XLLM rank from all sources"
+                  << std::endl;
+    }
+}
+
+void set_rank_for_vllm() {
     if (!init_python_api()) {
         return;
     }
@@ -391,6 +442,36 @@ bool is_process_spawned_by_vllm() {
     return false;
 }
 
+bool is_process_spawned_by_xllm() {
+    pid_t current_pid = getpid();
+    const int MAX_DEPTH = 10;
+    int depth = 0;
+
+    while (current_pid > 1 && depth < MAX_DEPTH) {
+        std::string cmdline = get_process_cmdline(current_pid);
+        if (!cmdline.empty()) {
+            std::string lower_cmdline = cmdline;
+            std::transform(lower_cmdline.begin(), lower_cmdline.end(),
+                           lower_cmdline.begin(), ::tolower);
+            if (lower_cmdline.find("xllm") != std::string::npos) {
+                return true;
+            }
+        }
+
+        current_pid = get_parent_pid(current_pid);
+        depth++;
+    }
+
+    return false;
+}
+
+void set_rank() {
+    if (is_process_spawned_by_vllm()) {
+        set_rank_for_vllm();
+    } else if (is_process_spawned_by_xllm()) {
+        set_rank_for_xllm();
+    }
+}
 void init_systrace() {
     try {
         const char *log_path_env = std::getenv("SYSTRACE_LOG_PATH");
@@ -413,14 +494,22 @@ void async_delayed_init() {
 
 #define HOOKED_FUNCTION(func_ptr, func_name, ...)                              \
     do {                                                                       \
-        if (!(check_rank_env() && check_local_rank_env()) &&                   \
-            is_process_spawned_by_vllm()) {                                    \
-            std::call_once(global_delayed_init_flag, []() {                    \
-                std::thread t(async_delayed_init);                             \
-                t.detach();                                                    \
-            });                                                                \
+        if (!(check_rank_env() && check_local_rank_env())) {                   \
+            if (is_process_spawned_by_vllm()) {                                \
+                std::call_once(global_delayed_init_flag, []() {                \
+                    std::thread t(async_delayed_init);                         \
+                    t.detach();                                                \
+                });                                                            \
+            } else if (is_process_spawned_by_xllm()) {                         \
+                std::call_once(global_delayed_init_flag,                       \
+                               []() { async_delayed_init(); });                \
+            } else {                                                           \
+                std::call_once(global_delayed_init_flag,                       \
+                               []() { init_systrace(); });                     \
+            }                                                                  \
         } else {                                                               \
-            init_systrace();                                                   \
+            std::call_once(global_delayed_init_flag,                           \
+                           []() { init_systrace(); });                         \
         }                                                                      \
         if (!func_ptr) {                                                       \
             func_ptr = (decltype(func_ptr))load_symbol(func_name);             \

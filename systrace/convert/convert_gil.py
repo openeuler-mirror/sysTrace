@@ -3,7 +3,6 @@ import logging
 import time
 import argparse
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from typing import Dict, List, Any
 from tqdm import tqdm
 
@@ -17,7 +16,9 @@ HOLD_NAME = "hold_gil"
 class GilTracker:
     def __init__(self):
         self.events = []
-        self.last_acquire_e: Dict[str, tuple] = defaultdict(lambda: (0, ""))
+        self.pending_acquire: Dict[str, tuple] = {}
+        self.pending_release: Dict[str, tuple] = {}
+        self.last_hold_start: Dict[str, tuple] = {}
 
     def process_event(self, raw_event: Dict[str, Any]):
         try:
@@ -28,37 +29,33 @@ class GilTracker:
             tid = raw_event["tid"]
 
             if name == "take_gil":
-                self.events.append({
-                    "name": ACQUIRE_NAME,
-                    "ph": ph,
-                    "ts": ts,
-                    "pid": pid,
-                    "tid": tid
-                })
-                if ph == "E":
-                    self.last_acquire_e[tid] = (ts, pid)
+                if ph == "B":
+                    self.pending_acquire[tid] = (ts, pid)
+                elif ph == "E":
+                    start_ts, start_pid = self.pending_acquire.pop(tid, (0, 0))
+                    if start_ts > 0:
+                        self.events.append({
+                            "name": ACQUIRE_NAME, "ph": "X", "ts": start_ts,
+                            "dur": ts - start_ts, "pid": start_pid, "tid": tid
+                        })
+                        self.last_hold_start[tid] = (ts, start_pid)
 
             elif name == "drop_gil":
                 if ph == "B":
-                    acquire_ts, acquire_pid = self.last_acquire_e[tid]
-                    if acquire_ts > 0:
+                    self.pending_release[tid] = (ts, pid)
+                    hold_ts, hold_pid = self.last_hold_start.pop(tid, (0, 0))
+                    if hold_ts > 0:
                         self.events.append({
-                            "name": HOLD_NAME,
-                            "ph": "X",
-                            "ts": acquire_ts,
-                            "dur": ts - acquire_ts,
-                            "pid": acquire_pid,
-                            "tid": tid
+                            "name": HOLD_NAME, "ph": "X", "ts": hold_ts,
+                            "dur": ts - hold_ts, "pid": hold_pid, "tid": tid
                         })
-                        self.last_acquire_e[tid] = (0, "")
-
-                self.events.append({
-                    "name": RELEASE_NAME,
-                    "ph": ph,
-                    "ts": ts,
-                    "pid": pid,
-                    "tid": tid
-                })
+                elif ph == "E":
+                    start_ts, start_pid = self.pending_release.pop(tid, (0, 0))
+                    if start_ts > 0:
+                        self.events.append({
+                            "name": RELEASE_NAME, "ph": "X", "ts": start_ts,
+                            "dur": ts - start_ts, "pid": start_pid, "tid": tid
+                        })
 
         except KeyError as e:
             logging.warning(f"Missing field {e} in event: {raw_event}")
