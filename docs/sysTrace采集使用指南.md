@@ -572,7 +572,7 @@ sysTrace 支持 pb 和 json 格式落盘。**只有 pb 格式数据需要安装 
 **1. 拷贝 sysTrace_pb2.py 到 convert 目录下**
 
 ```bash
-cp <path-to-sysTrace>/systrace/protos/sysTrace_pb2.py <path-to-sysTrace>/systrace/convert
+cp <path-to-sysTrace>/systrace/protos/systrace_pb2.py <path-to-sysTrace>/systrace/convert
 ```
 
 **2. 安装转换脚本依赖包（仅 pb 格式需要）**
