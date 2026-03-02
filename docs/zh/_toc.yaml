@@ -1,0 +1,8 @@
+label: sysTrace用户指南
+isManual: true
+description: AI 训推任务的在线性能监控与故障诊断工具
+sections:
+  - label: 安装sysTrace
+    href: ./快速入门.md
+  - label: 使用sysTrace
+    href: ./采集使用指南.md
