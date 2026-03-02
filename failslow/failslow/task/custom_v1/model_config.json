@@ -1,0 +1,48 @@
+{
+  "with_fail_slow": false,
+  "task_stable_step": 3,
+  "max_data_queue_steps": 1000,
+  "min_startup_detection_steps": 10,
+  "fail_slow_span_mins": 30,
+  "enable_hbm_detect": false,
+  "hbm_data_path": "/home/hbdir/npu_data_sampler/0_metrics/npu_device_ranks",
+  "hbm_sample_interval_min": 1, 
+  "training_log": "/home/workspace/hbdir/systrace/localhost.localdomain--00000.timeline",
+  "fail_slow_perception_path": "/etc/systrace/result/fail_slow",
+  "hang_times_mins_thr": 30,
+  "steps_window_size": 10,
+  "k_sigma": 2,
+  "anomaly_degree_thr": 0.2,
+  "slow_node_detection_range_times": [],
+  "slow_node_detection_time_span_hours": 0.5,
+  "slow_node_detection_path": "/etc/systrace/result/slow_node",
+  "data_type": "json",
+  "root_path": "/home/sysTrace/local/csv_files/",
+  "filter_data_by_timestamp": false,
+  "enable_detect_type": {
+    "enable_cal": true,
+    "enable_op_launch": false,
+    "enable_comm": false,
+    "enable_dataloader": false,
+    "enable_ckpt": false
+  },
+  "fail_slow_ops":{
+    "cal_slow": "ncclDevKernel_ReduceScatter_Sum_f32_RING_LL",
+    "op_launch_slow": "ncclDevKernel_AllReduce_Sum_f32_RING_LL_launch",
+    "comm_slow": "HcclBatchSendRecv",
+    "dataloader_slow": "Dataloader",
+    "ckpt_slow": "SaveCkpt"
+  },
+  "save_image": "image",
+  "record_kpi": false,
+  "use_plot": false,
+  "max_num_normal_results": 16,
+  "look_back": 20,
+  "hccl_domain": {
+    "tp": [[0, 1, 2, 3, 4, 5, 6, 7]],
+    "dp": [[0, 1, 2, 3, 4, 5, 6, 7]]
+  },
+  "gpu_or_npu": "gpu",
+  "rank_table_json": "./rank_table.json",
+  "debug_data": false
+}

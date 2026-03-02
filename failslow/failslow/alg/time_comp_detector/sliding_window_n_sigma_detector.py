@@ -71,6 +71,7 @@ class SlidingWindowKSigmaDetector():
                 continue
             infer_metric_data = infer_data[self.metric_name].values
             time_stamp_data = infer_data["timestamp"].values
+            # logger.info(f"failslow/failslow/alg/time_comp_detector/sliding_window_n_sigma_detector.py {device_label} infer_metric_data: {infer_metric_data}")
             # 去除训练数据集中的噪音数据
             noisy_labels = self._preprocessing(infer_metric_data)
             detect_result = np.zeros(len(infer_metric_data))

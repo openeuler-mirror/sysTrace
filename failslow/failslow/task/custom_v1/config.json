@@ -1,0 +1,61 @@
+{
+    "degradation_perception": {
+        "enable": true,
+        "alert_reporter_config": {
+            "reporter_type": "LoggerAlertReporter",
+            "config": {
+                "logger_level": "INFO"
+            }
+        },
+        "hang_detection_config": {
+            "enable": true,
+            "hang_check_interval": 120.0
+        },
+        "degradation_detection_config": {
+            "detector_type": "SlidingWindowKSigmaRobust",
+            "detector_config": {
+                "algo_config": {
+                    "window_size": 10,
+                    "k_sigma": 2.0,
+                    "anomaly_degree_thr": 0.05,
+                    "use_variable_window": true,
+                    "sliding_window_increase_ratio": 0.5,
+                    "eps": 1e-06
+                },
+                "alert_config": {
+                    "min_consecutive": 6,
+                    "detect_rise": true,
+                    "detect_drop": false
+                }
+            }
+        },
+        "alert_attrs": {}
+    },
+    "slow_node_locator": {
+        "detection_minimum_interval_seconds": 10,
+        "alert_reporter_config": {
+            "reporter_type": "LoggerAlertReporter",
+            "config": {
+                "logger_level": "INFO"
+            }
+        },
+        "csv_path": "/home/sysTrace/local/csv_files/",
+        "max_rows": 10000000,
+        "model_config_path": "/etc/systrace/config/model_config.json",
+        "metric_config_path": "/etc/systrace/config/metric_config.json",
+        "metric_white_list": [
+            "ncclDevKernel_AllReduce_Sum_f32_RING_LL",
+            "ncclDevKernel_ReduceScatter_Sum_f32_RING_LL",
+            "ncclDevKernel_AllReduce_Sum_f32_RING_LL_launch",
+            "ncclDevKernel_ReduceScatter_Sum_bf16_RING_LL",
+            "HcclAllreduce",
+            "HcclAllreduce_launch",
+            "HcclAllGather",
+            "HcclAllGather_launch",
+            "HcclBroadcast",
+            "HcclBroadcast_launch",
+            "HcclReduceScatter",
+            "HcclReduceScatter_launch"
+        ]
+    }
+}

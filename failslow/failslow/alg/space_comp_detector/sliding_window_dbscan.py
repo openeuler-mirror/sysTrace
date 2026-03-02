@@ -3,12 +3,13 @@ from collections import Counter
 
 import numpy as np
 from sklearn.cluster import DBSCAN
+
 from failslow.util.logging_utils import get_default_logger
 
 logger = get_default_logger(__name__)
 
 
-class SlidingWindowDBSCAN():
+class SlidingWindowDBSCAN:
     def __init__(self, cfg):
         self.smooth_window = cfg.get("smooth_window")
         self.smooth = cfg.get("smooth")
@@ -50,13 +51,13 @@ class SlidingWindowDBSCAN():
             self.buffer_size = self.window_size
 
     def cal_sim_matrix(self, nodes_data):
-        '''计算单指标节点间的相似度矩阵
-            @params:
-                nodes_data: list(np.ndarray), [arr1, arr2, ...]
-                dist_func_name: str, "euclid_dist"|"consine_dist"|"dtw_dist"
-            @return:
-                dists: np.ndarray, 节点间的两两相似度矩阵
-        '''
+        """计算单指标节点间的相似度矩阵
+        @params:
+            nodes_data: list(np.ndarray), [arr1, arr2, ...]
+            dist_func_name: str, "euclid_dist"|"consine_dist"|"dtw_dist"
+        @return:
+            dists: np.ndarray, 节点间的两两相似度矩阵
+        """
         fake_data_len = len(nodes_data)
         dists = np.zeros((fake_data_len, fake_data_len))
         dist_func = getattr(self, self.dist_metric)
@@ -66,10 +67,10 @@ class SlidingWindowDBSCAN():
                 try:
                     cal_dist = dist_func(nodes_data[inner_idx], data)
                 except Exception:
-                    cal_dist = 0.
+                    cal_dist = 0.0
 
                 if np.isnan(cal_dist):
-                    dist = 0.
+                    dist = 0.0
                 else:
                     dist = cal_dist
                 dist = round(dist, 6)
@@ -88,7 +89,7 @@ class SlidingWindowDBSCAN():
     @staticmethod
     def consine(vec1, vec2):
         if np.unique(vec1).size > 1 and np.unique(vec2).size > 1:
-            return 1. - vec1.dot(vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
+            return 1.0 - vec1.dot(vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2))
         elif np.unique(vec1).size == 1 and np.unique(vec2).size > 1:
             return 1
         elif np.unique(vec1).size > 1 and np.unique(vec2).size == 1:
@@ -97,6 +98,7 @@ class SlidingWindowDBSCAN():
             return 0
 
     def _db_scan(self, data) -> np.ndarray:
+        # logger.info(f"pre data: {data}")
         data = np.swapaxes(data, 0, 1)
         # 对data取均值
         compute_data = np.mean(data, axis=-1)
@@ -108,6 +110,8 @@ class SlidingWindowDBSCAN():
         # labels = DBSCAN(eps=self.eps, min_samples=self.min_samples, metric=self.dist_metric).fit_predict(compute_data)
         dbscan = DBSCAN(eps=self.eps, min_samples=self.min_samples)
         sim_scores = self.cal_sim_matrix(data)
+        # logger.info(f"data: {data}")
+        # logger.info(f"sim_scores: {sim_scores}")
         labels = dbscan.fit_predict(sim_scores)
         logger.info(f"dnscan labels: {labels}")
         label_counts = Counter(labels)
@@ -116,7 +120,9 @@ class SlidingWindowDBSCAN():
         # 找到样本数量最多的类别
         most_common_label, _ = label_counts.most_common(1)[0]
         new_labels = np.where(labels == most_common_label, 0, 1)
-        broad_cast_labels = np.broadcast_to(new_labels, (data.shape[1], new_labels.size))
+        broad_cast_labels = np.broadcast_to(
+            new_labels, (data.shape[1], new_labels.size)
+        )
         return broad_cast_labels
 
     @staticmethod
@@ -137,23 +143,29 @@ class SlidingWindowDBSCAN():
 
         if self.smooth:
             test_data = np.apply_along_axis(
-                lambda m: np.convolve(m, np.ones(self.window_size) / self.window_size, mode='same'), axis=0,
-                arr=test_data)
+                lambda m: np.convolve(
+                    m, np.ones(self.window_size) / self.window_size, mode="same"
+                ),
+                axis=0,
+                arr=test_data,
+            )
         ret_values = np.zeros(test_data.shape)
 
         if self.scaling:
             test_data = self._scaling_normalization(test_data)
         for i in range(test_data.shape[0], 0, -self.window_size):
             start_index = max(0, i - self.window_size)
-            detect_data = test_data[start_index:start_index + self.window_size]
+            detect_data = test_data[start_index : start_index + self.window_size]
 
             if len(detect_data) < self.window_size:
+                logger.info("detect_data length is less than window_size")
                 continue
             label_de_scan = self._db_scan(detect_data)
             label_cv = self._coefficient_of_variation(self.cv_threshold, detect_data)
             label = np.logical_and(label_de_scan, label_cv)
-            ret_values[start_index:start_index + self.window_size, :] = label
+            ret_values[start_index : start_index + self.window_size, :] = label
             if np.any(label):
                 logger.debug(detect_data)
                 logger.debug(label)
+        return ret_values
         return ret_values
