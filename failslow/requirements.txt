@@ -8,3 +8,4 @@ scikit_learn
 joblib
 protobuf
 prometheus_client
+pydantic

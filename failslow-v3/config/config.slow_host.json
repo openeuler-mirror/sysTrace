@@ -1,0 +1,162 @@
+{
+    "logging": {
+        "level": "DEBUG"
+    },
+    "tasks": [
+        {
+            "task_name": "slow_host_detector",
+            "task_type": "slow_host",
+            "enable_group_detection": true,
+            "detect_interval_seconds": 5.0,
+            "hccl_restore": {
+                "enabled": true,
+                "tp_groups": [[0, 1, 2, 3, 4, 5, 6, 7]],
+                "dp_groups": [[0, 1, 2, 3, 4, 5, 6, 7]],
+                "pp_groups": []
+            },
+            "data_source": {
+                "type": "local_csv",
+                "params": {
+                    "directory_path": "/home/sysTrace/mspti",
+                    "format": "auto",
+                    "strict_mode": true,
+                    "max_workers": 4
+                }
+            },
+            "data_sink": {
+                "type": "local_csv",
+                "enabled": true,
+                "params": {
+                    "output_directory": "/home/sysTrace/local/data/sink/slow_host/",
+                    "format": "hccl"
+                }
+            },
+            "metric_extractors": [
+                {"type": "slow_host_extractor", "enabled": true}
+            ],
+            "preprocessors": [
+                {
+                    "type": "op_name_filter",
+                    "enabled": true,
+                    "params": {}
+                },
+                {
+                    "type": "time_window_aggregator",
+                    "enabled": true,
+                    "params": {
+                        "time_window_seconds": 4,
+                        "drop_head_seconds": 0,
+                        "drop_tail_seconds": 0,
+                        "filter_extreme_values": true,
+                        "extreme_quantile_lower": 0.001,
+                        "extreme_quantile_upper": 0.999,
+                        "aggregation_functions": [
+                            {"function": "mean"}
+                        ],
+                        "smoothing": {
+                            "function": "gaussian",
+                            "window_size": 10
+                        },
+                        "metric_configs": {
+                            "HcclAllGather": {
+                                "time_window_seconds": 3.0,
+                                "aggregation_functions": [{"function": "percentile", "func_params": {"q": 90}}]
+                            },
+                            "HcclAllreduce": {
+                                "time_window_seconds": 1.0,
+                                "aggregation_functions": [{"function": "percentile", "func_params": {"q": 80}}]
+                            },
+                            "HcclReduceScatter": {
+                                "time_window_seconds": 1.0,
+                                "aggregation_functions": [{"function": "percentile", "func_params": {"q": 50}}]
+                            },
+                            "ncclKernel_AllReduce_RING_LL_Sum_float": {
+                                "time_window_seconds": 4.0,
+                                "aggregation_functions": [{"function": "mean"}]
+                            },
+                            "ncclDevKernel_AllReduce_Sum_f32_RING_LL": {
+                                "time_window_seconds": 4.0,
+                                "aggregation_functions": [{"function": "mean"}]
+                            },
+                            "ncclDevKernel_ReduceScatter_Sum_f32_RING_LL": {
+                                "time_window_seconds": 1.0,
+                                "aggregation_functions": [{"function": "mean"}]
+                            }
+                        }
+                    }
+                }
+            ],
+            "detectors": [
+                {
+                    "type": "composite",
+                    "enabled": true,
+                    "params": {
+                        "enable_time_detect": false,
+                        "enable_space_detect": true,
+                        "min_ranks_for_space": 2,
+                        "fusion_mode": "time_space",
+                        "time_detector": {
+                            "type": "sliding_window_ksigma",
+                            "params": {
+                                "k": 2.5,
+                                "look_back": 8,
+                                "slow_type": "slow_host",
+                                "use_variable_window": true,
+                                "window_increase_ratio": 0.5,
+                                "smooth_size": 10,
+                                "filter_extreme_values": true,
+                                "extreme_quantile": 0.01,
+                                "anom_threshold": 5,
+                                "change_conf": 0.5,
+                                "keep_last": 0.2,
+                                "alert_conf_thresh": 4.0,
+                                "conf_score_decay": 5.0,
+                                "deviation_ratio_thresh": 1.01,
+                                "enable_debug_logging": true,
+                                "plt_save_path": "/home/sysTrace/local/output/slow_host/"
+                            }
+                        },
+                        "space_detector": {
+                            "type": "sliding_window_ksigma",
+                            "params": {
+                                "k": 2.5,
+                                "look_back": 8,
+                                "slow_type": "slow_host",
+                                "use_variable_window": true,
+                                "window_increase_ratio": 0.5,
+                                "smooth_size": 10,
+                                "filter_extreme_values": true,
+                                "extreme_quantile": 0.01,
+                                "anom_threshold": 5,
+                                "change_conf": 0.5,
+                                "keep_last": 0.2,
+                                "alert_conf_thresh": 4.0,
+                                "conf_score_decay": 5.0,
+                                "deviation_ratio_thresh": 1.1,
+                                "enable_debug_logging": true,
+                                "plt_save_path": "/home/sysTrace/local/output/slow_host/"
+                            }
+                        }
+                    }
+                }
+            ],
+            "alert_reporters": [
+                {
+                    "type": "console",
+                    "enabled": true,
+                    "params": {
+                        "level": "INFO"
+                    }
+                },
+                {
+                    "type": "file",
+                    "enabled": true,
+                    "params": {
+                        "output_path": "/home/sysTrace/local/output/slow_host_alerts.json",
+                        "format": "json"
+                    }
+                }
+            ]
+        }
+    ]
+}
