@@ -24,7 +24,11 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/include")
     set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/lib64")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    set(UNWIND_LIB "unwind")
+    find_library(
+        UNWIND_LIB
+        NAMES libunwind-x86_64.so.8
+        PATHS /usr
+    )
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/include")
     set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/lib64")
 else()
@@ -155,3 +159,7 @@ if(HAS_BPF_SUPPORT)
     target_link_libraries(sysTrace_hook ebpf_module)
     message(STATUS "Linking ebpf_module library")
 endif()
+
+target_link_libraries(sysTrace_hook
+    ${UNWIND_LIB}
+)
