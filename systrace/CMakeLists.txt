@@ -20,21 +20,18 @@ else()
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
-    set(UNWIND_LIB "unwind-aarch64")
+    set(UNWIND_LIB libunwind-aarch64)
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/include")
     set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/lib64")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    find_library(
-        UNWIND_LIB
-        NAMES libunwind-x86_64.so.8
-        PATHS /usr
-    )
+    set(UNWIND_LIB libunwind-x86_64)
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/include")
     set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/lib64")
 else()
     message(WARNING "Unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
     set(UNWIND_LIB "unwind")
 endif()
+
 include_directories(
     ${MSPTI_INCLUDE}
 )
