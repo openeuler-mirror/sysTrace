@@ -2,7 +2,19 @@ label: sysTrace用户指南
 isManual: true
 description: AI 训推任务的在线性能监控与故障诊断工具
 sections:
+  - label: 认识sysTrace
+    href: ./introduction.md
   - label: 安装sysTrace
-    href: ./快速入门.md
+    href: ./installation.md
   - label: 使用sysTrace
-    href: ./采集使用指南.md
+    sections:
+      - label: 数据采集
+        href: ./data_collection.md
+      - label: 数据落盘
+        href: ./data_storage.md
+      - label: 数据分析
+        href: ./data_analysis.md
+      - label: 数据转换与可视化
+        href: ./data_conversion_and_visualization.md
+  - label: 附录
+    href: ./appendix.md
