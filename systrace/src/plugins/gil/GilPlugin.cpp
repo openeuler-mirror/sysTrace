@@ -4,7 +4,9 @@
 
 #define MAP_HOOK_PID_PATH "/sys/fs/bpf/sysTrace/__osprobe_rank_pid"
 #define PROC_FILTER_RANK_MAP_PATH "/sys/fs/bpf/sysTrace/__osprobe_proc_filter"
+#define GIL_TRACE_CFG_MAP_PATH "/sys/fs/bpf/sysTrace/__osprobe_gil_trace_cfg"
 #define GET_HOOK_PID_COUNT 20
+#define TRACE_CFG_GIL 1
 
 const int MAP_READY_TIMEOUT_S = 30;
 const int MAP_INIT_TIMEOUT_S = 5;
@@ -12,25 +14,32 @@ const int MAP_INIT_TIMEOUT_S = 5;
 extern "C" char g_python_lib_path[512];
 extern "C" pid_t g_hooked_pid;
 
-struct event {
-    unsigned long long ts;
-    unsigned int pid;
-    unsigned int tid;
+typedef enum {
+    EVT_TYPE_GIL = 1,
+} trace_event_type_t;
+
+typedef struct {
+    int pid;
+    int id;
+} gil_m_key_t;
+
+typedef struct {
+    unsigned long long start_time;
+    unsigned long long end_time;
+    unsigned long long duration;
+    int id;
     char name[16];
-    char ph;
-    char pad[7];
-} __attribute__((aligned(8)));
+} gil_data_t;
 
-UprobeLink::UprobeLink(int p, const std::string &fn, bool ir,
-                       struct bpf_link *l)
-    : pid(p), func_name(fn), is_ret(ir), link(l) {}
-
-UprobeLink::~UprobeLink() {
-    if (link) {
-        bpf_link__destroy(link);
-        link = nullptr;
-    }
-}
+typedef struct {
+    int pid;
+    int tid;
+    char comm[16];
+    trace_event_type_t type;
+    union {
+        gil_data_t gil_d;
+    };
+} gil_trace_event_data_t;
 
 GILPlugin::GILPlugin() {
     pluginName_ = PluginNameType::PYTHON_GIL_PLUGIN.data();
@@ -52,6 +61,19 @@ GILPlugin::GILPlugin() {
         if (ret) {
             LOG_MODULE(ERROR, pluginName_) << "init hook map error";
         }
+
+        // Pin gil_trace_cfg_map for controlling GIL trace
+        struct bpf_map *trace_cfg_map = bpf_skeleton_->maps.gil_trace_cfg_map;
+        if (trace_cfg_map) {
+            ret = bpf_map__pin(trace_cfg_map, GIL_TRACE_CFG_MAP_PATH);
+            if (ret) {
+                LOG_MODULE(ERROR, pluginName_)
+                    << "Failed to pin gil_trace_cfg_map";
+            } else {
+                LOG_MODULE(DEBUG, pluginName_)
+                    << "Pinned gil_trace_cfg_map to " << GIL_TRACE_CFG_MAP_PATH;
+            }
+        }
     }
     register_target_process_to_bpf();
 }
@@ -67,6 +89,18 @@ GILPlugin::~GILPlugin() {
             if (ret) {
                 LOG_MODULE(ERROR, pluginName_)
                     << "unlink pin file error, path=" << MAP_HOOK_PID_PATH;
+            }
+        }
+
+        // Clean up gil_trace_cfg_map pin file
+        if (access(GIL_TRACE_CFG_MAP_PATH, F_OK) == 0) {
+            int ret = unlink(GIL_TRACE_CFG_MAP_PATH);
+            if (ret) {
+                LOG_MODULE(ERROR, pluginName_)
+                    << "unlink pin file error, path=" << GIL_TRACE_CFG_MAP_PATH;
+            } else {
+                LOG_MODULE(DEBUG, pluginName_)
+                    << "Unlinked gil_trace_cfg_map pin file";
             }
         }
     }
@@ -91,6 +125,9 @@ bool GILPlugin::start(const json &params, int duration) {
         LOG_MODULE(ERROR, pluginName_) << "Skeleton is null, stop";
         stop();
         return false;
+    } else {
+        clean_ringbuffer();
+        clear_gil_maps();
     }
     std::vector<int> pids = get_trace_pids(params);
 
@@ -133,6 +170,9 @@ bool GILPlugin::start(const json &params, int duration) {
 
     poll_thread_ = std::thread(&GILPlugin::consume_perf_events, this);
 
+    // 启用GIL事件采集开关
+    set_gil_trace_enabled(true);
+
     if (duration > 0) {
         systrace::utils::TimerManager::getInstance().startTimer(
             get_id(), duration, [this]() { this->stop(); });
@@ -149,54 +189,55 @@ void GILPlugin::stop() {
         return;
     }
 
-    LOG_MODULE(DEBUG, pluginName_)
-        << "Stop request received, initiating cleanup";
-
+    // 禁用GIL事件采集开关
+    set_gil_trace_enabled(false);
     if (active_.load()) {
-        active_.store(false, std::memory_order_release);
-    }
+        LOG_MODULE(INFO, pluginName_) << "trace stop.";
+        active_.store(false);
+        if (poll_thread_.joinable())
+            poll_thread_.join();
+        cleanup_skel();
+        clear_gil_maps();
+        {
+            std::lock_guard<std::mutex> lock(rb_mutex_);
+            if (rb_) {
+                while (ring_buffer__poll(rb_, 0) > 0)
+                    ;
+                ring_buffer__free(rb_);
+                rb_ = nullptr;
+            }
+        }
 
-    if (poll_thread_.joinable()) {
-        LOG_MODULE(DEBUG, pluginName_) << "Joining poll thread...";
-        poll_thread_.join();
-        LOG_MODULE(DEBUG, pluginName_) << "Poll thread joined successfully";
-    }
+        if (trace_output_stream_) {
+            LOG_MODULE(DEBUG, pluginName_) << "Finalizing output file...";
+            systrace::fileWriterUtil::strbuf_flush(&json_buf_);
+            systrace::fileWriterUtil::strbuf_destroy(&json_buf_);
+            fprintf(trace_output_stream_, "\n]\n");
+            if (fclose(trace_output_stream_) != 0) {
+                LOG_MODULE(DEBUG, pluginName_)
+                    << "Failed to close JSON file: " << strerror(errno);
+            } else {
+                LOG_MODULE(DEBUG, pluginName_) << "JSON file synced and closed";
+            }
+            trace_output_stream_ = nullptr;
+        }
 
-    {
-        std::lock_guard<std::mutex> lock(pb_mutex_);
-        if (pb_) {
-            perf_buffer__free(pb_);
-            pb_ = nullptr;
-            LOG_MODULE(DEBUG, pluginName_) << "Perf buffer resource released";
+        systrace::utils::TimerManager::getInstance().stopTimer(get_id());
+    }
+    stop_latched_.clear(std::memory_order_release);
+}
+void GILPlugin::cleanup_skel() {
+    for (auto link : links_) {
+        if (link) {
+            bpf_link__destroy(link);
         }
     }
-
-    cleanup_all_uprobe_links();
+    links_.clear();
 
     if (bpf_skeleton_) {
         python_gil_bpf__detach(bpf_skeleton_);
     }
-
-    if (trace_output_stream_) {
-        LOG_MODULE(DEBUG, pluginName_) << "Finalizing output file...";
-        systrace::fileWriterUtil::strbuf_flush(&json_buf_);
-        systrace::fileWriterUtil::strbuf_destroy(&json_buf_);
-        fprintf(trace_output_stream_, "\n]\n");
-        if (fclose(trace_output_stream_) != 0) {
-            LOG_MODULE(DEBUG, pluginName_)
-                << "Failed to close JSON file: " << strerror(errno);
-        } else {
-            LOG_MODULE(DEBUG, pluginName_) << "JSON file synced and closed";
-        }
-        trace_output_stream_ = nullptr;
-    }
-
-    systrace::utils::TimerManager::getInstance().stopTimer(get_id());
-    LOG_MODULE(INFO, pluginName_) << " trace stop.";
-
-    stop_latched_.clear(std::memory_order_release);
 }
-
 void GILPlugin::register_target_process_to_bpf() {
     int hook_pid_fd = -1;
     int count = GET_HOOK_PID_COUNT;
@@ -227,94 +268,127 @@ void GILPlugin::register_target_process_to_bpf() {
     close(hook_pid_fd);
 }
 
-void GILPlugin::cleanup_all_uprobe_links() {
-    std::lock_guard<std::mutex> lock(link_mutex_);
+void GILPlugin::clean_ringbuffer() {
+    struct ring_buffer *temp_rb = ring_buffer__new(
+        bpf_map__fd(bpf_skeleton_->maps.event_map),
+        [](void *, void *, size_t) { return 0; }, nullptr, nullptr);
+    if (temp_rb) {
+        while (ring_buffer__poll(temp_rb, 0) > 0)
+            ;
+        ring_buffer__free(temp_rb);
+    }
+}
 
-    if (uprobe_links_.empty()) {
-        LOG_MODULE(DEBUG, pluginName_) << "No active uprobe links to clean";
+void GILPlugin::clear_gil_maps() {
+    if (!bpf_skeleton_) {
         return;
     }
 
-    size_t total = uprobe_links_.size();
-    LOG_MODULE(DEBUG, pluginName_)
-        << "Cleaning up " << total << " uprobe links";
+    struct bpf_map *enter_map = bpf_skeleton_->maps.gil_enter_map;
+    if (!enter_map) {
+        return;
+    }
 
-    for (auto &link_ptr : uprobe_links_) {
-        if (!link_ptr)
-            continue;
+    int fd = bpf_map__fd(enter_map);
+    if (fd <= 0) {
+        return;
+    }
 
-        if (link_ptr->link) {
-            int ret = bpf_link__destroy(link_ptr->link);
-            if (ret == 0) {
-                LOG_MODULE(DEBUG, pluginName_)
-                    << "Destroyed link: func=" << link_ptr->func_name
-                    << ", pid=" << link_ptr->pid;
-            } else {
-                LOG_MODULE(INFO, pluginName_)
-                    << "Failed to destroy link: func=" << link_ptr->func_name
-                    << ", pid=" << link_ptr->pid << ", err=" << strerror(-ret);
-            }
-            link_ptr->link = nullptr;
+    gil_m_key_t key = {0};
+    gil_m_key_t next_key;
+    int delete_count = 0;
+
+    bool has_key = (bpf_map_get_next_key(fd, NULL, &next_key) == 0);
+    while (has_key) {
+        key = next_key;
+        has_key = (bpf_map_get_next_key(fd, &key, &next_key) == 0);
+
+        if (bpf_map_delete_elem(fd, &key) == 0) {
+            delete_count++;
         }
     }
-    uprobe_links_.clear();
+
+    if (delete_count > 0) {
+        LOG_MODULE(DEBUG, pluginName_)
+            << "Cleared " << delete_count
+            << " residual entries from gil_enter_map";
+    }
 }
 
+void GILPlugin::set_gil_trace_enabled(bool enabled) {
+    struct bpf_map *gil_trace_cfg_map = bpf_skeleton_->maps.gil_trace_cfg_map;
+    if (gil_trace_cfg_map) {
+        int trace_cfg_fd = bpf_map__fd(gil_trace_cfg_map);
+        if (trace_cfg_fd >= 0) {
+            u32 key = TRACE_CFG_GIL;
+            u32 value = enabled ? 1 : 0;
+            bpf_map_update_elem(trace_cfg_fd, &key, &value, BPF_ANY);
+            LOG_MODULE(DEBUG, pluginName_)
+                << "GIL trace " << (enabled ? "enabled" : "disabled");
+        } else {
+            LOG_MODULE(WARN, pluginName_)
+                << "Failed to get gil_trace_cfg_map fd: " << strerror(errno);
+        }
+    } else {
+        LOG_MODULE(WARN, pluginName_)
+            << "gil_trace_cfg_map not found in skeleton";
+    }
+}
 void GILPlugin::consume_perf_events() {
-    struct perf_buffer *local_pb = nullptr;
+    struct ring_buffer *local_rb = nullptr;
 
     if (!bpf_skeleton_) {
         LOG_MODULE(ERROR, pluginName_) << "Skeleton is null, poll loop exit";
         return;
     }
 
-    local_pb = perf_buffer__new(
-        bpf_map__fd(bpf_skeleton_->maps.events), 64,
-        [](void *ctx, int cpu, void *data, __u32 size) {
+    local_rb = ring_buffer__new(
+        bpf_map__fd(bpf_skeleton_->maps.event_map),
+        [](void *ctx, void *data, size_t size) {
             auto *plugin = static_cast<GILPlugin *>(ctx);
             if (plugin->active_.load()) {
                 plugin->process_raw_event(data);
             }
+            return 0;
         },
-        nullptr, this, nullptr);
+        this, nullptr);
 
-    if (!local_pb) {
+    if (!local_rb) {
         LOG_MODULE(ERROR, pluginName_)
-            << "Create perf buffer failed: " << strerror(errno);
+            << "Create ringbuf failed: " << strerror(errno);
         return;
     }
 
     {
-        std::lock_guard<std::mutex> lock(pb_mutex_);
-        pb_ = local_pb;
+        std::lock_guard<std::mutex> lock(rb_mutex_);
+        rb_ = local_rb;
     }
 
     while (active_.load()) {
-        perf_buffer__poll(local_pb, 50);
+        ring_buffer__poll(local_rb, 50);
     }
 
-    perf_buffer__free(local_pb);
-
+    // 清理资源
     {
-        std::lock_guard<std::mutex> lock(pb_mutex_);
-        pb_ = nullptr;
+        std::lock_guard<std::mutex> lock(rb_mutex_);
+        rb_ = nullptr;
     }
+    ring_buffer__free(local_rb);
 
     LOG_MODULE(DEBUG, pluginName_) << "Poll loop exited normally";
 }
 
 void GILPlugin::process_raw_event(void *data) {
 
-    struct event *e = (struct event *)data;
+    gil_trace_event_data_t *e = (gil_trace_event_data_t *)data;
 
     if (!trace_output_stream_ || !json_buf_.buf) {
         return;
     }
-    if (json_buf_.total_size - json_buf_.used_size < 512) {
-        systrace::fileWriterUtil::strbuf_flush(&json_buf_);
-    }
+    // 优化缓冲区管理，确保有足够空间写入事件
     size_t remaining = json_buf_.total_size - json_buf_.used_size;
-    if (remaining < 256) {
+    // 当剩余空间小于事件估计大小时，先flush确保有足够空间
+    if (remaining < 512) {
         systrace::fileWriterUtil::strbuf_flush(&json_buf_);
         remaining = json_buf_.total_size - json_buf_.used_size;
     }
@@ -332,6 +406,7 @@ void GILPlugin::process_raw_event(void *data) {
         write_ptr += ret;
         remaining -= ret;
     }
+
     std::string rank_str = "";
     if (host_pid_to_rank_mapping_.find(e->pid) !=
         host_pid_to_rank_mapping_.end()) {
@@ -339,13 +414,18 @@ void GILPlugin::process_raw_event(void *data) {
     } else {
         rank_str = std::to_string(e->pid);
     }
+
     std::string tid_str =
         std::string(pluginName_) + "_" + std::to_string(e->tid);
-    uint64_t current_time = systrace::util::time::MonotonicNsToUtcUs(e->ts);
+
+    uint64_t start_time_us =
+        systrace::util::time::MonotonicNsToUtcUs(e->gil_d.start_time);
+    double duration_us = (double)e->gil_d.duration / 1000.0;
+
     ret = snprintf(write_ptr, remaining,
-                   "  {\"name\": \"%s\", \"ph\": \"%c\", \"ts\": %lu, "
-                   "\"pid\": \"%s\", \"tid\": \"%s\"}",
-                   e->name, e->ph, current_time, rank_str.c_str(),
+                   "  {\"name\": \"%s\", \"ph\": \"X\", \"ts\": %lu, "
+                   "\"dur\": %.3f, \"pid\": \"%s\", \"tid\": \"%s\"}",
+                   e->gil_d.name, start_time_us, duration_us, rank_str.c_str(),
                    tid_str.c_str());
 
     if (ret < 0 || ret >= static_cast<int>(remaining)) {
@@ -376,8 +456,7 @@ bool GILPlugin::try_bind_uprobe(struct bpf_program *prog, int pid,
                 prog, is_ret, pid, path.c_str(), off);
             if (link) {
                 std::lock_guard<std::mutex> lock(link_mutex_);
-                uprobe_links_.emplace_back(
-                    std::make_unique<UprobeLink>(pid, func, is_ret, link));
+                links_.push_back(link);
                 LOG_MODULE(DEBUG, pluginName_)
                     << "Attached uprobe: PID=" << pid << ", func=" << func
                     << ", is_ret=" << is_ret << ", offset=0x" << std::hex << off

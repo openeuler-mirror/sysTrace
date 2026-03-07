@@ -28,21 +28,12 @@
 #include <unordered_map>
 #include <vector>
 
+typedef uint32_t u32;
 struct python_gil_bpf;
-struct perf_buffer;
+struct ring_buffer;
 struct bpf_link;
 
 using PluginNameType = systrace::constant::Plugin;
-
-struct UprobeLink {
-    int pid;
-    std::string func_name;
-    bool is_ret;
-    struct bpf_link *link;
-
-    UprobeLink(int p, const std::string &fn, bool ir, struct bpf_link *l);
-    ~UprobeLink();
-};
 
 class GILPlugin : public EbpfCollectorBase, public ICollector {
   public:
@@ -59,11 +50,14 @@ class GILPlugin : public EbpfCollectorBase, public ICollector {
     bool try_bind_uprobe(struct bpf_program *prog, int pid,
                          const std::string &path,
                          const std::vector<std::string> &funcs, bool is_ret);
-    void cleanup_all_uprobe_links();
 
     void register_target_process_to_bpf();
     std::string auto_find_libpython();
-    const size_t BUF_CHUNK_SIZE = 64 * 1024;
+    void clean_ringbuffer();
+    void cleanup_skel();
+    void clear_gil_maps();
+    void set_gil_trace_enabled(bool enabled);
+    const size_t BUF_CHUNK_SIZE = 256 * 1024;
     std::atomic_flag stop_latched_ = ATOMIC_FLAG_INIT;
     struct python_gil_bpf *bpf_skeleton_ = nullptr;
     std::thread poll_thread_;
@@ -71,9 +65,9 @@ class GILPlugin : public EbpfCollectorBase, public ICollector {
     bool first_event_ = true;
     systrace::fileWriterUtil::strbuf_t json_buf_;
     std::unordered_map<int, int> host_pid_to_rank_mapping_;
-    struct perf_buffer *pb_ = nullptr;
-    std::mutex pb_mutex_;
-    std::vector<std::unique_ptr<UprobeLink>> uprobe_links_;
+    struct ring_buffer *rb_ = nullptr;
+    std::mutex rb_mutex_;
+    std::vector<struct bpf_link *> links_;
     std::mutex link_mutex_;
     std::string output_;
     const std::vector<std::string> gil_acquire_symbols = {
