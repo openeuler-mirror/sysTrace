@@ -2,9 +2,8 @@ import json
 import logging
 import time
 import argparse
-from abc import ABC, abstractmethod
-from typing import Dict, List, Any
 from tqdm import tqdm
+from typing import Optional, Tuple
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s]:%(message)s')
 
@@ -12,104 +11,132 @@ ACQUIRE_NAME = "require_gil"
 RELEASE_NAME = "release_gil"
 HOLD_NAME = "hold_gil"
 
+OFFSET = 0.5
 
-class GilTracker:
-    def __init__(self):
-        self.events = []
-        self.pending_acquire: Dict[str, tuple] = {}
-        self.pending_release: Dict[str, tuple] = {}
-        self.last_hold_start: Dict[str, tuple] = {}
-
-    def process_event(self, raw_event: Dict[str, Any]):
+def get_safe_event_value(event: dict, key: str, default: any = None) -> any:
+    value = event.get(key, default)
+    if key in ["ts", "dur"]:
         try:
-            name = raw_event["name"]
-            ph = raw_event["ph"]
-            ts = raw_event["ts"]
-            pid = raw_event["pid"]
-            tid = raw_event["tid"]
+            return float(value) if value is not None else 0.0
+        except (ValueError, TypeError):
+            return 0.0
+    elif key in ["pid", "tid"]:
+        return str(value) if value is not None else "unknown"
+    return value
 
-            if name == "take_gil":
-                if ph == "B":
-                    self.pending_acquire[tid] = (ts, pid)
-                elif ph == "E":
-                    start_ts, start_pid = self.pending_acquire.pop(tid, (0, 0))
-                    if start_ts > 0:
-                        self.events.append({
-                            "name": ACQUIRE_NAME, "ph": "X", "ts": start_ts,
-                            "dur": ts - start_ts, "pid": start_pid, "tid": tid
-                        })
-                        self.last_hold_start[tid] = (ts, start_pid)
+def calculate_hold_gil(
+        take_ts: float, take_dur: float, drop_ts: float
+) -> Optional[Tuple[float, float]]:
+    hold_start = take_ts + take_dur + OFFSET
+    hold_end = drop_ts - OFFSET
+    hold_dur = hold_end - hold_start
 
-            elif name == "drop_gil":
-                if ph == "B":
-                    self.pending_release[tid] = (ts, pid)
-                    hold_ts, hold_pid = self.last_hold_start.pop(tid, (0, 0))
-                    if hold_ts > 0:
-                        self.events.append({
-                            "name": HOLD_NAME, "ph": "X", "ts": hold_ts,
-                            "dur": ts - hold_ts, "pid": hold_pid, "tid": tid
-                        })
-                elif ph == "E":
-                    start_ts, start_pid = self.pending_release.pop(tid, (0, 0))
-                    if start_ts > 0:
-                        self.events.append({
-                            "name": RELEASE_NAME, "ph": "X", "ts": start_ts,
-                            "dur": ts - start_ts, "pid": start_pid, "tid": tid
-                        })
+    if hold_dur > 0 and hold_start < hold_end:
+        return (hold_start, hold_dur)
+    return None
 
-        except KeyError as e:
-            logging.warning(f"Missing field {e} in event: {raw_event}")
+def convert_gil_trace(input_path: str, output_path: str):
+    logging.info(f"Start conversion: {input_path} → {output_path}")
 
-    def get_sorted_events(self) -> List[Dict[str, Any]]:
-        return sorted(self.events, key=lambda x: x["ts"])
-
-
-class ParsingStrategy(ABC):
-    @abstractmethod
-    def parse(self, input_path: str) -> List[Dict[str, Any]]:
-        pass
-
-
-class FullCycleStrategy(ParsingStrategy):
-    def parse(self, input_path: str) -> List[Dict[str, Any]]:
-        tracker = GilTracker()
+    try:
         with open(input_path, 'r', encoding='utf-8') as f:
             raw_data = json.load(f)
-            if isinstance(raw_data, list):
-                for event in tqdm(raw_data, desc="Parsing events"):
-                    tracker.process_event(event)
-            else:
-                tracker.process_event(raw_data)
-        return tracker.get_sorted_events()
+    except FileNotFoundError:
+        logging.error(f"Input file not found: {input_path}")
+        raise
+    except json.JSONDecodeError as e:
+        logging.error(f"Invalid JSON format in input file: {e}")
+        raise
 
+    if isinstance(raw_data, dict) and "traceEvents" in raw_data:
+        events = raw_data["traceEvents"]
+    elif isinstance(raw_data, list):
+        events = raw_data
+    else:
+        logging.error("Input data must be a list or a dict with 'traceEvents' key")
+        raise ValueError("Invalid input data format")
 
-class TraceConverter:
-    def __init__(self, strategy: ParsingStrategy):
-        self.strategy = strategy
+    logging.info(f"Loaded {len(events)} raw events")
+    if not events:
+        logging.warning("No events found in input file")
 
-    def convert(self, input_path: str, output_path: str):
-        logging.info(f"Start conversion: {input_path} → {output_path}")
-        events = self.strategy.parse(input_path)
-        output_data = {
-            "traceEvents": events,
-            "displayTimeUnit": "ns"
-        }
+    for i, ev in enumerate(events):
+        ev['_idx'] = i
+    events.sort(key=lambda x: (get_safe_event_value(x, "ts"), x.get("_idx", 0)))
+
+    output_events = []
+    last_takes = {}
+
+    for event in tqdm(events, desc="Processing events"):
+        ev_copy = event.copy()
+        ev_copy.pop('_idx', None)
+
+        name = get_safe_event_value(ev_copy, "name")
+        ts = get_safe_event_value(ev_copy, "ts")
+        dur = get_safe_event_value(ev_copy, "dur")
+        pid = get_safe_event_value(ev_copy, "pid")
+        tid = get_safe_event_value(ev_copy, "tid")
+        ph = get_safe_event_value(ev_copy, "ph")
+
+        if ph != "X":
+            output_events.append(ev_copy)
+            continue
+
+        if name == "take_gil":
+            ev_copy["name"] = ACQUIRE_NAME
+            output_events.append(ev_copy)
+            last_takes[(pid, tid)] = (ts, dur)
+
+        elif name == "drop_gil":
+            ev_copy["name"] = RELEASE_NAME
+            output_events.append(ev_copy)
+
+            take_info = last_takes.pop((pid, tid), None)
+            if take_info is not None:
+                take_ts, take_dur = take_info
+                hold_result = calculate_hold_gil(take_ts, take_dur, ts)
+                if hold_result is not None:
+                    hold_start, hold_dur = hold_result
+                    hold_event = {
+                        "name": HOLD_NAME,
+                        "ph": "X",
+                        "ts": round(hold_start, 3),
+                        "dur": round(hold_dur, 3),
+                        "pid": pid,
+                        "tid": tid
+                    }
+                    output_events.append(hold_event)
+        else:
+            output_events.append(ev_copy)
+
+    for i, ev in enumerate(output_events):
+        ev['_idx2'] = i
+    output_events.sort(key=lambda x: (get_safe_event_value(x, "ts"), x.get("_idx2", 0)))
+    for ev in output_events:
+        ev.pop('_idx2', None)
+
+    try:
         with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(output_data, f, indent=2, ensure_ascii=False)
+            f.write('{\n"traceEvents": [\n')
+            total = len(output_events)
+            for i, ev in enumerate(output_events):
+                line = json.dumps(ev, separators=(',', ':'))
+                f.write(f"  {line}{',' if i < total - 1 else ''}\n")
+            f.write('],\n"displayTimeUnit": "ns"\n}')
+    except Exception as e:
+        logging.error(f"Failed to write output file: {e}")
+        raise
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="GIL Trace Converter")
-    parser.add_argument("--input", default="gil.json", help="Input file path")
-    parser.add_argument("--output", default="output.json", help="Output file path")
+    parser = argparse.ArgumentParser(description="Convert GIL trace events")
+    parser.add_argument("--input", default="gil.json", help="Input GIL trace file path")
+    parser.add_argument("--output", default="output.json", help="Output CTF trace file path")
     args = parser.parse_args()
 
     start = time.perf_counter()
     try:
-        strategy = FullCycleStrategy()
-        converter = TraceConverter(strategy)
-        converter.convert(args.input, args.output)
-        logging.info(f"Total time elapsed: {time.perf_counter() - start:.2f} seconds")
+        convert_gil_trace(args.input, args.output)
+        logging.info(f"Conversion completed in {time.perf_counter() - start:.2f}s")
     except Exception as e:
-        logging.error(f"Conversion failed: {e}")
-        raise
+        logging.error(f"Conversion failed: {str(e)}", exc_info=True)
