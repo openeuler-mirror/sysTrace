@@ -1,0 +1,8 @@
+label: sysTrace用户指南
+isManual: true
+description: AI 训推任务的在线性能监控与故障诊断工具
+sections:
+  - label: 数据采集
+    href: ./data_collection.md
+  - label: 数据分析
+    href: ./data_analysis.md
