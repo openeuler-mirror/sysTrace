@@ -193,7 +193,7 @@ EXAMPLES:
 
 **采集结果：**
 
-保存位置：`/home/sysTrace/io_trace`
+保存位置：`/home/sysTrace/io`
 
 **数据格式：** pb/json
 
@@ -221,8 +221,10 @@ Flag,Id,Kind,Name,SourceKind,Timestamp,msptiObjectId_Ds_DeviceId,msptiObjectId_D
 **采集指令：**
 
 ```bash
-./sysTrace_cli enable MSPTI duration=10
+./sysTrace_cli enable MSPTI event=marker,kernel,api duration=10
 ```
+
+marker,kernel,api 为可选采集项
 
 **采集结果：**
 
