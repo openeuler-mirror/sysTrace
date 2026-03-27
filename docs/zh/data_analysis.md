@@ -53,7 +53,7 @@ FailSlow 算法是 sysTrace 针对这一痛点设计的核心算法，它通过�
 ### 执行算法
 
 ```bash
-python failslow/fail_slow_detection.py
+systrace-failslow --remote-hosts [ip] --ssh-port [port] --enable-fail-slow 
 ```
 
 ### 输出结果
@@ -62,29 +62,35 @@ python failslow/fail_slow_detection.py
 
 | 字段                | 类型   | 说明                                 | 默认值                                                       |
 | ------------------- | ------ | ------------------------------------ | ------------------------------------------------------------ |
-| is_anomaly          | bool   | 检测数据是否异常                     | True                                                         |
-| anomaly_count_times | int    | 检测出的异常点数                     | 1                                                            |
-| anomaly_info        | list   | 记录异常信息，每个元素对应一个异常点 | {'training_step': 16, 'anomaly_time': '2025-06-12 19:39:24', 'anomaly_degree': 26.053, 'anomaly_training_time': '69435ms', 'normal_training_time': '2566.6ms'} |
-| anomaly_type        | string | 检测结果类型：normal, failslow, hang | failslow                                                     |
-| start_time          | int    | 检测开始时间                         | 1749728380752                                                |
-| end_time            | int    | 检测结束时间                         | 1749728419305                                                |
+| alert_type          | string   | 劣化类型                     | performance_degradation                                              |
+| severity            | string   | 劣化告警等级                  | critical                                                            |
+| timestamp           | int      | 检测到的劣化时间戳节点         | 1772269252025108                                                    |
+| rank_id             | int      | 检测到劣化的卡号              | 0                                                                    |
+| description         | string      | 劣化告警描述               | Performance degradation detected at step 25 at time 1772269252025108 |
+| detector_type       | string    | 检测器算法                   | SlidingWindowKSigmaRobust                                          |
+| degradation_type    | string    | 检测种类                     | rise                                                               |
+| identified_index    | int    | 检测到的step                    | 25                                                                 |
+| observed_value      | int    | 检测到的劣化的值                 | 3239875791                                                          |
+| mean                | float    | 窗口内的均值                   | 1054789970.0                                                      |
+| std                 | float    | 窗口内的标准差                 | 860609524.0659                                                      |
 
 **输出样例：**
 
 ```json
 {
-  "is_anomaly": true,
-  "anomaly_count_times": 1,
-  "anomaly_info": [{
-    "training_step": 16,
-    "anomaly_time": "2025-06-12 19:39:24",
-    "anomaly_degree": 26.053,
-    "anomaly_training_time": "69435ms",
-    "normal_training_time": "2566.6ms"
-  }],
-  "anomaly_type": "failSlow",
-  "start_time": 1749728380752,
-  "end_time": 1749728419305
+  "alert_type": "performance_degradation",
+  "severity": "critical",
+  "timestamp": 1772269252025108,
+  "rank_id": 0,
+  "description": "Performance degradation detected at step 25 at time 1772269252025108",
+  "details": {
+    "detector_type": "SlidingWindowKSigmaRobust",
+    "degradation_type": "rise",
+    "identified_index": 25,
+    "observed_value": 3239875791,
+    "mean": 1054789970.0,
+    "std": 860609524.0659
+  }
 }
 ```
 
@@ -160,6 +166,7 @@ python failslow/fail_slow_detection.py
 
 | 指标名称                  | 指标类型 | 说明                                     | 对应故障类型       |
 | ------------------------- | -------- | ---------------------------------------- | ------------------ |
+| HcclAllreduce             | device  | 计算慢对应的观测点                       | 计算慢             |
 | HcclAllGather            | device   | 计算慢对应的观测点                       | 计算慢             |
 | HcclAllGather_launch     | host     | 算子下发慢对应的观测点                   | 算子下发慢         |
 | HcclBatchSendRecv        | device   | 通信慢对应的观测点                       | 通信慢             |
@@ -201,6 +208,7 @@ python failslow/fail_slow_detection.py
 | min_samples          | int     | DBSCAN 最小成新簇的点数                                       |
 | window_size          | int     | 窗口大小，表示单次检测的窗口，不重叠                       |
 | scaling              | bool    | 表示时间序列是否归一化                                      |
+| deviation_ratio_thresh | float | 异常序列偏离正常序列的检测倍数                               |
 | type                 | string  | 空间检测器类型，可选值："SlidingWindowDBSCAN"、"OuterDataDetector" |
 
 **time_detector 配置说明：**
@@ -208,7 +216,7 @@ python failslow/fail_slow_detection.py
 | 配置项              | 类型    | 说明                                                         |
 | ------------------- | ------- | ------------------------------------------------------------ |
 | preprocess_eps        | float   | DBSCAN 预处理的阈值                                         |
-| preprocess_min_samplesES | int     | DBSCAN 预处理的最小点数                                     |
+| preprocess_min_samples | int     | DBSCAN 预处理的最小点数                                     |
 | type                 | string  | 时间检测器类型，可选值："TSDBSCANDetector"、"SlidingWindowKSigmaDetector" |
 | n_sigma_method       | dict    | 当为 "SlidingWindowKSigmaDetector" 类型时的配置                 |
 
@@ -232,9 +240,7 @@ python failslow/fail_slow_detection.py
 ### 执行算法
 
 ```bash
-systrace-failslow
-# 或者
-python failslow/main.py
+systrace-failslow --remote-hosts [ip] --ssh-port [port] --enable-slow-node
 ```
 
 > **注意：** 算法执行前，需[参考文档](https://gitcode.com/openeuler/sysTrace/blob/master/failslow/docs/conf_introduction.md)配置对应的数据路径
@@ -245,48 +251,31 @@ python failslow/main.py
 
 | 字段           | 类型   | 说明                             |
 | -------------- | ------ | -------------------------------- |
-| resultCode     | int    | 结果码，200 表示正常，201 表示异常 |
-| compute        | bool   | 计算导致的慢卡                   |
-| network        | bool   |  通信导致的慢卡                   |
-| storage        | bool   | 存储导致的慢卡                   |
-| abnormalDetail | list   | 异常 rank 卡的信息               |
-| normalDetail   | list   | 正常 rank 卡的信息               |
-| errorMsg       | string | 记录异常信息                     |
-| timestamp      | int    | 故障发生时间                     |
+| objectId       | string    | 检测到的慢卡卡号                  |
+| serverIp       | string   | 检测到的慢卡节点ip                |
+| deviceInfo     | string   |  检测到的慢卡卡号                 |
+| kpiId          | string   | 检测用的算子名称                  |
+| methodType     | string   | 检测的类型（空间还是时间）         |
+| kpiData        | list   | 检测的数值                          |
+| relaIds        | list | 相关联的rank卡号                      |
+| omittedDevices | list    | 忽略的设备列表                     |
+| anomalyTimeRanges | list    | 故障发生时间范围                |
 
 **输出样例：**
 
 ```json
 {
-  "resultCode": 201,
-  "compute": true,
-  "network": false,
-  "storage": false,
-  "abnormalDetail": [
-    {
-      "objectId": "3",
-      "serverIp": "9.13.100.7",
-      "deviceInfo": "rank_3",
-      "kpiId": "HcclAllGather",
-      "methodType": "SPACE",
-      "kpiData": [],
-      "relaIds": [0, 1, 2, 4, 5, 6, 7],
-      "omittedDevices": []
-    }
-  ],
-  "normalDetail": [
-    {
-      "objectId": "0",
-      "serverIp": "9.13.100.7",
-      "deviceInfo": "rank_0",
-      "kpiId": "HcclAllGather",
-      "methodType": "SPACE",
-      "kpiData": [],
-      "relaIds": [],
-      "omittedDevices": []
-    }
-  ],
-  "errorMsg": "",
-  "timestamp": 1749084984
+  "objectId": "1",
+  "serverIp": "x.x.x.x",
+  "deviceInfo": "rank_1",
+  "kpiId": "HcclAllreduce",
+  "methodType": "SPACE",
+  "kpiData": [],
+  "relaIds": [0, 2, 3],
+  "omittedDevices": [],
+  "anomalyTimeRanges": [{
+    "start": 1772265166453,
+    "end": 1772265300654
+  }]
 }
 ```
