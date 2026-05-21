@@ -59,10 +59,11 @@ static void find_python_path_cmd() {
     }
     result.erase(result.find_last_not_of("\r\n ") + 1);
     if (!result.empty()) {
-        char real_path[512];
-        if (realpath(result.c_str(), real_path)) {
+        char *real_path = realpath(result.c_str(), nullptr);
+        if (real_path) {
             std::strncpy(g_python_lib_path, real_path,
                          sizeof(g_python_lib_path) - 1);
+            free(real_path);
         } else {
             std::strncpy(g_python_lib_path, result.c_str(),
                          sizeof(g_python_lib_path) - 1);
