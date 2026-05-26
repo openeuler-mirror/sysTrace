@@ -1,0 +1,73 @@
+{
+    "logging": {
+        "level": "INFO"
+    },
+    "tasks": [
+        {
+            "task_name": "multi_node_degradation_detection",
+            "task_type": "degradation",
+            "enable_group_detection": false,
+            "detect_interval_seconds": 30.0,
+            "hccl_restore": null,
+            "data_source": null,
+            "data_sink": {
+                "type": "local_csv",
+                "enabled": false,
+                "params": {
+                    "output_directory": "/home/sysTrace/local/data/sink/multi_node_degradation/",
+                    "format": "hccl"
+                }
+            },
+            "metric_extractors": [
+                {
+                    "type": "degradation_extractor",
+                    "enabled": true
+                }
+            ],
+            "preprocessors": [
+                {
+                    "type": "step_aggregator",
+                    "enabled": true,
+                    "params": {
+                        "steps_per_group": 1
+                    }
+                }
+            ],
+            "detectors": [
+                {
+                    "type": "degradation_ksigma_robust",
+                    "enabled": true,
+                    "params": {
+                        "window_size": 10,
+                        "k_sigma": 2.0,
+                        "anomaly_degree_thr": 0.15,
+                        "use_variable_window": true,
+                        "window_increase_ratio": 0.5,
+                        "eps": 1e-6,
+                        "min_consecutive": 6,
+                        "detect_rise": true,
+                        "detect_drop": false,
+                        "plt_save_path": "/home/sysTrace/local/output/degradation/"
+                    }
+                }
+            ],
+            "alert_reporters": [
+                {
+                    "type": "console",
+                    "enabled": true,
+                    "params": {
+                        "level": "INFO"
+                    }
+                },
+                {
+                    "type": "file",
+                    "enabled": true,
+                    "params": {
+                        "output_path": "/home/sysTrace/local/output/degradation_alerts.json",
+                        "format": "json"
+                    }
+                }
+            ]
+        }
+    ]
+}

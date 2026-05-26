@@ -1,0 +1,76 @@
+{
+  "logging": {
+    "level": "DEBUG"
+  },
+  "tasks": [
+    {
+      "task_name": "degradation_detection",
+      "task_type": "degradation",
+      "enable_group_detection": false,
+      "detect_interval_seconds": 5.0,
+      "hccl_restore": null,
+      "data_source": {
+        "type": "degradation_step_csv",
+        "params": {
+          "directory_path": "/home/sysTrace/mspti/",
+          "file_pattern": "training-step-time-*.csv",
+          "max_workers": 4
+        }
+      },
+      "data_sink": {
+        "type": "local_csv",
+        "enabled": false,
+        "params": {
+          "output_directory": "/home/sysTrace/local/data/sink/degradation/",
+          "format": "hccl"
+        }
+      },
+      "metric_extractors": [
+        {
+          "type": "degradation_extractor",
+          "enabled": true
+        }
+      ],
+      "preprocessors": [
+        {
+          "type": "step_aggregator",
+          "enabled": true,
+          "params": {
+            "steps_per_group": 1
+          }
+        }
+      ],
+      "detectors": [
+        {
+          "type": "degradation_bocpd",
+          "enabled": true,
+          "params": {
+            "distribution": "StudentTProb1d",
+            "hazard": 0.002,
+            "min_consecutive": 6,
+            "detect_rise": true,
+            "detect_drop": false,
+            "plt_save_path": "/home/sysTrace/local/output/degradation/"
+          }
+        }
+      ],
+      "alert_reporters": [
+        {
+          "type": "console",
+          "enabled": true,
+          "params": {
+            "level": "INFO"
+          }
+        },
+        {
+          "type": "file",
+          "enabled": true,
+          "params": {
+            "output_path": "/home/sysTrace/local/output/degradation_alerts.json",
+            "format": "json"
+          }
+        }
+      ]
+    }
+  ]
+}
