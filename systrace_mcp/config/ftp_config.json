@@ -3,8 +3,8 @@
     {
       "ip": "192.168.159.130",
       "port": 22,
-      "user": "root",
-      "password": "Huawei12#$",
+      "user": "",
+      "password": "",
       "perception_remote_dir": "/home/sysTrace_dataloader/timeline",
       "detection_remote_dir": "/home/sysTrace_dataloader/mspti"
     }
