@@ -33,8 +33,8 @@ systrace-openapi #开启openapi server服务 服务端口 12146
     {
       "ip": "192.168.122.196",  #远程目标服务器的ip
       "port": 22, #远程目标服务器的ssh端口
-      "user": "root", #用户名
-      "password": "Huawei12#$", #密码
+      "user": "", #用户名
+      "password": "", #密码
       "perception_remote_dir": "/home/hx/sysTrace_dataloader/timeline", #远程目标服务器systrace采集的timeline数据保存路径
       "detection_remote_dir": "/home/hx/sysTrace_dataloader/mspti",#远程目标服务器systrace采集的mspti数据保存路径
     }
