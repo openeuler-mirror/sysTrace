@@ -2,7 +2,7 @@
 
 # 安装部署
 ## 前置条件
-支持的python版本：3.7+；
+支持的 Python 版本：3.10+；
 failslow 依赖于 systrace 采集的数据通信算子数据，请先完成 训练任务的 通信算子采集；
 
 failslow-mcpserver 支持本地或者远程获取远程目标服务器的systrace 采集的通信算子数据，需要在配置文件中指定通信算子数据的路径。
@@ -11,19 +11,18 @@ failslow-openapi 支持本地或者远程获取远程目标服务器的systrace 
 ## 从本仓库源码安装运行（适用于开发者）
 ### 下载源码
  git clone https://gitcode.com/openeuler/sysTrace.git
-### 安装 failslow
-工程./systrace目录下执行下面命令：
-python3 setup.py install
-### 运行
-systrace-failslow
+### 安装依赖
+在仓库根目录执行下面命令，uv 会创建并同步工作区虚拟环境：
+uv sync --locked --all-packages
 
-### 安装mcpserver
-工程./systrace/systrace_mcp目录下执行下面命令：
-python3 setup.py install
-### 运行
-systrace-mcpserver #开启mcp server服务 服务端口为 12145
+华为云 PyPI 镜像已在根目录 `pyproject.toml` 中配置。
+### 运行 failslow
+uv run --locked --all-packages systrace-failslow
 
-systrace-openapi #开启openapi server服务 服务端口 12146
+### 运行 mcpserver
+uv run --locked --all-packages systrace-mcpserver # 开启 mcp server 服务，端口为 12145
+
+uv run --locked --all-packages systrace-openapi # 开启 openapi server 服务，端口为 12146
 
 
 配置远程获取数据，修改./config/ftp_config.json文件

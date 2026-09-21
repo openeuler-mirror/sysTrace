@@ -1,0 +1,43 @@
+[project]
+name = "systrace-mcp"
+version = "1.1.1"
+description = "MCP Server for Systrace Fail Slow Detection for AI Model Training and Inference"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "xu hou", email = "houxu5@h-partners.com" }]
+keywords = ["Fail Slow Detection", "Group Compare", "AI Model", "MCP Server"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Intended Audience :: Developers",
+]
+dependencies = [
+    "systrace-failslow",
+    # mcp_server.py 使用 mcp 1.x 的 FastMCP API；2.x 已改名为 MCPServer
+    "mcp<2",
+    "paramiko",
+    "fastapi",
+    "uvicorn",
+]
+
+[project.urls]
+Homepage = "https://gitcode.com/openeuler/sysTrace"
+
+[project.scripts]
+systrace-mcpserver = "systrace_mcp.mcp_server:main"
+systrace-openapi = "systrace_mcp.openapi_server:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["systrace_mcp*"]
+exclude = ["tests*", "test*"]
+
+# systrace-failslow 来自同一 uv workspace，而非 PyPI
+[tool.uv.sources]
+systrace-failslow = { workspace = true }
