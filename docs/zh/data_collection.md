@@ -1,49 +1,43 @@
-# 背景
+# 数据采集
 
-在 AI 训练过程中，性能问题和故障是影响训练效率和成本的关键因素。尽管 sysTrace 能够采集多维度的性能数据，但这些原始数据本身并不能直接揭示训练过程中的问题。数据分析模块是 sysTrace 的核心智能组件，它通过先进的算法对采集到的各类数据进行深度分析，实现对训练性能的实时监控、异常检测和故障定位。  
+## 背景
 
-AI 训练面临的主要性能挑战包括：  
+在 AI 训练过程中，性能问题和故障诊断是关键挑战。为了实现对训练过程的全面监控和问题定位，sysTrace 需要采集多维度的性能数据。数据采集是 sysTrace 功能实现的基础，通过收集 torch_npu 层、CANN 层、MSPTI 通信算子以及系统级事件等数据，为后续的性能分析和故障诊断提供原始素材。
 
-训练过程中的性能突然劣化（FailSlow），导致训练时间显著增加  
-多卡/多节点训练环境下的性能不一致，存在"慢卡"问题  
+数据采集模块的主要作用包括：
 
-数据分析模块的主要作用包括：  
+- 实时捕获训练过程中的关键性能指标
+- 记录可能导致性能问题的异常事件
+- 为性能劣化检测和慢卡定位提供数据支撑
+- 帮助用户深入了解训练任务的资源使用情况和执行状态
 
-实时监测训练性能指标，及时发现性能劣化和异常  
-精确定位导致性能问题的具体节点、算子或系统资源  
+## 数据采集方式
 
-# sysTrace_cli
+sysTrace 通过 `LD_PRELOAD` 方式将动态库加载到 AI 训练任务中，实现对训练过程的无侵入式数据采集：
 
-## 工具说明
+### 方式一：使用低版本 libunwind（< 1.7）
 
-`sysTrace_cli` 是 sysTrace 项目自带的命令行工具，用于与训练/推理任务中的 sysTrace 服务通信，控制各采集项的启停。
+系统自带的低于 1.7 版本的 libunwind 存在未知错误 ，需要手动下载最新版本的 libunwind
 
-## 使用方式
+源码安装libunwind方法：
 
-通过设置`LD_PRELOAD` 环境变量将 `libsysTrace.so` 动态库加载到 AI 推理/训练任务中，从而启用 sysTrace 的数据采集功能。  
-其中torch_npu 层的 Python 函数调用栈是常开的，不需要手动开启。
+```bash
+git clone https://github.com/libunwind/libunwind.git
+cd libunwind && git checkout v1.8.2
+./configure --prefix=/usr/local --enable-shared --enable-static
+make -j$(nproc) && make install
+```
 
-## 采集项列表
+使用sysTrace：
 
-| Plugin    | 适用场景                                           | 命令示例                                                     |
-| :-------- | :------------------------------------------------- | :----------------------------------------------------------- |
-| IO        | 磁盘和网络I/O延迟/吞吐量                           | `sysTrace_cli enable IO duration=10`                       |
-| MSPTI     | Atlas活动跟踪（HCCL，内核）                 | `sysTrace_cli enable MSPTI duration=10`                    |
+```bash
+LD_PRELOAD=/usr/local/lib/libunwind.so.8.2.0:/usr/local/lib/libunwind-aarch64.so.8.2.0:/home/ascend-toolkit-bak/ascend-toolkit/8.0.RC3.10/tools/mspti/lib64/libmspti.so:<path-to-sysTrace>/systrace/build/libsysTrace.so python ...
+```
 
-### IO 数据格式
+### 方式二：使用高版本 libunwind（>= 1.7）
 
-采集磁盘和网络 I/O 延迟/吞吐量数据。
+如果环境中的 libunwind 版本大于等于 1.7，使用以下命令：
 
-**数据格式：** pb/json
-
-### MSPTI 数据格式
-
-采集 Atlas 活动跟踪数据，包括通信算子下发/执行信息，用于判断是否发生算子慢的情况。
-
-**数据格式：** CSV
-
-**数据字段：**
-
-```python
-Flag,Id,Kind,Name,SourceKind,Timestamp,msptiObjectId_Ds_DeviceId,msptiObjectId_Ds_StreamId,msptiObjectId_Pt_ProcessId,msptiObjectId_Pt_ThreadId
+```bash
+LD_PRELOAD=/home/ascend-toolkit-bak/ascend-toolkit/8.0.RC3.10/tools/mspti/lib64/libmspti.so:<path-to-sysTrace>/systrace/build/libsysTrace.so python ...
 ```
