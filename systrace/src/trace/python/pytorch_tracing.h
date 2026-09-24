@@ -37,6 +37,7 @@ typedef struct {
     const char *function_name;
     int tag_name;
     int is_native;
+    int stage_type;
     UT_hash_handle hh;
 } TracingFunction;
 
@@ -50,6 +51,7 @@ typedef struct {
 typedef struct _frame PyFrameObject;
 uint64_t getCodeOfFrame(PyFrameObject *frame);
 static void capture_stack(PyFrameObject *frame,
+                          PyCodeObject *first_code,
                           PyTorchTracingData *trace_entry);
 
 static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -61,7 +63,8 @@ static int start_tracing = 1;
 static int tracing_data_count = 0;
 
 static int GetFuncAddressByPython(const char *input, char **error_message,
-                                  int64_t *code_address, int *is_native);
+                                  int64_t *code_address, int *is_native,
+                                  PyObject **code_object);
 static TracingFunction *isTracedPyTorchFunction(PyFrameObject *frame);
 static TracingData *receiveTracingData(int name);
 static void addTracingData(int name, const char *func_name);

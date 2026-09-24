@@ -10,7 +10,9 @@ set(CMAKE_INSTALL_RPATH "")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 option(USE_JSON_FORMAT "Build with JSON output and NO protobuf link" OFF)
 option(HAS_BTF_SUPPORT "Enable BPF modules with BTF support" OFF)
-option(ENABLE_PYTHON_TRACING "Enable Python-based tracing (links libpython)" ON)
+option(ENABLE_PYTHON_TRACING "Enable Python-based tracing" ON)
+option(PYTHON_TRACING_LINK_LIBPYTHON
+       "Link the preload library against the build-time libpython" OFF)
 
 if(USE_JSON_FORMAT)
     add_definitions(-DUSE_JSON)
@@ -37,7 +39,11 @@ include_directories(
 )
 
 if(ENABLE_PYTHON_TRACING)
-    message(STATUS ">>> Python tracing: ENABLED (will link libpython) <<<")
+    if(PYTHON_TRACING_LINK_LIBPYTHON)
+        message(STATUS ">>> Python tracing: ENABLED (link libpython) <<<")
+    else()
+        message(STATUS ">>> Python tracing: ENABLED (runtime Python symbols) <<<")
+    endif()
     find_package(Python3 REQUIRED COMPONENTS Development)
 else()
     message(STATUS ">>> Python tracing: DISABLED (no libpython link) <<<")
@@ -138,7 +144,7 @@ target_link_libraries(sysTrace_hook
     -ldl
 )
 
-if(ENABLE_PYTHON_TRACING)
+if(ENABLE_PYTHON_TRACING AND PYTHON_TRACING_LINK_LIBPYTHON)
     target_link_libraries(sysTrace_hook
         ${Python3_LIBRARIES}
     )
@@ -156,7 +162,3 @@ if(HAS_BPF_SUPPORT)
     target_link_libraries(sysTrace_hook ebpf_module)
     message(STATUS "Linking ebpf_module library")
 endif()
-
-target_link_libraries(sysTrace_hook
-    ${UNWIND_LIB}
-)

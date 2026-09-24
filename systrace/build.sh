@@ -94,7 +94,10 @@ build() {
 
     check_btf && cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=ON" || cmake_flags="$cmake_flags -DHAS_BTF_SUPPORT=OFF"
     check_bpf && f_bpf="-DHAS_BPF_SUPPORT=ON" || f_bpf="-DHAS_BPF_SUPPORT=OFF"
-    cmake .. $cmake_flags $f_bpf -DENABLE_PYTHON_TRACING=$PYTHON_TRACING_FLAG
+    cmake .. $cmake_flags $f_bpf \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DENABLE_PYTHON_TRACING=$PYTHON_TRACING_FLAG \
+        -DPYTHON_TRACING_LINK_LIBPYTHON=OFF
     make -j $(nproc)
     cd ..
 }
