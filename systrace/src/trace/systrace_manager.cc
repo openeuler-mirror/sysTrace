@@ -18,7 +18,7 @@ void cleanup_osprobe();
 namespace systrace {
 
 namespace {
-constexpr uint64_t TRACE_INTERVAL = 100;
+constexpr uint64_t DUMP_INTERVAL = 3000;
 constexpr std::chrono::milliseconds POLL_INTERVAL(10);
 } // namespace
 
@@ -96,7 +96,7 @@ void PyTorchTrace::registerTracingFunctions() {
     }
 }
 
-bool PyTorchTrace::triggerTrace() { return has_trigger_trace_.exchange(true); }
+bool PyTorchTrace::triggerTrace() { return has_trigger_trace_.exchange(false); }
 
 void PyTorchTrace::dumpPyTorchTracing() {
     const std::string dump_path =
@@ -335,11 +335,15 @@ void SysTrace::initializeSystem() {
     registerPlugins();
     ControlManager::getInstance().start();
 
+#ifdef ENABLE_PYTHON_TRACING
     PyTorchTrace::getInstance();
+#endif
 #ifdef HAS_BTF_SUPPORT
     os_probe_ = std::thread(&run_osprobe);
 #endif
+#ifdef ENABLE_PYTHON_TRACING
     startEventPoller();
+#endif
 }
 
 void SysTrace::startEventPoller() {
@@ -356,15 +360,15 @@ void SysTrace::stopEventPoller() {
 }
 
 void SysTrace::eventPollerMain() {
+#ifdef ENABLE_PYTHON_TRACING
     while (should_run_) {
-        if (loop_count_++ % TRACE_INTERVAL == 0) {
-            if (PyTorchTrace::getInstance().triggerTrace()) {
-                PyTorchTrace::getInstance().dumpPyTorchTracing();
-            }
+        if (loop_count_++ % DUMP_INTERVAL == 0 && loop_count_ > 1) {
+            PyTorchTrace::getInstance().dumpPyTorchTracing();
         }
         std::this_thread::sleep_for(POLL_INTERVAL);
     }
     PyTorchTrace::getInstance().dumpPyTorchTracing();
+#endif
 }
 
 #ifdef HAS_BTF_SUPPORT
@@ -377,7 +381,9 @@ void SysTrace::stopOsProbePoller() {
 
 void SysTrace::cleanup() {
     if (instance_) {
+#ifdef ENABLE_PYTHON_TRACING
         PyTorchTrace::getInstance().dumpPyTorchTracing();
+#endif
     }
 #ifdef HAS_BTF_SUPPORT
     instance_->stopOsProbePoller();

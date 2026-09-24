@@ -10,6 +10,9 @@ set(CMAKE_INSTALL_RPATH "")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 option(USE_JSON_FORMAT "Build with JSON output and NO protobuf link" OFF)
 option(HAS_BTF_SUPPORT "Enable BPF modules with BTF support" OFF)
+option(ENABLE_PYTHON_TRACING "Enable Python-based tracing" ON)
+option(PYTHON_TRACING_LINK_LIBPYTHON
+       "Link the preload library against the build-time libpython" OFF)
 
 if(USE_JSON_FORMAT)
     add_definitions(-DUSE_JSON)
@@ -19,22 +22,32 @@ else()
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
-    set(UNWIND_LIB "unwind-aarch64")
+    set(UNWIND_LIB unwind-aarch64)
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/include")
     set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/aarch64/mspti/lib64")
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    set(UNWIND_LIB "unwind")
+    set(UNWIND_LIB unwind-x86_64)
     set(MSPTI_INCLUDE "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/include")
     set(MSPTI_LIB "${PROJECT_SOURCE_DIR}/thirdparty/x86_64/mspti/lib64")
 else()
     message(WARNING "Unknown architecture: ${CMAKE_SYSTEM_PROCESSOR}")
     set(UNWIND_LIB "unwind")
 endif()
+
 include_directories(
     ${MSPTI_INCLUDE}
 )
 
-find_package(Python3 REQUIRED COMPONENTS Development)
+if(ENABLE_PYTHON_TRACING)
+    if(PYTHON_TRACING_LINK_LIBPYTHON)
+        message(STATUS ">>> Python tracing: ENABLED (link libpython) <<<")
+    else()
+        message(STATUS ">>> Python tracing: ENABLED (runtime Python symbols) <<<")
+    endif()
+    find_package(Python3 REQUIRED COMPONENTS Development)
+else()
+    message(STATUS ">>> Python tracing: DISABLED (no libpython link) <<<")
+endif()
 find_package(Threads REQUIRED)
 
 if(NOT USE_JSON_FORMAT)
@@ -48,8 +61,13 @@ add_library(common STATIC
 )
 target_include_directories(common PUBLIC
     ${PROJECT_SOURCE_DIR}/include
-    ${Python3_INCLUDE_DIRS}
 )
+
+if(ENABLE_PYTHON_TRACING)
+    target_include_directories(common PUBLIC
+        ${Python3_INCLUDE_DIRS}
+    )
+endif()
 
 
 if(NOT USE_JSON_FORMAT)
@@ -71,7 +89,6 @@ set(SYSTRACE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/trace/library_loader.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_loader.cc
     ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing_manager.cc
-    ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing.c
     ${PROJECT_SOURCE_DIR}/src/ascend/hook.cc
     ${PROJECT_SOURCE_DIR}/src/mspti/mspti_tracker.cpp
     ${PROJECT_SOURCE_DIR}/src/cann/common_hook.c
@@ -82,6 +99,12 @@ set(SYSTRACE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/plugins/ebpfPluginBase/EbpfCollectorBase.cpp
     ${PROJECT_SOURCE_DIR}/src/plugins/ftrace/FtracePlugin.cpp
 )
+
+if(ENABLE_PYTHON_TRACING)
+    list(APPEND SYSTRACE_SOURCES
+        ${PROJECT_SOURCE_DIR}/src/trace/python/pytorch_tracing.c
+    )
+endif()
 
 if(HAS_BPF_SUPPORT)
     message(STATUS "Enabling BPF modules")
@@ -109,14 +132,23 @@ if(HAS_BPF_SUPPORT)
     target_compile_definitions(sysTrace_hook PRIVATE HAS_BPF_SUPPORT=1)
 endif()
 
+if(ENABLE_PYTHON_TRACING)
+    target_compile_definitions(sysTrace_hook PRIVATE ENABLE_PYTHON_TRACING=1)
+endif()
+
 target_link_libraries(sysTrace_hook
     common
-    ${Python3_LIBRARIES}
     ${PB_LIBS}
     ${CMAKE_THREAD_LIBS}
     pthread
     -ldl
 )
+
+if(ENABLE_PYTHON_TRACING AND PYTHON_TRACING_LINK_LIBPYTHON)
+    target_link_libraries(sysTrace_hook
+        ${Python3_LIBRARIES}
+    )
+endif()
 
 if(HAS_BTF_SUPPORT)
     target_link_libraries(sysTrace_hook os_probe)
